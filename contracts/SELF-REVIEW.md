@@ -55,7 +55,7 @@ tokens with transfer hooks/callbacks (ERC-777 and similar) are not supported; th
 warning already covered fee-on-transfer, rebasing, blacklisting and pausable
 tokens.
 
-**Fixed in the v2 source, not deployed:** `contracts/v2/LockVaultV2.sol` adds a
+**Fixed in v2 (deployed on 4663 / Base / Polygon, not wired to the site; BNB pending gas):** `contracts/v2/LockVaultV2.sol` adds a
 `nonReentrant` guard on `createLock`, `claim`, `revoke` and `editLock`.
 `test/foundry/V2Fixes.t.sol` runs the same re-entrant token against v2: the outer
 transaction reverts, no lock is booked and no tokens stay in the vault. The
@@ -69,8 +69,7 @@ deployment/migration plan (new salts, dual-read old and new vaults) is in
 forever. The site never sends value; the functions do not need ETH. Impact is
 limited to a caller who attaches value by mistake.
 
-Status on the deployed contracts: cannot be patched. **Fixed in the v2 source,
-not deployed:** `contracts/v2/PinkLockAdapterV2.sol` keeps the functions payable
+Status on the deployed contracts: cannot be patched. **Fixed in v2 (deployed on 4663 / Base / Polygon, not wired to the site; BNB pending gas):** `contracts/v2/PinkLockAdapterV2.sol` keeps the functions payable
 for PinkSale's form but refunds `msg.value` to the caller in the same
 transaction; `V2Fixes.t.sol` asserts the adapter ends with a zero ETH balance.
 
