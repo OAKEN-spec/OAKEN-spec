@@ -1,0 +1,49 @@
+name: solana-e2e
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'solana/**'
+      - '.github/workflows/solana-e2e.yml'
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Solana (Agave)
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Versions
+        run: |
+          solana --version
+          cargo-build-sbf --version
+
+      - name: Build the program
+        working-directory: solana
+        run: cargo build-sbf
+
+      - name: Install JS dependencies
+        working-directory: solana
+        run: npm ci
+
+      - name: Instruction/ABI builders
+        working-directory: solana
+        run: node --test test/builders.test.mjs
+
+      - name: Run E2E on a local validator
+        working-directory: solana
+        run: node scripts/e2e.mjs --start

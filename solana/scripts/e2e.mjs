@@ -19,7 +19,14 @@ import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import * as web3 from '@solana/web3.js';
 import { createMint, getOrCreateAssociatedTokenAccount, mintTo, getAccount } from '@solana/spl-token';
-import { makeSolana } from '../../public/app/solana.js';
+
+/* 页面与脚本共用同一份布局/指令实现。源码树里是 `app/solana.js`，导出仓库里是
+   `frontend/app/solana.js`；旧的 `public/app` 也留着兼容。 */
+let makeSolana;
+for (const candidate of ['../../app/solana.js', '../../frontend/app/solana.js', '../../public/app/solana.js']) {
+  try { ({ makeSolana } = await import(candidate)); break; } catch { /* 试下一个 */ }
+}
+if (!makeSolana) { console.error('✗ 找不到 solana.js（app/ 或 frontend/app/）'); process.exit(1); }
 
 const RPC = process.env.RPC || 'http://127.0.0.1:8899';
 const LOCAL = /127\.0\.0\.1|localhost/.test(RPC);
