@@ -16,6 +16,7 @@ frontend/serve-local.mjs  Minimal static server for the exported pages (no index
 frontend/brand/       OAKEN brand assets used by the pages
 solana/               Solana lock program source (not deployed; no keypair)
 docs/                 Frontend/local-development notes
+THIRD-PARTY-NOTICES.md  Licenses of the bundled libraries and fonts
 ```
 
 ## Contracts
