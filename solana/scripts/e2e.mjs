@@ -233,10 +233,13 @@ async function waitForRpc(conn, tries = 60) {
     check('下一个 id', await S.readNextId(conn), startId + 3);
 
     console.log(`\n${bad === 0 ? `✓ 全部通过（${ok} 条）` : `✗ ${bad} 条没过（通过 ${ok}）`}`);
-    process.exitCode = bad === 0 ? 0 : 1;
+    /* 成功路径也要**明确退出**：spawn 出来的 validator 是活句柄，
+       只设 process.exitCode 再等事件循环排空会一直挂着（2026-10-23 CI 抓到的）。 */
+    if (validator) { try { validator.kill('SIGKILL'); } catch { /* 已经退了 */ } }
+    process.exit(bad === 0 ? 0 : 1);
   } finally {
     if (validator) {
-      try { validator.kill(); } catch { /* 已经退了 */ }
+      try { validator.kill('SIGKILL'); } catch { /* 已经退了 */ }
     }
   }
 })().catch((e) => { console.error('✗ ' + (e.message || e)); process.exit(1); });
