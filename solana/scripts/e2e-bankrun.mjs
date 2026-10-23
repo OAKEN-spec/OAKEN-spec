@@ -60,7 +60,7 @@ const check = (label, got, want) => {
   console.log('\n① 准备（真 SPL Token 程序）');
   const mint = await createMint(ctx.banksClient, payer, payer.publicKey, null, 6);   // 6 位小数，故意不用 9/18
   const payerAta = await getOrCreateAssociatedTokenAccount(ctx.banksClient, payer, mint, payer.publicKey);
-  const total = 1_000_000_000n;
+  const total = 2_000_000_000n;   // 三把锁各 400：供应量要够用，别让夹具先没钱
   await mintTo(ctx.banksClient, payer, mint, payerAta.address, payer, total);
   check('付款人拿到代币', await tokenAmount(payerAta.address), total);
   check('mint 精度是 6', (await getMint(ctx.banksClient, mint)).decimals, 6);

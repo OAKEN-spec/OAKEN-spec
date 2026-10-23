@@ -90,7 +90,7 @@ async function waitForRpc(conn, tries = 60) {
     // 6 位小数：故意不用 18 —— 精度换算的坑只在位数不是 18 的时候才露头
     const mint = await createMint(conn, payer, payer.publicKey, null, 6);
     const payerAta = await getOrCreateAssociatedTokenAccount(conn, payer, mint, payer.publicKey);
-    const total = 1_000_000_000n;                       // 1000.000000
+    const total = 2_000_000_000n;                       // 2000.000000（三把锁各 400，留出余额）
     await mintTo(conn, payer, mint, payerAta.address, payer.publicKey, total);
     check('付款人拿到代币', (await getAccount(conn, payerAta.address)).amount, total);
 
