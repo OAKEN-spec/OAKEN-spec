@@ -814,7 +814,7 @@ export async function lockToken({
   const A = api();
   const c = await ready();
   if (!(await programLive())) {
-    throw new Error('The OAKEN Lock program is not deployed on Solana mainnet yet — nothing was sent.');
+    throw new Error('The OAKEN Lock program did not answer on Solana right now — nothing was sent.');
   }
   const mk = new w.PublicKey(String(mint).trim());
   const info = await A.readMint(c, mk);

@@ -33,6 +33,42 @@ const LOCAL = /127\.0\.0\.1|localhost/.test(RPC);
 const S = makeSolana(web3);
 const { Keypair, Connection, PublicKey, Transaction, SystemProgram, sendAndConfirmTransaction, LAMPORTS_PER_SOL } = web3;
 
+/**
+ * 用**HTTP 轮询**确认交易，不用 WebSocket。
+ *
+ * `web3.js` 的 `sendAndConfirmTransaction` 走 `confirmTransaction`，默认开 WS 订阅；
+ * 这台机器/公共 RPC 的 wss 常被挡，表现是 `ws error: connect ETIMEDOUT` 然后
+ * "block height exceeded" —— 交易其实可能已经发出去了（2026-10-23 主网第一次跑就踩到）。
+ */
+async function sendAndConfirm(conn, tx, signers) {
+  const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash('confirmed');
+  tx.recentBlockhash = blockhash;
+  if (!tx.feePayer) tx.feePayer = signers[0].publicKey;
+  tx.sign(...signers);
+  let sig;
+  try {
+    sig = await conn.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 5 });
+  } catch (e) {
+    if (e && e.logs && e.logs.length) console.error('simulation logs:\n' + e.logs.join('\n'));
+    throw e;
+  }
+  for (let i = 0; i < 120; i++) {
+    const st = await conn.getSignatureStatuses([sig], { searchTransactionHistory: true });
+    const s = st.value[0];
+    if (s?.err) throw new Error('transaction failed: ' + JSON.stringify(s.err) + ' · ' + sig);
+    if (s && (s.confirmationStatus === 'confirmed' || s.confirmationStatus === 'finalized')) return sig;
+    if (i % 5 === 0) {
+      try {
+        if (await conn.getBlockHeight('confirmed') > lastValidBlockHeight) {
+          throw new Error('transaction expired: ' + sig);
+        }
+      } catch { /* 读高度失败就继续轮询 */ }
+    }
+    await sleep(1000);
+  }
+  throw new Error('timed out waiting for ' + sig);
+}
+
 let ok = 0, bad = 0;
 const check = (label, got, want) => {
   const pass = String(got) === String(want);
@@ -60,6 +96,28 @@ async function waitForRpc(conn, tries = 60) {
   let validator = null;
   if (process.argv.includes('--start')) validator = await startValidator();
   const conn = new Connection(RPC, 'confirmed');
+  /* 公共 RPC 的 wss 常被挡：把 confirmTransaction 覆写成 HTTP 轮询。
+     `@solana/spl-token` 的 createMint / mintTo / getOrCreateAssociatedTokenAccount
+     内部也走这个方法，所以这一处覆盖就能让它们全部不再碰 WebSocket。 */
+  conn.confirmTransaction = async (strategyOrSignature, _commitment) => {
+    const sig = typeof strategyOrSignature === 'string' ? strategyOrSignature : strategyOrSignature.signature;
+    const lastValid = typeof strategyOrSignature === 'object' ? strategyOrSignature.lastValidBlockHeight : null;
+    for (let i = 0; i < 120; i++) {
+      const st = await conn.getSignatureStatuses([sig], { searchTransactionHistory: true });
+      const v = st.value[0];
+      if (v?.err) throw new Error('transaction failed: ' + JSON.stringify(v.err) + ' · ' + sig);
+      if (v && (v.confirmationStatus === 'confirmed' || v.confirmationStatus === 'finalized')) {
+        return { context: { slot: v.slot }, value: { err: v.err } };
+      }
+      if (lastValid && i % 5 === 0) {
+        try {
+          if (await conn.getBlockHeight('confirmed') > lastValid) throw new Error('transaction expired: ' + sig);
+        } catch (e) { if (String(e.message).startsWith('transaction expired')) throw e; }
+      }
+      await sleep(1000);
+    }
+    throw new Error('timed out waiting for ' + sig);
+  };
   if (!(await waitForRpc(conn))) { console.error('✗ 本地验证器没起来（RPC ' + RPC + '）'); process.exit(1); }
 
   try {
@@ -82,7 +140,7 @@ async function waitForRpc(conn, tries = 60) {
     }
     check('付款账户有币', (await conn.getBalance(payer.publicKey)) > 0, true);
     const fund = async (to, sol = 0.05) => {
-      await sendAndConfirmTransaction(conn, new Transaction().add(SystemProgram.transfer({
+      await sendAndConfirm(conn, new Transaction().add(SystemProgram.transfer({
         fromPubkey: payer.publicKey, toPubkey: to, lamports: Math.round(sol * LAMPORTS_PER_SOL),
       })), [payer]);
     };
@@ -117,7 +175,7 @@ async function waitForRpc(conn, tries = 60) {
         source: payerAta.address, lock: lockPda, vault, config,
       }),
     );
-    await sendAndConfirmTransaction(conn, new Transaction().add(createIx), [payer]);
+    await sendAndConfirm(conn, new Transaction().add(createIx), [payer]);
 
     const lock = await S.readLock(conn, id);
     check('锁存在且 id 对', lock.id, BigInt(id));
@@ -136,7 +194,7 @@ async function waitForRpc(conn, tries = 60) {
     }));
     let rejected = false;
     try {
-      await sendAndConfirmTransaction(conn, new Transaction().add(claimIx), [beneficiary]);
+      await sendAndConfirm(conn, new Transaction().add(claimIx), [beneficiary]);
     } catch { rejected = true; }
     check('没到期领不出来', rejected, true);
     check('金库里的币没动', (await getAccount(conn, vault)).amount, amount);
@@ -156,12 +214,12 @@ async function waitForRpc(conn, tries = 60) {
         source: payerAta.address, lock: lockPda2, vault: vault2, config,
       }),
     );
-    await sendAndConfirmTransaction(conn, new Transaction().add(createIx2), [payer]);
+    await sendAndConfirm(conn, new Transaction().add(createIx2), [payer]);
     check('第二把锁已到期', (await S.readLock(conn, id2)).unlockDate < Math.floor(Date.now() / 1000), true);
 
     const dest2 = S.ata(beneficiary.publicKey, mint);
     // 由**第三方**提交（payer 付 gas），币必须进受益人
-    await sendAndConfirmTransaction(conn, new Transaction().add(S.claimIx(S.claimKeys({
+    await sendAndConfirm(conn, new Transaction().add(S.claimIx(S.claimKeys({
       lock: lockPda2, vault: vault2, mint, destination: dest2[0], payer: payer.publicKey, beneficiary: beneficiary.publicKey,
     }))), [payer]);
     check('受益人拿到了', (await getAccount(conn, dest2[0])).amount, amount);
@@ -170,7 +228,7 @@ async function waitForRpc(conn, tries = 60) {
 
     let doubleClaim = false;
     try {
-      await sendAndConfirmTransaction(conn, new Transaction().add(S.claimIx(S.claimKeys({
+      await sendAndConfirm(conn, new Transaction().add(S.claimIx(S.claimKeys({
         lock: lockPda2, vault: vault2, mint, destination: dest2[0], payer: beneficiary.publicKey, beneficiary: beneficiary.publicKey,
       }))), [beneficiary]);
     } catch { doubleClaim = true; }
@@ -180,20 +238,20 @@ async function waitForRpc(conn, tries = 60) {
     console.log('\n⑤ 转让与放弃');
     const heir = Keypair.generate();
     await fund(heir.publicKey);
-    await sendAndConfirmTransaction(conn, new Transaction().add(S.transferIx({
+    await sendAndConfirm(conn, new Transaction().add(S.transferIx({
       lock: lockPda2, beneficiary: beneficiary.publicKey, newBeneficiary: heir.publicKey,
     })), [beneficiary]);
     check('受益人换了', (await S.readLock(conn, id2)).beneficiary, heir.publicKey.toBase58());
 
     let outsiderTransfer = false;
     try {
-      await sendAndConfirmTransaction(conn, new Transaction().add(S.transferIx({
+      await sendAndConfirm(conn, new Transaction().add(S.transferIx({
         lock: lockPda2, beneficiary: beneficiary.publicKey, newBeneficiary: beneficiary.publicKey,
       })), [beneficiary]);
     } catch { outsiderTransfer = true; }
     check('前任受益人转不动了', outsiderTransfer, true);
 
-    await sendAndConfirmTransaction(conn, new Transaction().add(S.renounceIx({
+    await sendAndConfirm(conn, new Transaction().add(S.renounceIx({
       lock: lockPda, beneficiary: beneficiary.publicKey,
     })), [beneficiary]);
     check('renounced 记上了', (await S.readLock(conn, id)).renounced, true);
@@ -202,7 +260,7 @@ async function waitForRpc(conn, tries = 60) {
     console.log('\n⑥ 撤锁');
     let revokeNonRevocable = false;
     try {
-      await sendAndConfirmTransaction(conn, new Transaction().add(S.revokeIx({
+      await sendAndConfirm(conn, new Transaction().add(S.revokeIx({
         lock: lockPda, creator: payer.publicKey, vault, mint,
         destination: payerAta.address,
       })), [payer]);
@@ -212,7 +270,7 @@ async function waitForRpc(conn, tries = 60) {
     const id3 = await S.readNextId(conn);
     const [lockPda3] = S.lockPda(id3);
     const [vault3] = S.ata(lockPda3, mint);
-    await sendAndConfirmTransaction(conn, new Transaction().add(S.createLockIx(
+    await sendAndConfirm(conn, new Transaction().add(S.createLockIx(
       { id: id3, amount, unlockDate: Math.floor(Date.now() / 1000) + 3600, revocable: true, label: 'Marketing' },
       S.createLockKeys({
         payer: payer.publicKey, beneficiary: beneficiary.publicKey, mint,
@@ -221,7 +279,7 @@ async function waitForRpc(conn, tries = 60) {
     )), [payer]);
 
     const before = (await getAccount(conn, payerAta.address)).amount;
-    await sendAndConfirmTransaction(conn, new Transaction().add(S.revokeIx({
+    await sendAndConfirm(conn, new Transaction().add(S.revokeIx({
       lock: lockPda3, creator: payer.publicKey, vault: vault3, mint, destination: payerAta.address,
     })), [payer]);
     check('币退回来了', (await getAccount(conn, payerAta.address)).amount - before, amount);
@@ -231,6 +289,20 @@ async function waitForRpc(conn, tries = 60) {
     /* ── 计数器 ─────────────────────────────────────────────────────── */
     console.log('\n⑦ 计数器');
     check('下一个 id', await S.readNextId(conn), startId + 3);
+
+    /* 主网跑的是真 SOL：把 beneficiary / heir 剩下的余额扫回付款人，
+       别把 0.1 SOL 留在临时 keypair 里。ATA 的 rent 留在受益人账户下（程序没有 close）。 */
+    const sweep = async (kp) => {
+      const bal = await conn.getBalance(kp.publicKey);
+      const fee = 1_000_000;   // 留 0.001 SOL —— 低于 rent-exempt 最小值的账户会被运行时拒绝
+      if (bal > fee) {
+        await sendAndConfirm(conn, new Transaction().add(SystemProgram.transfer({
+          fromPubkey: kp.publicKey, toPubkey: payer.publicKey, lamports: bal - fee,
+        })), [kp]);
+      }
+    };
+    await sweep(beneficiary);
+    await sweep(heir);
 
     console.log(`\n${bad === 0 ? `✓ 全部通过（${ok} 条）` : `✗ ${bad} 条没过（通过 ${ok}）`}`);
     /* 成功路径也要**明确退出**：spawn 出来的 validator 是活句柄，
@@ -242,4 +314,10 @@ async function waitForRpc(conn, tries = 60) {
       try { validator.kill('SIGKILL'); } catch { /* 已经退了 */ }
     }
   }
-})().catch((e) => { console.error('✗ ' + (e.message || e)); process.exit(1); });
+})().catch((e) => {
+  console.error('✗ ' + (e.message || e));
+  if (e && e.logs) console.error('logs: ' + JSON.stringify(e.logs));
+  if (e && e.transactionLogs) console.error('transactionLogs: ' + JSON.stringify(e.transactionLogs));
+  if (e && e.signature) console.error('signature: ' + e.signature);
+  process.exit(1);
+});

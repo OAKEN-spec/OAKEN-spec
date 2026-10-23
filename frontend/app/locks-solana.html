@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Locks on Solana · OAKEN</title>
-<meta name="description" content="Lock SPL tokens on Solana until a date you choose. The live route is Jupiter Lock, a third-party program; OAKEN's own lock program is not deployed yet. OAKEN takes no fee.">
+<meta name="description" content="Lock SPL tokens on Solana until a date you choose. OAKEN's own lock program is live on mainnet, with its upgrade authority revoked; Jupiter Lock remains a third-party option. OAKEN takes no fee.">
 <meta property="og:title" content="Locks on Solana · OAKEN">
-<meta property="og:description" content="Lock SPL tokens on Solana through Jupiter Lock, a third-party program; OAKEN's own lock program is not deployed yet. OAKEN takes no fee.">
+<meta property="og:description" content="Lock SPL tokens on Solana through OAKEN's own program (no owner, no upgrade) or Jupiter Lock, a third-party option. OAKEN takes no fee.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://oaken.one/locks/solana">
 <meta property="og:image" content="https://oaken.one/logo512.png">
@@ -95,8 +95,8 @@
   <div class="wrap ph-in">
     <div class="eyebrow reveal">Solana · locks</div>
     <h1 class="reveal">The same lock, on Solana.</h1>
-    <p class="lede reveal">SPL tokens go into a vault that only the clock can open. The live route is <b>Jupiter Lock</b>,
-      a third-party program; OAKEN's own lock program is not deployed on mainnet yet. OAKEN takes no fee.</p>
+    <p class="lede reveal">SPL tokens go into a vault that only the clock can open. OAKEN's own lock program is <b>live on mainnet</b>,
+      with its upgrade authority revoked; <b>Jupiter Lock</b> remains a third-party option. OAKEN takes no fee.</p>
   </div>
 </section>
 
@@ -133,9 +133,9 @@
             <label class="f">Lock program</label>
             <div class="seg" id="backend" style="display:inline-flex">
               <button type="button" data-b="jupiter">Jupiter Lock (third-party)</button>
-              <button type="button" data-b="oaken" disabled>OAKEN Lock (not deployed)</button>
+              <button type="button" data-b="oaken" disabled>OAKEN Lock (ours)</button>
             </div>
-            <div class="hint" id="backendnote">Jupiter Lock is a live third-party vesting program. It is upgradeable by its team — it is not the ownerless OAKEN Lock.</div>
+            <div class="hint" id="backendnote">OAKEN Lock is our own program: no owner, no upgrade. Its on-chain upgrade authority is revoked.</div>
           </div>
           <div>
             <label class="f" for="mint">Token address</label>
@@ -227,9 +227,10 @@
             submit it, and the tokens always go to the beneficiary. There is no per-lock admin key and no pause on
             the lock itself — but the live program (Jupiter Lock) can be upgraded by its team; see below.</div>
           <div class="hint">OAKEN's own lock program is <span class="mono">Co9ZnAVxX2siGThhjTpPgXPHYrCev1nrXFyGB1VcZcQW</span>
-            (source in the repository). It is built and tested but <b>not deployed on mainnet yet</b>, so this page
-            uses Jupiter Lock (<span class="mono">LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn</span>) as the live
-            third-party option. Jupiter's program can be upgraded by its team; neither product is audited by us.</div>
+            (source in the repository). It is <b>deployed on Solana mainnet, upgrade authority none</b>, and passed a
+            25-check E2E on a local validator. Jupiter Lock
+            (<span class="mono">LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn</span>) remains a third-party option;
+            Jupiter's program can be upgraded by its team. Neither product is audited by us.</div>
           <a class="btn btn-s" href="/locks">EVM locks →</a>
         </div>
       </div>
@@ -288,7 +289,7 @@
     $('revocablewrap').style.display = state.backend === 'oaken' ? '' : 'none';
     $('backendnote').innerHTML = state.backend === 'jupiter'
       ? 'Jupiter Lock is a live third-party vesting program. It is upgradeable by its team — it is not the ownerless OAKEN Lock.'
-      : 'OAKEN Lock is our own program: no owner, no pause, no upgrade. It is not deployed on mainnet yet.';
+      : 'OAKEN Lock is our own program: no owner, no pause, no upgrade. It is live on Solana mainnet and its upgrade authority is revoked.';
     update();
   }
 
@@ -390,7 +391,7 @@
     const out = [];
     if (!state.addr) out.push('Connect a Solana wallet.');
     if (state.backend === 'jupiter' && !state.jupLive) out.push('Jupiter Lock is not reachable.');
-    if (state.backend === 'oaken' && !state.oakenLive) out.push('The OAKEN Lock program is not deployed on Solana yet.');
+    if (state.backend === 'oaken' && !state.oakenLive) out.push('The OAKEN Lock program did not answer on Solana — nothing will be sent.');
     if (!state.mint) out.push('Paste a valid SPL mint.');
     if (state.decimals !== null) {
       const raw = parseAmount($('amount').value, state.decimals);
@@ -414,7 +415,7 @@
     const errs = validate();
     let label = 'Connect a Solana wallet';
     if (state.addr) {
-      if (state.backend === 'oaken' && !state.oakenLive) label = 'OAKEN Lock is not deployed';
+      if (state.backend === 'oaken' && !state.oakenLive) label = 'OAKEN Lock is unreachable';
       else if (state.backend === 'jupiter' && !state.jupLive) label = 'Jupiter Lock is not reachable';
       else label = state.busy ? 'Working…' : (state.backend === 'jupiter' ? 'Lock with Jupiter' : 'Lock on Solana');
     }
@@ -669,7 +670,7 @@
       if (state.oakenLive) {
         $('programBanner').innerHTML = '<b>OAKEN Lock is live on Solana.</b> Our own program is deployed; Jupiter Lock is also available as a third-party option.';
       } else if (state.jupLive) {
-        $('programBanner').innerHTML = '<b>OAKEN’s own lock program is not deployed on Solana mainnet yet.</b> So this page uses <b>Jupiter Lock</b> — a live third-party vesting program — for Solana locks. Jupiter’s program is upgradeable by its team; the OAKEN Lock program is built and tested, and opens when it is deployed. The EVM locks on <a href="/locks" style="color:var(--gold)">/locks</a> are live.';
+        $('programBanner').innerHTML = '<b>OAKEN’s own lock program did not answer right now.</b> This page falls back to <b>Jupiter Lock</b> — a live third-party vesting program. Jupiter’s program is upgradeable by its team; the OAKEN Lock program is deployed with its upgrade authority revoked. The EVM locks on <a href="/locks" style="color:var(--gold)">/locks</a> are still live.';
       } else {
         $('programBanner').innerHTML = '<b>Solana locks are not available right now.</b> Neither the OAKEN program nor Jupiter Lock answered. Nothing will be signed.';
       }

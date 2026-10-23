@@ -1,9 +1,24 @@
 # Oaken Lock — Solana
 
-> ## 2026-10-20：周边先上了真链，**这个程序本身仍未部署**
+> ## 2026-10-23：程序已部署到 Solana 主网，升级权已置空
+>
+> - Program ID `Co9ZnAVxX2siGThhjTpPgXPHYrCev1nrXFyGB1VcZcQW`
+>   · ProgramData `34ZjBrqr37VxPHPx2VFGDgmuCKjPRayi44QjT93qhTgn`
+>   · **Authority: none**（部署后 `set-upgrade-authority --final`，不可逆）
+>   · 链上字节 sha256 `8de3b7cbe1041ad0f846e3a8e4e80d337e5a6f115f9aba0fbb4924bc65abdce4`，
+>     与本地 `target/deploy/oaken_lock.so` 逐字节相同。
+> - **E2E 25/25 全绿**：GitHub Actions `.github/workflows/solana-e2e.yml` 在 ubuntu 上编译程序、
+>   起本地 `solana-test-validator`、跑五条指令（建锁/领取/拒绝/转让/放弃/撤锁/计数器）。
+>   主网也跑了同一套（5 把测试锁留在链上，可读回）。
+> - E2E 抓出并修掉三个只有真 CPI 才会暴露的 bug：PDA 建账户要用 `invoke_signed`；
+>   claim 要带 beneficiary 账户；claim 的 lock 账户必须是可写。
+> - 站点 `/locks/solana` 现在默认用自有程序；Jupiter Lock 保留为第三方选项。
+> - 部署成本：programdata rent 0.24785 SOL + buffer ≈0.2476 ⇒ 峰值约 0.55 SOL。
+
+> ## 2026-10-20：周边先上了真链（历史）
 >
 > - 站点新增 `/launch/solana`（OAKEN Factory = SPL + Metaplex；pump.fun = 手写 `create_v2`）和
->   `/locks/solana`（暂用第三方 **Jupiter Lock**，因为本程序的部署 rent 约 0.34 SOL，账户里没有）。
+>   `/locks/solana`（当时用第三方 **Jupiter Lock**，因为自有程序尚未部署）。
 > - 真链实验（mainnet）：pump.fun 发射 `BbV7QT1u…qXmY` → 买 5U → Jupiter 锁 1 小时
 >   （escrow `ymNVpHAm…q9k`）；OAKEN Factory 另发 `5MqDmgSs…Qk9u`，mint 权限已吊销。
 >   证据在 `solana/_live-test-evidence.json` 与 `solana/_live-own-launch-evidence.json`。
@@ -14,9 +29,10 @@
 > - 新脚本：`scripts/live-pump-lock.mjs`（发射+买+锁）、`scripts/live-own-launch.mjs`（自有发射）、
 >   `scripts/claim-jup-lock.mjs`（到期领取）。
 >
-> **⚠ 下面这段"没在链上跑过"仍然适用于本程序（`Co9Zn…`）——它还在等部署那笔 rent。**
+> **2026-10-23 更新：下面这段"没在链上跑过"已经过期。** 程序已部署、升级权已置空；
+> 五条指令在本地验证器（25/25）和主网都实际执行过。保留原文只作历史记录。
 
-> ## 状态（2026-10-11）：**写完了，但没在链上跑过**
+> ## 历史状态（2026-10-11）：写完了，但当时没在链上跑过
 >
 > - ✅ **编得过**：`cargo build-sbf` → `target/deploy/oaken_lock.so`（48.6 KB）
 > - ✅ **17 个单元测试过**：状态布局的往返、指令编解码、SPL/ATA/System 的指令字节、PDA 推导
@@ -57,8 +73,8 @@ EVM 那边 `LockVault` 的 Solana 版：把 SPL 代币锁进一个只有到期�
 Co9ZnAVxX2siGThhjTpPgXPHYrCev1nrXFyGB1VcZcQW
 ```
 
-> ⚠ `program-keypair.json` 就是程序的**身份**：部署用它，将来升级也用它。
-> 丢了 = 这个程序永远改不了（对这个产品来说后果不大，但要知道）。
+> ⚠ `program-keypair.json` 是程序的**身份**。**升级权已于 2026-10-23 置空**，
+> 它现在只能证明"这个地址是我们的"，不能再用来升级。妥善备份即可。
 
 ## 和 EVM 版怎么对上
 
@@ -104,7 +120,7 @@ cargo build-sbf          # 产物在 target/deploy/oaken_lock.so
 node scripts/e2e.mjs --start
 ```
 
-`scripts/e2e.mjs` 用的是**页面那份** `public/app/solana.js`（布局解析 + 指令编码），
+`scripts/e2e.mjs` 用的是**页面那份** `app/solana-build.js`（布局解析 + 指令编码），
 所以它同时证明"页面和程序对协议的理解是同一份"。
 
 ## 部署
@@ -119,7 +135,7 @@ solana airdrop 2                        # 只有 devnet/testnet 有水管
 solana program deploy target/deploy/oaken_lock.so \
   --program-id program-keypair.json
 
-# ⚠ **最后一件事**：把升级权置空。做了就回不去了 —— 在真链上要等验证完再做。
+# ⚠ **最后一件事**：把升级权置空。做了就回不去了 —— 2026-10-23 已在主网执行（Authority: none）。
 solana program set-upgrade-authority Co9ZnAVxX2siGThhjTpPgXPHYrCev1nrXFyGB1VcZcQW --final
 ```
 

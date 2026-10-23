@@ -127,11 +127,16 @@
             <tr><td>pump.fun launch</td><td class="mono">6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P</td>
               <td class="ok">third-party, live</td></tr>
             <tr><td>OAKEN Lock (our program)</td><td class="mono">Co9ZnAVxX2siGThhjTpPgXPHYrCev1nrXFyGB1VcZcQW</td>
-              <td class="warn">built &amp; unit-tested — not deployed on mainnet</td></tr>
-            <tr><td>Jupiter Lock (Solana locks on this site)</td><td class="mono">LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn</td>
+              <td class="ok">deployed — upgrade authority none</td></tr>
+            <tr><td>Jupiter Lock (third-party option)</td><td class="mono">LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn</td>
               <td class="ok">third-party, live; upgradeable by Jupiter</td></tr>
           </tbody>
         </table>
+        <div class="hint" style="margin-top:10px">
+          <b>OAKEN Lock is deployed.</b> ProgramData <span class="mono">34ZjBrqr37VxPHPx2VFGDgmuCKjPRayi44QjT93qhTgn</span>,
+          upgrade authority <b>none</b> (revoked on-chain), deployed bytecode sha256
+          <span class="mono">8de3b7cb…</span> matches the build. It passed a <b>25-check E2E</b> on a local
+          validator, and the same five instructions ran on mainnet (5 test locks; re-read from chain).</div>
         <div class="hint" style="margin-top:14px">
           <b>Own launch:</b> the site generates a mint, mints the supply, writes Metaplex metadata, then revokes
           the mint authority in a second transaction. There is no OAKEN program in that path — only the SPL Token

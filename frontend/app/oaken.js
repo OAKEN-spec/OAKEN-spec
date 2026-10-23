@@ -2336,6 +2336,7 @@ export function shell({ active } = {}) {
         <!-- Gas balance appears here after a wallet connects; it is not rendered while disconnected. -->
         <button class="chip gaschip" id="gas-chip" type="button" title="Your gas balance" style="display:none"></button>
         <a class="icon-btn" href="https://x.com/oakenhood" target="_blank" rel="noopener" aria-label="OAKEN on X">${icon('x', 16)}</a>
+        <a class="icon-btn" href="https://github.com/OAKEN-spec/OAKEN-spec" target="_blank" rel="noopener" aria-label="OAKEN source on GitHub" title="Source code on GitHub">${icon('github', 16)}</a>
         <button class="btn btn-p" id="connect">${icon('wallet', 16)}<span>Connect</span></button>
         <!-- Chain switcher sits on the far right, away from the nav. -->
         <button class="chip" id="chain-chip" type="button" title="Network"><span class="dot"></span><b>${CHAIN.name}</b><span class="cid"> · ${CHAIN.id}</span></button>
@@ -2362,6 +2363,8 @@ export function shell({ active } = {}) {
       <a href="/privacy">Privacy</a>
       <span>·</span>
       <a href="https://x.com/oakenhood" target="_blank" rel="noopener">@oakenhood</a>
+      <span>·</span>
+      <a href="https://github.com/OAKEN-spec/OAKEN-spec" target="_blank" rel="noopener">GitHub</a>
       <span class="sp">Locks and balances are read from the chain the site is on, or from our own index.
         Sale listings are the captured snapshot that ships with this build — and every page says which of the two it is showing.
         No protocol fee on locks or our own factory: you pay gas only. Verification is not an audit.</span>
