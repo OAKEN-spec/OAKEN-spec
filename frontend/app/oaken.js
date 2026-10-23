@@ -2351,6 +2351,8 @@ export function shell({ active } = {}) {
       <span>·</span>
       <a href="/verify">Verify</a>
       <span>·</span>
+      <a href="/security">Security</a>
+      <span>·</span>
       <a href="/docs">Docs</a>
       <span>·</span>
       <a href="/terms">Terms</a>
