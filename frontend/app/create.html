@@ -209,7 +209,8 @@
             <button class="copybtn" type="button" data-copy="0xe410d0a21C1376992874a9bEEeE0d623A50D4a34">copy</button>
             — from fees, rewards and max-transaction limits <b>before</b> locking, or the transfer can be taxed or
             blocked and the lock will hold less than you asked. The same addresses exist on every chain we deploy to.
-            <b>We don't support rebase tokens.</b>
+            <b>We don't support rebase tokens.</b> <b>Tokens with transfer hooks/callbacks (ERC-777-style) are not
+            supported either</b> — the vault's accounting assumes a plain ERC-20 transfer.
           </div>
 
           <div class="err hide" id="err"></div>
@@ -905,7 +906,7 @@
     if (errs.length) { toast(errs[0], 'bad'); return; }
     /**
      * Forced confirmation for the token behaviours that break a lock quietly.
-     * The page cannot detect fee-on-transfer/rebase/blacklist tokens reliably,
+     * The page cannot detect fee-on-transfer/rebase/blacklist/hook tokens reliably,
      * so the user has to acknowledge the risk before the first signature.
      */
     /**
@@ -923,7 +924,7 @@
       : '\nUnlocks: ' + until + ' (single unlock).';
     if (!window.confirm('Confirm this lock:\n\nAmount: ' + fmtAmount(state.amountWei, state.decimals) + ' '
       + (state.symbol || 'token') + '\nFrom: ' + state.addr + who + sched
-      + '\n\nFee-on-transfer, rebasing, blacklisting or pausable tokens can make this lock hold less than it says, or block the release. The vault only counts what actually arrives.\n\nIf your token does any of that, do not lock it here. Continue?')) return;
+      + '\n\nFee-on-transfer, rebasing, blacklisting, pausable or transfer-hook (ERC-777-style) tokens can make this lock hold less than it says, block the release, or confuse the vault\'s balance accounting. The vault only counts what actually arrives.\n\nIf your token does any of that, do not lock it here. Continue?')) return;
     /* ⚠ 快照在**这一行**取：校验刚过、还没 await 过任何东西。往下挪任何一步都会重新打开
        "读到一半 state.token 是空的"那个窗口（真链 E2E 抓过两次）。 */
     const tokenAddr = state.token;

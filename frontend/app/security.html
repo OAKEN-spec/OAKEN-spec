@@ -74,6 +74,25 @@
       anywhere on this site, no report link, and no bounty program to link to. If that changes, the firm, date,
       scope, report URL and unresolved findings will be added here and on the Verify page before any badge appears.</p>
 
+    <div class="eyebrow" style="margin-top:46px">Internal self-review</div>
+    <h2 class="sec" style="font-size:28px">We looked, with tools. It is still not an audit.</h2>
+    <div class="grid2" style="margin-top:18px">
+      <div class="card"><h3>What was run</h3><p>Slither 0.11.6 over the product contracts (107 findings,
+        17 High/Medium before triage), the 120 Hardhat tests, the Foundry fuzz/invariant suites, and a
+        reentrancy proof-of-concept. Halmos did not run on this Foundry toolchain; no symbolic result is
+        claimed. <a href="https://github.com/OAKEN-spec/OAKEN-spec/blob/master/contracts/SELF-REVIEW.md"
+        target="_blank" rel="noopener">Full self-review →</a></p></div>
+      <div class="card"><h3>What it found</h3><p>One <b>High, conditional</b>: a token with a transfer
+        callback can re-enter <span class="mono">createLock</span>/<span class="mono">editLock</span> and
+        over-credit a lock, at the expense of another lock of the same token. The deployed contracts are
+        immutable; the creation form now warns against transfer-hook (ERC-777-style) tokens. One
+        <b>Low</b>: the adapter accepts ETH it cannot return. The rest were informational or false
+        positives, each with a reason in the report.</p></div>
+    </div>
+    <p class="hint" style="max-width:84ch;margin-top:14px">This is not an independent review. The code was
+      reviewed by the same person who wrote it, with public tools and a reproducible command list. Treat it
+      as evidence of method, not as an audit opinion.</p>
+
     <div class="ssplit">
       <div class="scard ownerless">
         <h3>Ownerless by design</h3>
@@ -113,9 +132,10 @@
       contracts <b>99.58% statements · 99.82% lines · 100% functions</b>; branch coverage <b>73.38%</b> and is
       reported separately rather than rounded up. The four deterministic-address tests run in the normal suite;
       the coverage build uses viaIR instrumentation and excludes them.</p>
-    <div class="hint" style="max-width:84ch">The public repository is being prepared as a sanitized export
-      (contracts, tests, deployment scripts, frontend source, Solana source). It will be linked here when the
-      owner publishes it. No repository link is shown before it exists.</div>
+    <div class="hint" style="max-width:84ch">The sanitized public repository is live at
+      <a href="https://github.com/OAKEN-spec/OAKEN-spec" target="_blank" rel="noopener">OAKEN-spec/OAKEN-spec</a>
+      (contracts, tests, deployment scripts, frontend source, Solana source). Use GitHub's private vulnerability
+      reporting for a confidential report.</div>
 
     <div class="eyebrow" style="margin-top:46px">What the tests actually assert</div>
     <div class="grid2" style="margin-top:18px">
@@ -127,8 +147,7 @@
         without a lock record are refused.</p></div>
       <div class="card"><h3>Tools</h3><p>Factory fixed supply, multisender batch atomicity, Merkle double-claim
         prevention and sweep deadlines, presale cap/refund accounting, and router liquidity shares.</p></div>
-      <div class="card"><h3>Not covered by a proof</h3><p>Rebasing tokens are not modelled; blacklists/hooks can
-        block a claim; no formal verification has been performed. The invariant suite is evidence, not a proof.</p></div>
+      <div class="card"><h3>Not covered by a proof</h3><p>Rebasing tokens are not modelled; blacklists can block a claim; tokens with transfer hooks can re-enter the accounting (SR-01 in the self-review); no formal verification has been performed. The invariant suite is evidence, not a proof.</p></div>
     </div>
 
     <div class="eyebrow" style="margin-top:46px">Contracts</div>
@@ -150,6 +169,7 @@
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
       <a class="btn btn-p" href="/verify">Verify it yourself</a>
       <a class="btn btn-s" href="/security/bug-bounty">Bug bounty &amp; disclosure</a>
+      <a class="btn btn-s" href="https://github.com/OAKEN-spec/OAKEN-spec/security/advisories/new" target="_blank" rel="noopener noreferrer">Private vulnerability report</a>
       <a class="btn btn-s" href="https://x.com/oakenhood" target="_blank" rel="noopener noreferrer">Report a vulnerability · @oakenhood</a>
     </div>
     <p class="hint" style="max-width:80ch;margin-top:12px">For a vulnerability report, include the chain/address,
