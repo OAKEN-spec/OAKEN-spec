@@ -20,7 +20,7 @@ import {
   createAccount, createInitializeAccountInstruction, createMintToInstruction,
   TOKEN_PROGRAM_ID as SPL_TOKEN,
 } from '@solana/spl-token';
-import { makeSolana } from '../../public/app/solana.js';
+import { makeSolana } from '../../frontend/app/solana.js';
 
 const S = makeSolana(web3);
 const { Keypair, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } = web3;

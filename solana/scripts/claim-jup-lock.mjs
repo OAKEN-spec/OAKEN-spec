@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Connection, Keypair, PublicKey, Transaction, ComputeBudgetProgram } from '@solana/web3.js';
 import { ProxyAgent, fetch as ufetch } from '../../contracts/node_modules/undici/index.js';
-import { makeSolana } from '../../app/solana-build.js';
+import { makeSolana } from '../../frontend/app/solana-build.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(here, '../..');

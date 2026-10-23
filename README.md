@@ -1,5 +1,8 @@
 # OAKEN
 
+**Website:** https://oaken.one · **X:** [@oakenhood](https://x.com/oakenhood) ·
+**Security:** [SECURITY.md](SECURITY.md)
+
 Open-source source code for OAKEN: EVM lock and launch contracts, their tests,
 the static frontend source, and the Solana program source.
 

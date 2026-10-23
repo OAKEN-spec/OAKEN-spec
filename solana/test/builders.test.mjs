@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import * as spl from '@solana/spl-token';
 import * as web3 from '@solana/web3.js';
-import { makeSolana } from '../../app/solana-build.js';
+import { makeSolana } from '../../frontend/app/solana-build.js';
 
 const W = web3;
 const SB = makeSolana(W);

@@ -17,7 +17,7 @@ import { getAssociatedTokenAddressSync } from '@solana/spl-token';
 import BN from 'bn.js';
 import { PumpSdk, OnlinePumpSdk, getBuyTokenAmountFromSolAmount } from '@pump-fun/pump-sdk';
 import { ProxyAgent, fetch as ufetch } from '../../contracts/node_modules/undici/index.js';
-import { makeSolana, JUP_LOCK_PROGRAM_ID } from '../../app/solana-build.js';
+import { makeSolana, JUP_LOCK_PROGRAM_ID } from '../../frontend/app/solana-build.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(here, '../..');

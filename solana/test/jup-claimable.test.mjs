@@ -1,7 +1,7 @@
 // Jupiter escrow 的可领数量：到期那一刻最容易炸的是 **BigInt 与 number 混算**。
 // 这个测试故意在 cliff 之后调用，钉住 `Math.min(BigInt, number)` 那类错误。
 import assert from 'node:assert/strict';
-import { jupClaimable } from '../../app/solana.js';
+import { jupClaimable } from '../../frontend/app/solana.js';
 
 const base = {
   cliffTime: 1_000, frequency: 1, cliffUnlockAmount: 999n,
