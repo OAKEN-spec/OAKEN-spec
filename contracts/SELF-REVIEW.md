@@ -50,10 +50,10 @@ credited 150, an unrelated 100-token lock exists, the vault holds 250, the
 attacker claims 200, and the unrelated claim then reverts.
 
 Status on the deployed contracts: **cannot be patched** (no owner, no upgrade).
-Mitigation for the current deployment: the creation UI must warn explicitly that
-tokens with transfer hooks/callbacks (ERC-777 and similar) are not supported;
-the existing warning covers fee-on-transfer, rebasing, blacklisting and pausable
-tokens but not callbacks. Future deployment: add a reentrancy guard, or allocate
+Mitigation for the current deployment: the creation UI now warns explicitly that
+tokens with transfer hooks/callbacks (ERC-777 and similar) are not supported; the
+warning already covered fee-on-transfer, rebasing, blacklisting and pausable
+tokens. Future deployment: add a reentrancy guard, or allocate
 `lockId` / write a pending record **before** the transfer and settle the counted
 amount after it. Re-run the PoC against the fixed version to prove it fails.
 
