@@ -208,8 +208,14 @@
     if (lookup && lookup.rows.length) {
       const seen = new Set(shown.map((d) => d.chain.id + ':' + (d.vault || 'v1') + ':' + d.lockId));
       for (const r of lookup.rows) if (!seen.has(r.chain.id + ':' + (r.vault || 'v1') + ':' + r.lockId)) shown.push(r);
-      shown.sort((a, b) => Number(b.lockId) - Number(a.lockId));
     }
+    /* 排序按**新旧**，不按锁号：v1 和 v2 各自从 1 开始编号，v2 的新锁号反而最小，
+       按 id 排会把它压到最后一页（"我锁完了列表里却没有"）。live 行（刚锁的那把）
+       永远在前；其余按链上创建块；没有块的（链上现读、索引快照的旧形状）按 id 兜底。 */
+    shown.sort((a, b) =>
+      (Number(b.live === true) - Number(a.live === true))
+      || (Number(b.block || 0) - Number(a.block || 0))
+      || (Number(b.lockId) - Number(a.lockId)));
     const hint = document.getElementById('scopehint');
     if (scope === 'mine') {
       if (!acct) {

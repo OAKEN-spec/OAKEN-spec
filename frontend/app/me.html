@@ -203,7 +203,10 @@
           }));
         }));
         for (const g of groups) rows.push(...g);
-        rows.sort((a, b) => Number(b.id) - Number(a.id));
+        /* v2 的锁首先列出（新金库、号从 1 起），再按 id 倒序 ——
+           只按 id 排会把"今天刚锁的那把"排到最下面。 */
+        rows.sort((a, b) =>
+          (Number(b.vault === 'v2') - Number(a.vault === 'v2')) || Number(b.id) - Number(a.id));
         /* ⚠ 链表为空时不能写 "read live from 0 chains"（假数据，且和空状态叠在一起像"你没有锁"）。
            链表拿不到 → 后面那条 catch 分支会如实说"这次读不到链"。 */
         if (!live.length) throw new Error('the chain list did not load');

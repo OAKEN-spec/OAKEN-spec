@@ -14,7 +14,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:site" content="@oakenhood">
 <link rel="icon" href="/favicon.png">
-<link rel="preload" as="image" href="/app/media/stamp-die.jpg">
+<link rel="preload" as="image" href="/app/media/stamp-press-poster.jpg">
 <link rel="stylesheet" href="/app/oaken.css">
 <!-- oaken-boot-gate -->
 <script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
@@ -252,11 +252,11 @@
     transition: transform .55s cubic-bezier(.2, .9, .25, 1.2), opacity .25s ease; }
   .stamp-veil.in .stamp-card { transform: scale(1) rotate(-3deg); opacity: 1; }
   .stamp-die {
-    width: 170px; height: 170px; margin: 0 auto 16px; border-radius: 50%; overflow: hidden;
-    border: 2px solid rgba(232, 184, 92, .82);
-    box-shadow: 0 0 0 8px rgba(217, 163, 67, .12), 0 24px 55px -20px #000;
+    width: 260px; height: 260px; margin: 0 auto 16px; border-radius: 10px; overflow: hidden;
+    border: 1px solid rgba(232, 184, 92, .72); background: #16110d;
+    box-shadow: 0 0 0 8px rgba(217, 163, 67, .10), 0 24px 55px -20px #000;
   }
-  .stamp-die img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .stamp-die video, .stamp-die img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .stamp-label { font-family: 'Oaken Display', Georgia, serif; font-size: 30px; color: var(--parch);
     word-break: break-all; max-width: 88vw; margin: 0 auto; }
   .stamp-label i { color: var(--gold); font-style: normal; }
@@ -265,7 +265,7 @@
     font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: rgba(240, 228, 208, .6);
   }
   .stamp-veil::after {
-    content: ''; position: absolute; width: 190px; height: 190px; border-radius: 50%;
+    content: ''; position: absolute; width: 320px; height: 320px; border-radius: 18px;
     border: 1px solid rgba(232, 184, 92, .55); opacity: 0;
     animation: stampRing .9s ease-out .12s;
   }
@@ -293,7 +293,7 @@
   }
   @media (max-width: 620px) {
     .nsearch .btn { width: 100%; }
-    .stamp-die { width: 140px; height: 140px; }
+    .stamp-die { width: 210px; height: 210px; }
     .stamp-label { font-size: 24px; }
   }
   @media (max-width: 520px) {
@@ -667,8 +667,9 @@
     const el = $('plate-sub');
     if (el) el.textContent = text || PLATE_SUB;
   }
-  /** The registration "thunk": a short, decorative stamp. The toast already announces success,
-      so this overlay is aria-hidden and skipped under reduced motion. */
+  /** The registration "thunk": a close-up of the brass stamp pressing into the wax.
+      The toast already announces success, so this overlay is aria-hidden and skipped under reduced motion.
+      The clip is a one-way seal (never reversed) — it plays once and the overlay closes when it ends. */
   function stampMoment(label) {
     if (!label || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     document.querySelector('.stamp-veil')?.remove();
@@ -676,7 +677,8 @@
     el.className = 'stamp-veil';
     el.setAttribute('aria-hidden', 'true');
     el.innerHTML = `<div class="stamp-card">
-      <div class="stamp-die"><img src="/app/media/stamp-die.jpg" alt=""></div>
+      <div class="stamp-die"><video src="/app/media/stamp-press.mp4" poster="/app/media/stamp-press-poster.jpg"
+        muted playsinline autoplay preload="auto"></video></div>
       <div class="stamp-label">${esc(label)}<i>.hood</i></div>
       <div class="stamp-sub">Registered on Robinhood Chain</div>
     </div>`;
@@ -690,7 +692,21 @@
       setTimeout(() => el.remove(), 520);
     };
     el.addEventListener('click', close, { once: true });
-    setTimeout(close, 2800);
+    // Fallback timer in case `ended` never fires (video blocked, slow network): never leave it stuck.
+    const fallback = setTimeout(close, 6500);
+    const vid = el.querySelector('video');
+    if (vid) {
+      vid.addEventListener('ended', () => { clearTimeout(fallback); setTimeout(close, 600); }, { once: true });
+      vid.play().catch(() => { /* autoplay blocked → the poster frame stays, the timer still closes */ });
+    }
+  }
+  // Warm the clip once the page is idle so the seal starts instantly after signing.
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(() => {
+      const l = document.createElement('link');
+      l.rel = 'prefetch'; l.as = 'video'; l.href = '/app/media/stamp-press.mp4';
+      document.head.appendChild(l);
+    }, { timeout: 4000 });
   }
 
   const rp = () => {

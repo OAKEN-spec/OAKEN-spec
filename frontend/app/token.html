@@ -154,7 +154,10 @@
       });
       return;
     }
-    rows.sort((a, b) => Number(b.id) - Number(a.id));
+    /* 新锁在前：v2 是 2026-10-23 起的新金库，它的锁号从 1 重新开始 ——
+       只按 id 排会把 v2 的锁全压到最后（"刚锁的看不见"）。 */
+    rows.sort((a, b) =>
+      (Number(b.version === 'v2') - Number(a.version === 'v2')) || Number(b.id) - Number(a.id));
     /* 「金库持有」= 还没被领走的量：amount 是**当初锁进去的**，claimed 是已经出去的。
        只加 amount 会把领过的锁也算成全额在库里 —— 那个数比链上余额大。 */
     const held = rows.reduce((s, r) => s + (BigInt(r.amount) - BigInt(r.claimed || 0)), 0n);
