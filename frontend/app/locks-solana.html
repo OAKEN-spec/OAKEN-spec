@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Locks on Solana · OAKEN</title>
+<meta name="description" content="Lock SPL tokens on Solana until a date you choose. The live route is Jupiter Lock, a third-party program; OAKEN's own lock program is not deployed yet. OAKEN takes no fee.">
+<meta property="og:title" content="Locks on Solana · OAKEN">
+<meta property="og:description" content="Lock SPL tokens on Solana through Jupiter Lock, a third-party program; OAKEN's own lock program is not deployed yet. OAKEN takes no fee.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://oaken.one/locks/solana">
+<meta property="og:image" content="https://oaken.one/logo512.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below.';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'+err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+<style>
+  body.sol-page #gas-chip, body.sol-page #connect { display: none !important; }
+  .flow { display: grid; grid-template-columns: 1fr 1.15fr; gap: 26px; align-items: start; }
+  .panel .body { display: grid; gap: 13px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .hint { color: var(--muted); font-size: 12.5px; line-height: 1.55; }
+  .warnline { color: #e0a85f; }
+  .okline { color: var(--ok, #6fbf73); }
+  .lab { display: flex; align-items: baseline; gap: 10px; }
+  .secretline { font-size: 23px; letter-spacing: .12em; color: var(--gold); margin-top: 8px; }
+  input.i, select.i, textarea.i { width: 100%; box-sizing: border-box; }
+  .walletrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .walletrow .addr { font: 12px/1.4 ui-monospace, Consolas, monospace; color: var(--parch); }
+  .walletbtns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tokcard { display: flex; gap: 12px; align-items: center; border: 1px solid var(--line); border-radius: var(--r);
+             padding: 11px 13px; background: var(--panel); }
+  .tokcard .sym { font-size: 15px; color: var(--gold); }
+  .tokcard .meta { color: var(--muted); font-size: 12px; }
+  .track { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .track li { display: grid; grid-template-columns: 14px 1fr; gap: 10px; align-items: baseline;
+              border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; background: var(--panel); }
+  .track li .dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(240,228,208,.22); }
+  .track li[data-state="run"] .dot { background: var(--gold); animation: pulse 1.2s ease-in-out infinite; }
+  .track li[data-state="done"] .dot { background: var(--ok, #6fbf73); }
+  .track li[data-state="fail"] { border-color: rgba(224,120,95,.5); }
+  .track li[data-state="fail"] .dot { background: var(--bad, #e0785f); }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+  .banner { border: 1px solid rgba(217,163,67,.5); background: rgba(217,163,67,.07); border-radius: var(--r);
+            padding: 14px 16px; font-size: 13px; line-height: 1.6; color: var(--parch); }
+  .banner b { color: var(--gold); }
+  .lockrow { border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; background: var(--panel);
+             display: grid; gap: 9px; }
+  .lockrow + .lockrow { margin-top: 10px; }
+  .lockrow .top { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+  .lockrow .id { color: var(--gold); font-weight: 700; }
+  .lockrow .amount { font-size: 15px; }
+  .lockrow .meta { color: var(--muted); font-size: 12.5px; display: grid; gap: 3px; }
+  .lockrow .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 99px;
+          padding: 3px 9px; font-size: 11.5px; color: var(--muted); }
+  .pill.ok { color: var(--ok, #6fbf73); border-color: rgba(111,191,115,.45); }
+  .pill.warn { color: #e0a85f; border-color: rgba(224,168,95,.45); }
+  .pill.bad { color: var(--bad, #e0785f); border-color: rgba(224,120,95,.45); }
+  .empty { border: 1px dashed var(--line); border-radius: var(--r); padding: 26px; text-align: center; color: var(--muted); }
+  .err { border: 1px solid rgba(224,120,95,.5); background: rgba(224,120,95,.06); border-radius: var(--r);
+         padding: 11px 13px; color: #f0c8bd; font-size: 13px; }
+  .hide { display: none !important; }
+  @media (max-width: 980px) { .flow { grid-template-columns: 1fr; } .row2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body class="sol-page">
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/vaultdoor.webp"><source src="/app/media/vaultdoor-live.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Solana · locks</div>
+    <h1 class="reveal">The same lock, on Solana.</h1>
+    <p class="lede reveal">SPL tokens go into a vault that only the clock can open. The live route is <b>Jupiter Lock</b>,
+      a third-party program; OAKEN's own lock program is not deployed on mainnet yet. OAKEN takes no fee.</p>
+  </div>
+</section>
+
+<main class="wrap">
+  <div id="programBanner" class="banner" style="margin-bottom:18px">
+    <b>Checking the lock program…</b> This page reads the program account before it offers a signature.
+  </div>
+
+  <div class="flow">
+    <div>
+      <div class="panel">
+        <div class="head"><h3>Wallet</h3><span class="steps-mini">mainnet-beta</span></div>
+        <div class="body">
+          <div id="walletbox">
+            <div class="hint" id="walletstate">Looking for a Solana wallet…</div>
+            <div class="walletbtns" id="walletbtns" style="margin-top:10px"></div>
+            <div class="hint" id="walletinstall" style="display:none;margin-top:10px">
+              No Solana wallet found. Install <a href="https://phantom.app/" target="_blank" rel="noopener" style="color:var(--gold)">Phantom</a>
+              or <a href="https://solflare.com/" target="_blank" rel="noopener" style="color:var(--gold)">Solflare</a>, then reload.
+            </div>
+          </div>
+          <div class="walletrow" id="walletrow" style="display:none">
+            <span class="addr" id="walletaddr"></span>
+            <span class="hint" id="walletbal"></span>
+            <button class="btn btn-s" type="button" id="walletdisconnect">Disconnect</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px">
+        <div class="head"><h3>Create a lock</h3></div>
+        <div class="body">
+          <div>
+            <label class="f">Lock program</label>
+            <div class="seg" id="backend" style="display:inline-flex">
+              <button type="button" data-b="jupiter">Jupiter Lock (third-party)</button>
+              <button type="button" data-b="oaken" disabled>OAKEN Lock (not deployed)</button>
+            </div>
+            <div class="hint" id="backendnote">Jupiter Lock is a live third-party vesting program. It is upgradeable by its team — it is not the ownerless OAKEN Lock.</div>
+          </div>
+          <div>
+            <label class="f" for="mint">Token address</label>
+            <input class="i" id="mint" placeholder="SPL mint address" autocomplete="off" spellcheck="false">
+            <div class="hint" id="minthint">Paste the mint, not a token account or a trading pair.</div>
+          </div>
+
+          <div class="tokcard" id="tokcard" style="display:none">
+            <div style="min-width:0">
+              <div class="sym" id="toksym">—</div>
+              <div class="meta" id="tokmeta">—</div>
+              <div class="meta" id="tokbal">—</div>
+            </div>
+          </div>
+
+          <div>
+            <label class="f" for="amount">How much to lock</label>
+            <div class="lab">
+              <input class="i" id="amount" placeholder="0.0" inputmode="decimal" autocomplete="off">
+              <button class="btn btn-s" type="button" id="max" style="white-space:nowrap">Lock all</button>
+            </div>
+            <div class="hint" id="amounthint">The vault holds the tokens until the unlock date.</div>
+          </div>
+
+          <div>
+            <label class="f" for="date">Unlock date (your local time)</label>
+            <input class="i" id="date" type="datetime-local">
+            <div class="hint" id="datehint">Everything unlocks at once. The chain enforces the time; claim is permissionless.</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+              <button class="btn btn-s" type="button" data-preset="3600" style="padding:5px 10px;font-size:12px">1 hour</button>
+              <button class="btn btn-s" type="button" data-preset="86400" style="padding:5px 10px;font-size:12px">1 day</button>
+              <button class="btn btn-s" type="button" data-preset="2592000" style="padding:5px 10px;font-size:12px">30 days</button>
+              <button class="btn btn-s" type="button" data-preset="31536000" style="padding:5px 10px;font-size:12px">1 year</button>
+            </div>
+          </div>
+
+          <div id="revocablewrap">
+            <label class="chk" for="revocable"><input type="checkbox" id="revocable">
+              Allow the creator to revoke before the unlock date</label>
+            <div class="hint">Off is the honest default: once the lock is written, the creator cannot take it back.
+              On means the creator can cancel before the date — anyone reading the lock will see that.</div>
+          </div>
+
+          <label class="chk" for="useother"><input type="checkbox" id="useother"> use another beneficiary?</label>
+          <div id="otherwrap" class="hide">
+            <div>
+              <label class="f" for="benef">Beneficiary</label>
+              <input class="i" id="benef" placeholder="Solana address that can claim" autocomplete="off" spellcheck="false">
+              <div class="hint">They will be the only one who can claim, transfer or renounce this lock.</div>
+            </div>
+          </div>
+
+          <div>
+            <label class="f" for="label">Title (optional)</label>
+            <input class="i" id="label" placeholder="Ex: Team vesting" maxlength="64" autocomplete="off">
+          </div>
+
+          <div class="err hide" id="err"></div>
+          <button class="btn btn-p wide" type="button" id="go" disabled>Connect a Solana wallet</button>
+          <div class="hint" id="gohint">The wallet will show the exact rent and network fee before you sign.</div>
+        </div>
+      </div>
+
+      <div class="panel hide" id="trackpanel">
+        <div class="head"><h3>Progress</h3></div>
+        <div class="body"><ul class="track" id="track"></ul></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="head"><h3>My Solana locks</h3><button class="btn btn-s" type="button" id="refresh" style="margin-left:auto">Refresh</button></div>
+        <div class="body">
+          <div class="hint" id="listhint">Connect a wallet to see locks where you are the creator or beneficiary.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <input class="i" id="escrowin" placeholder="Paste a Jupiter escrow address" style="flex:1;min-width:220px" autocomplete="off" spellcheck="false">
+            <button class="btn btn-s" type="button" id="escrowopen">Open escrow</button>
+          </div>
+          <div class="hint" id="escrownote">A lock created by someone else will not be in your transaction history; open it by its escrow address.</div>
+          <div id="locklist"></div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px">
+        <div class="head"><h3>How Solana locks work</h3></div>
+        <div class="body">
+          <div class="hint">Tokens sit in an associated token account owned by a program-derived lock address.
+            Only the program can move them, and only after the unlock time. Claim is permissionless: anyone can
+            submit it, and the tokens always go to the beneficiary. There is no per-lock admin key and no pause on
+            the lock itself — but the live program (Jupiter Lock) can be upgraded by its team; see below.</div>
+          <div class="hint">OAKEN's own lock program is <span class="mono">Co9ZnAVxX2siGThhjTpPgXPHYrCev1nrXFyGB1VcZcQW</span>
+            (source in the repository). It is built and tested but <b>not deployed on mainnet yet</b>, so this page
+            uses Jupiter Lock (<span class="mono">LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn</span>) as the live
+            third-party option. Jupiter's program can be upgraded by its team; neither product is audited by us.</div>
+          <a class="btn btn-s" href="/locks">EVM locks →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="/app/vendor/oaken-buffer.iife.min.js"></script>
+<script src="/app/vendor/solana-web3.iife.min.js"></script>
+<script type="module">
+  import { shell, mountDatePicker, toast } from '/app/oaken.js';
+  import * as SOL from '/app/solana.js';
+
+  shell({ active: 'locks' });
+  document.documentElement.dataset.oakenBoot = '1';
+
+  const $ = (id) => document.getElementById(id);
+  const state = {
+    addr: null, backend: 'jupiter', jupLive: false, oakenLive: false, busy: false,
+    decimals: null, symbol: '', name: '', mint: null, balance: '0',
+    now: Math.floor(Date.now() / 1000), clockLocal: false,
+  };
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const short = (a) => (a ? a.slice(0, 4) + '…' + a.slice(-4) : '—');
+
+  function err(msg) { $('err').classList.remove('hide'); $('err').textContent = msg; }
+  function clearErr() { $('err').classList.add('hide'); $('err').textContent = ''; }
+
+  /** Decimal string -> base units as BigInt. No float round-trips. */
+  function parseAmount(str, decimals) {
+    const s = String(str || '').trim().replace(/,/g, '');
+    if (!/^\d*(\.\d*)?$/.test(s) || s === '' || s === '.') return null;
+    const [whole, frac = ''] = s.split('.');
+    if (frac.length > decimals) return null;
+    const digits = (whole || '0') + frac.padEnd(decimals, '0');
+    try { const v = BigInt(digits); return v > 0n ? v : null; } catch { return null; }
+  }
+  function fmtToken(raw, decimals) {
+    const v = BigInt(raw || 0);
+    const base = 10n ** BigInt(decimals);
+    const whole = v / base;
+    const frac = (v % base).toString().padStart(decimals, '0').slice(0, Math.min(decimals, 4)).replace(/0+$/, '');
+    return whole.toLocaleString('en-US') + (frac ? '.' + frac : '');
+  }
+  function fmtTime(sec) {
+    if (!sec) return '—';
+    return new Date(Number(sec) * 1000).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function paintBackends() {
+    for (const b of $('backend').querySelectorAll('[data-b]')) {
+      const live = b.dataset.b === 'jupiter' ? state.jupLive : state.oakenLive;
+      b.disabled = !live;
+      b.classList.toggle('on', state.backend === b.dataset.b);
+    }
+    $('revocablewrap').style.display = state.backend === 'oaken' ? '' : 'none';
+    $('backendnote').innerHTML = state.backend === 'jupiter'
+      ? 'Jupiter Lock is a live third-party vesting program. It is upgradeable by its team — it is not the ownerless OAKEN Lock.'
+      : 'OAKEN Lock is our own program: no owner, no pause, no upgrade. It is not deployed on mainnet yet.';
+    update();
+  }
+
+  function paintWallet() {
+    const list = SOL.wallets();
+    $('walletinstall').style.display = list.length ? 'none' : '';
+    $('walletbtns').innerHTML = list.map((w) => `<button class="btn btn-s" type="button" data-w="${esc(w.key)}">${esc(w.name)}</button>`).join('');
+    for (const b of $('walletbtns').querySelectorAll('[data-w]')) {
+      b.onclick = async () => {
+        clearErr(); b.disabled = true;
+        try { await SOL.connect(b.dataset.w); await afterConnect(); } catch (e) { err(SOL.humanize(e)); }
+        finally { b.disabled = false; }
+      };
+    }
+    const on = Boolean(state.addr);
+    $('walletstate').style.display = on ? 'none' : '';
+    $('walletbtns').style.display = on ? 'none' : '';
+    $('walletrow').style.display = on ? '' : 'none';
+    if (on) { $('walletaddr').textContent = state.addr; loadBalance(); }
+    update();
+  }
+
+  async function loadBalance() {
+    if (!state.addr) return;
+    try {
+      const lam = await SOL.balance();
+      $('walletbal').textContent = `${SOL.lamportsToSol(lam).toFixed(4)} SOL`;
+    } catch { $('walletbal').textContent = 'balance —'; }
+  }
+
+  async function afterConnect() {
+    state.addr = SOL.address();
+    paintWallet();
+    if (state.addr) await loadLocks();
+  }
+
+  async function loadToken() {
+    const v = $('mint').value.trim();
+    state.mint = null; state.decimals = null; state.symbol = ''; state.name = ''; state.balance = '0';
+    $('tokcard').style.display = 'none';
+    if (!v) { update(); return; }
+    try {
+      const info = await SOL.readMint(v);
+      if (!info) {
+        $('minthint').innerHTML = '<span class="warnline">No SPL token at that address on Solana.</span>';
+        update(); return;
+      }
+      const meta = await SOL.readMetadata(v).catch(() => null);
+      state.mint = v;
+      state.decimals = info.decimals;
+      state.symbol = meta?.symbol || '';
+      state.name = meta?.name || '';
+      state.balance = state.addr ? await SOL.tokenBalance(v) : '0';
+      $('minthint').textContent = info.isToken2022
+        ? 'Token-2022 — the lock routes here support classic SPL tokens only.'
+        : 'Classic SPL token.';
+      $('toksym').textContent = (state.symbol || 'SPL token') + (state.name ? ' · ' + state.name : '');
+      $('tokmeta').textContent = `${info.decimals} decimals · supply ${fmtToken(info.supply, info.decimals)} · ${v}`;
+      $('tokbal').textContent = state.addr ? `Your balance: ${fmtToken(state.balance, info.decimals)} ${state.symbol}` : 'Connect a wallet to see your balance.';
+      $('tokcard').style.display = '';
+      $('amounthint').textContent = `Base units: 1 token = 10^${info.decimals}. The lock stores the raw amount.`;
+    } catch (e) {
+      $('minthint').innerHTML = '<span class="warnline">' + esc(SOL.humanize(e)) + '</span>';
+    }
+    update();
+  }
+
+  let mintTimer = 0;
+  $('mint').addEventListener('input', () => { clearTimeout(mintTimer); mintTimer = setTimeout(loadToken, 450); });
+
+  $('max').onclick = () => {
+    if (state.decimals === null) return;
+    $('amount').value = fmtToken(state.balance, state.decimals).replace(/,/g, '');
+    update();
+  };
+
+  const dp = mountDatePicker($('date'));
+  for (const b of document.querySelectorAll('[data-preset]')) {
+    b.onclick = () => {
+      const secs = Number(b.dataset.preset);
+      const t = new Date((state.now + secs) * 1000);
+      const pad = (n) => String(n).padStart(2, '0');
+      $('date').value = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`;
+      $('date').dispatchEvent(new Event('input', { bubbles: true }));
+      update();
+    };
+  }
+
+  for (const b of $('backend').querySelectorAll('[data-b]')) {
+    b.onclick = () => { if (b.disabled) return; state.backend = b.dataset.b; paintBackends(); };
+  }
+  $('useother').onchange = () => { $('otherwrap').classList.toggle('hide', !$('useother').checked); update(); };
+  for (const id of ['amount', 'date', 'benef', 'label', 'revocable']) {
+    $(id).addEventListener('input', update);
+    $(id).addEventListener('change', update);
+  }
+
+  function validate() {
+    const out = [];
+    if (!state.addr) out.push('Connect a Solana wallet.');
+    if (state.backend === 'jupiter' && !state.jupLive) out.push('Jupiter Lock is not reachable.');
+    if (state.backend === 'oaken' && !state.oakenLive) out.push('The OAKEN Lock program is not deployed on Solana yet.');
+    if (!state.mint) out.push('Paste a valid SPL mint.');
+    if (state.decimals !== null) {
+      const raw = parseAmount($('amount').value, state.decimals);
+      if (!raw) out.push('Enter an amount with at most ' + state.decimals + ' decimals.');
+      else if (BigInt(state.balance) > 0n && raw > BigInt(state.balance)) out.push('Amount is more than your balance.');
+    }
+    const dt = $('date').value;
+    if (!dt) out.push('Pick an unlock date.');
+    else {
+      const until = Math.floor(new Date(dt).getTime() / 1000);
+      if (!(until > state.now + 30)) out.push('Unlock date must be at least 30 seconds in the future.');
+    }
+    if ($('useother').checked) {
+      const b = $('benef').value.trim();
+      if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(b)) out.push('Beneficiary must be a valid Solana address.');
+    }
+    return out;
+  }
+
+  function update() {
+    const errs = validate();
+    let label = 'Connect a Solana wallet';
+    if (state.addr) {
+      if (state.backend === 'oaken' && !state.oakenLive) label = 'OAKEN Lock is not deployed';
+      else if (state.backend === 'jupiter' && !state.jupLive) label = 'Jupiter Lock is not reachable';
+      else label = state.busy ? 'Working…' : (state.backend === 'jupiter' ? 'Lock with Jupiter' : 'Lock on Solana');
+    }
+    $('go').textContent = label;
+    $('go').disabled = state.busy || (Boolean(state.addr) && errs.length > 0)
+      || (state.backend === 'oaken' ? !state.oakenLive : !state.jupLive);
+    $('gohint').textContent = state.backend === 'jupiter'
+      ? 'Jupiter Lock is third-party; its program can be upgraded by its team. The wallet shows the exact rent and fee.'
+      : 'Your wallet will show the exact rent and network fee before you sign.';
+  }
+
+  $('walletdisconnect').onclick = async () => { await SOL.disconnect(); state.addr = null; paintWallet(); };
+
+  function setStep(key, text, stateName) {
+    let el = document.getElementById('tr-' + key);
+    if (!el) {
+      el = document.createElement('li');
+      el.id = 'tr-' + key;
+      el.innerHTML = '<span class="dot"></span><span></span>';
+      $('track').appendChild(el);
+    }
+    el.dataset.state = stateName || 'run';
+    el.querySelector('span:last-child').textContent = text;
+  }
+
+  $('go').onclick = async () => {
+    clearErr();
+    if (!state.addr) {
+      const list = SOL.wallets();
+      if (!list.length) { err('No Solana wallet found. Install Phantom or Solflare, then reload.'); return; }
+      try { await SOL.connect(list[0].key); await afterConnect(); } catch (e) { err(SOL.humanize(e)); }
+      return;
+    }
+    const errs = validate();
+    if (errs.length) { err(errs.slice(0, 3).join(' ')); return; }
+    const amount = parseAmount($('amount').value, state.decimals);
+    const until = Math.floor(new Date($('date').value).getTime() / 1000);
+    const benef = $('useother').checked ? $('benef').value.trim() : null;
+    state.busy = true; update();
+    $('trackpanel').classList.remove('hide');
+    $('track').innerHTML = '';
+    const onStep = (step, sig) => {
+      if (step === 'building') setStep('build', 'Building the transaction…');
+      if (step === 'signing') setStep('sign', 'Waiting for your wallet…');
+      if (step === 'sending') setStep('send', 'Sending the transaction…');
+      if (step === 'sent' && sig) {
+        setStep('send', '', 'run');
+        document.querySelector('#tr-send span:last-child').innerHTML = 'Sent — waiting for the block… <a href="' + SOL.SOLSCAN_TX(sig) + '" target="_blank" rel="noopener" style="color:var(--gold)">view</a>';
+      }
+      if (step === 'done') { setStep('build', 'Transaction built', 'done'); setStep('sign', 'Signed', 'done'); setStep('send', 'Confirmed', 'done'); }
+    };
+    try {
+      const res = state.backend === 'jupiter'
+        ? await SOL.jupCreateLock({ mint: state.mint, amount: amount.toString(), unlockDate: until, beneficiary: benef, onStep })
+        : await SOL.lockToken({
+            mint: state.mint, amount: amount.toString(), unlockDate: until,
+            revocable: $('revocable').checked, beneficiary: benef, label: $('label').value.trim(), onStep,
+          });
+      toast(state.backend === 'jupiter' ? 'Locked with Jupiter Lock' : `Locked as #${res.id} on Solana`, 'ok',
+        { href: res.signature ? SOL.SOLSCAN_TX(res.signature) : null, label: 'View ↗' });
+      $('amount').value = ''; $('label').value = '';
+      await loadToken();
+      await loadLocks();
+    } catch (e) {
+      const msg = SOL.humanize(e);
+      err(msg);
+      const running = [...$('track').querySelectorAll('li[data-state="run"]')];
+      running.forEach((el, i) => {
+        const last = i === running.length - 1;
+        el.dataset.state = last ? 'fail' : 'done';
+        el.querySelector('span:last-child').textContent = last ? msg : 'Done';
+      });
+      toast(msg.slice(0, 140), 'bad');
+    } finally {
+      state.busy = false; update();
+    }
+  };
+
+  async function enrichJup(rows) {
+    const out = [];
+    for (const r of rows) {
+      try {
+        const [info, meta] = await Promise.all([
+          SOL.readMint(r.mint).catch(() => null),
+          SOL.readMetadata(r.mint).catch(() => null),
+        ]);
+        out.push({ ...r, mintInfo: info, meta });
+      } catch { out.push(r); }
+    }
+    return out;
+  }
+
+  async function loadLocks() {
+    if (!state.addr) {
+      $('listhint').textContent = 'Connect a wallet to see locks where you are the creator or beneficiary.';
+      $('locklist').innerHTML = '';
+      return;
+    }
+    $('listhint').textContent = 'Reading locks from Solana…';
+    $('locklist').innerHTML = '';
+    try {
+      const all = [];
+      let scan = null;
+      if (state.jupLive) {
+        const jup = await SOL.jupMyLocks();
+        scan = jup.scan || null;
+        all.push(...await enrichJup(jup));
+      }
+      if (state.oakenLive) {
+        const locks = await SOL.myLocks();
+        const det = (await Promise.all(locks.map((l) => SOL.lockDetail(l.id).catch(() => null)))).filter(Boolean);
+        all.push(...det.map((l) => ({ ...l, backend: 'oaken', address: l.address })));
+      }
+      if (!all.length) {
+        $('listhint').textContent = scan && scan.mode === 'history'
+          ? `No Jupiter locks in the last ${scan.signatures || 0} transactions for this wallet. If you have an older lock, paste its escrow address above.`
+          : 'No locks where you are the creator or beneficiary.';
+        $('locklist').innerHTML = '<div class="empty">Nothing locked yet.</div>';
+        return;
+      }
+      all.sort((a, b) => (Number(b.unlockDate || b.cliffTime || 0)) - (Number(a.unlockDate || a.cliffTime || 0)));
+      $('listhint').textContent = `${all.length} lock${all.length === 1 ? '' : 's'} found.`
+        + (scan && scan.mode === 'history' ? ` (scanned the last ${scan.signatures} transactions${scan.complete ? '' : ' — the scan timed out, older locks may be missing'})` : '');
+      $('locklist').innerHTML = all.map((l) => rowHtml(l)).join('');
+      wireRows();
+    } catch (e) {
+      $('listhint').textContent = 'Could not read locks: ' + SOL.humanize(e);
+    }
+  }
+
+  function rowHtml(l) {
+    const now = state.now;
+    const dec = l.mintInfo?.decimals ?? state.decimals ?? 0;
+    const sym = l.meta?.symbol || state.symbol || (l.mint ? short(l.mint) : '');
+    if (l.backend === 'jupiter') {
+      const mine = String(l.recipient) === String(state.addr);
+      const claimable = SOL.jupClaimable(l, now);
+      const unlock = l.cliffTime;
+      const status = l.cancelledAt ? ['Cancelled', 'bad']
+        : claimable > 0n ? ['Unlocked — claimable', 'ok']
+        : now >= unlock ? ['Claimed', 'ok'] : ['Locked', ''];
+      return `<div class="lockrow" data-backend="jupiter" data-address="${esc(l.address)}" data-mint="${esc(l.mint)}">
+        <div class="top">
+          <div><span class="id">JUP</span> <span class="amount">${esc(fmtToken(l.cliffUnlockAmount + l.amountPerPeriod * l.numberOfPeriod, dec))} ${esc(sym)}</span></div>
+          <span class="pill ${status[1]}">${esc(status[0])}</span>
+        </div>
+        <div class="meta">
+          <span>Unlocks ${esc(fmtTime(unlock))} · non-cancelable</span>
+          <span>${mine ? 'You are the beneficiary' : 'Beneficiary ' + esc(short(l.recipient))}${String(l.creator) === String(state.addr) ? ' · you created it' : ''}</span>
+          ${claimable > 0n ? `<span class="okline">Claimable now: ${esc(fmtToken(claimable, dec))}</span>` : ''}
+          <span class="mono">${esc(l.address)}</span>
+        </div>
+        <div class="acts">
+          ${claimable > 0n && mine ? '<button class="btn btn-p btn-s" type="button" data-act="jupclaim">Claim</button>' : ''}
+          <a class="btn btn-s" href="https://solscan.io/account/${esc(l.address)}" target="_blank" rel="noopener">Solscan ↗</a>
+        </div>
+      </div>`;
+    }
+    const mine = String(l.beneficiary) === String(state.addr);
+    const creator = String(l.creator) === String(state.addr);
+    const due = Number(l.unlockDate) <= now;
+    const claimable = due && !l.renounced && !l.revoked ? BigInt(l.amount) - BigInt(l.claimed) : 0n;
+    const status = l.revoked ? ['Revoked', 'bad'] : l.renounced ? ['Renounced', 'warn']
+      : claimable > 0n ? ['Unlocked — claimable', 'ok'] : due ? ['Claimed', 'ok'] : ['Locked', ''];
+    return `<div class="lockrow" data-backend="oaken" data-id="${esc(String(l.id))}" data-address="${esc(l.address)}" data-mint="${esc(l.mint)}">
+      <div class="top">
+        <div><span class="id">#${esc(String(l.id))}</span> <span class="amount">${esc(fmtToken(l.amount, dec))} ${esc(sym)}</span></div>
+        <span class="pill ${status[1]}">${esc(status[0])}</span>
+      </div>
+      <div class="meta">
+        <span>Unlocks ${esc(fmtTime(l.unlockDate))}${l.revocable ? ' · creator can revoke before then' : ' · non-revocable'}</span>
+        <span>${mine ? 'You are the beneficiary' : 'Beneficiary ' + esc(short(l.beneficiary))}${creator ? ' · you created it' : ''}</span>
+        ${claimable > 0n ? `<span class="okline">Claimable now: ${esc(fmtToken(claimable, dec))}</span>` : ''}
+        ${l.label ? `<span>Title: ${esc(l.label)}</span>` : ''}
+      </div>
+      <div class="acts">
+        ${claimable > 0n ? '<button class="btn btn-p btn-s" type="button" data-act="claim">Claim</button>' : ''}
+        ${creator && l.revocable && !l.revoked && !due ? '<button class="btn btn-s" type="button" data-act="revoke">Revoke</button>' : ''}
+        ${mine && !l.renounced ? '<button class="btn btn-s" type="button" data-act="transfer">Transfer</button><button class="btn btn-s" type="button" data-act="renounce">Renounce</button>' : ''}
+      </div>
+    </div>`;
+  }
+
+  function wireRows() {
+    for (const row of $('locklist').querySelectorAll('.lockrow')) {
+      const id = Number(row.dataset.id);
+      row.querySelectorAll('[data-act]').forEach((b) => {
+        b.onclick = async () => {
+          const act = b.dataset.act;
+          clearErr();
+          try {
+            if (act === 'jupclaim') {
+              b.disabled = true;
+              const sig = await SOL.jupClaim({ escrow: row.dataset.address, mint: row.dataset.mint });
+              toast('Claimed on Solana', 'ok', { href: SOL.SOLSCAN_TX(sig), label: 'View ↗' });
+            } else if (act === 'claim') {
+              b.disabled = true;
+              const sig = await SOL.claimLock(id);
+              toast('Claimed on Solana', 'ok', { href: SOL.SOLSCAN_TX(sig), label: 'View ↗' });
+            } else if (act === 'revoke') {
+              if (!confirm('Revoke this lock? The tokens go back to you and the beneficiary gets nothing.')) return;
+              b.disabled = true;
+              const sig = await SOL.revokeLock(id);
+              toast('Lock revoked', 'ok', { href: SOL.SOLSCAN_TX(sig), label: 'View ↗' });
+            } else if (act === 'transfer') {
+              const to = prompt('New beneficiary Solana address:');
+              if (!to) return;
+              b.disabled = true;
+              const sig = await SOL.transferLock(id, to);
+              toast('Beneficiary transferred', 'ok', { href: SOL.SOLSCAN_TX(sig), label: 'View ↗' });
+            } else if (act === 'renounce') {
+              if (!confirm('Renounce forever? You will never be able to claim this lock.')) return;
+              b.disabled = true;
+              const sig = await SOL.renounceLock(id);
+              toast('Claim right renounced', 'ok', { href: SOL.SOLSCAN_TX(sig), label: 'View ↗' });
+            }
+            await loadLocks();
+            await loadToken();
+          } catch (e) {
+            err(SOL.humanize(e));
+            toast(SOL.humanize(e).slice(0, 140), 'bad');
+            b.disabled = false;
+          }
+        };
+      });
+    }
+  }
+
+  $('refresh').onclick = () => loadLocks();
+  $('escrowopen').onclick = async () => {
+    clearErr();
+    const a = $('escrowin').value.trim();
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(a)) { err('Enter a valid Solana escrow address.'); return; }
+    try {
+      const l = await SOL.jupLockDetail(a);
+      $('locklist').innerHTML = rowHtml(l);
+      $('listhint').textContent = 'Opened one escrow directly from the chain.';
+      wireRows();
+    } catch (e) { err(SOL.humanize(e)); }
+  };
+  SOL.onSolWallet('accounts', (a) => { state.addr = a; paintWallet(); loadLocks(); });
+  SOL.onSolWallet('disconnect', () => { state.addr = null; paintWallet(); });
+
+  (async () => {
+    try {
+      const cn = await SOL.clusterNow();
+      state.now = cn.now; state.clockLocal = cn.local;
+      if (cn.local) $('datehint').textContent = 'Your browser clock is used for the date check; the chain enforces its own time.';
+      await SOL.ready();
+      [state.jupLive, state.oakenLive] = await Promise.all([SOL.jupLive(), SOL.programLive()]);
+      state.backend = state.oakenLive ? 'oaken' : 'jupiter';
+      if (state.oakenLive) {
+        $('programBanner').innerHTML = '<b>OAKEN Lock is live on Solana.</b> Our own program is deployed; Jupiter Lock is also available as a third-party option.';
+      } else if (state.jupLive) {
+        $('programBanner').innerHTML = '<b>OAKEN’s own lock program is not deployed on Solana mainnet yet.</b> So this page uses <b>Jupiter Lock</b> — a live third-party vesting program — for Solana locks. Jupiter’s program is upgradeable by its team; the OAKEN Lock program is built and tested, and opens when it is deployed. The EVM locks on <a href="/locks" style="color:var(--gold)">/locks</a> are live.';
+      } else {
+        $('programBanner').innerHTML = '<b>Solana locks are not available right now.</b> Neither the OAKEN program nor Jupiter Lock answered. Nothing will be signed.';
+      }
+      paintBackends();
+      const restored = await SOL.restore();
+      state.addr = restored || SOL.address();
+      paintWallet();
+      const d = new Date((state.now + 30 * 86400) * 1000);
+      const pad = (n) => String(n).padStart(2, '0');
+      if (!$('date').value) $('date').value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      update();
+      await loadLocks();
+    } catch (e) {
+      err(SOL.humanize(e));
+      paintWallet();
+    }
+  })();
+</script>
+</body>
+
+</html>

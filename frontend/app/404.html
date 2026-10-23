@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Not found · OAKEN</title>
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below — '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/embers.webp"><source src="/app/media/embers-head.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">404</div>
+    <h1 class="reveal">This page is not here.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px;max-width:60ch">
+    <p class="muted" style="margin-top:14px">The address is wrong, or the page was never part of this site — we only keep the pages we can back with real data. Everything we do have is one click away:</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:26px">
+      <a class="btn btn-p" href="/locks">See the locks</a>
+      <a class="btn btn-s" href="/locks/create">Lock tokens</a>
+      <a class="btn btn-g" href="/">Home</a>
+    </div>
+  </section>
+</main>
+<script type="module">
+  import { shell , onChainSwitch} from '/app/oaken.js';
+  shell();
+    /* 2026-10-16：这一页的数据**不是按钱包那条链渲染的**（跨链读 / 由 URL 决定）——
+       钱包换链不改变这里的任何一块。登记一个空的处理器 = 换链时不整页重载（不白闪），
+       结果和以前重载完一模一样。没登记的页面仍走整页重载，见 oaken.js 的 onChainSwitch。 */
+    onChainSwitch(() => { /* 见上 */ });
+</script>
+</body>
+</html>

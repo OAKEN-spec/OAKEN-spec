@@ -1,0 +1,1828 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Names · OAKEN</title>
+<meta name="description" content="Register a .hood name on Robinhood Chain, point it at your wallet, and make it resolve. Read live from the chain.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OAKEN">
+<meta property="og:title" content="OAKEN Names — .hood on Robinhood Chain">
+<meta property="og:description" content="Search, register and activate a .hood name. Every read comes from the registry on Robinhood Chain; every write is signed by your wallet.">
+<meta property="og:url" content="https://oaken.one/names/">
+<meta property="og:image" content="https://oaken.one/logo512.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@oakenhood">
+<link rel="icon" href="/favicon.png">
+<link rel="preload" as="image" href="/app/media/stamp-die.jpg">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+<style>
+  /* Names — the .hood registry page. Everything below reuses the site's tokens. */
+  .nsearch { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; margin-top: 20px; }
+  .nsearch .field { flex: 1 1 340px; display: flex; align-items: center; gap: 4px; background: var(--bark);
+                    border: 1px solid var(--line); border-radius: var(--r); padding: 0 16px; min-width: 0; }
+  .nsearch .field:focus-within { border-color: var(--line-gold); }
+  .nsearch input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--parch);
+                   font-size: 19px; padding: 15px 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+  .nsearch input::placeholder { color: #6f6353; }
+  .nsearch .suffix { font-family: "Oaken Mono", ui-monospace, Consolas, monospace; font-size: 16px; color: var(--gold); pointer-events: none; }
+  .nsearch .btn { flex: none; }
+  .nlay { display: grid; grid-template-columns: 1.08fr .92fr; gap: 26px; align-items: start; }
+  .nprice { width: 100%; border-collapse: collapse; }
+  .nprice td { padding: 12px 10px; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .nprice tr { cursor: pointer; }
+  .nprice tr:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+  .nprice tr:last-child td { border-bottom: 0; }
+  .nprice tr.on td { background: rgba(217, 163, 67, .08); }
+  .nprice tr.on td:first-child { color: var(--gold); }
+  .pill.bad { color: var(--bad); border-color: rgba(224, 120, 95, .45); background: rgba(224, 120, 95, .07); }
+  .nprice .eth { text-align: right; font-family: "Oaken Mono", ui-monospace, Consolas, monospace; color: var(--parch); white-space: nowrap; }
+  .nprice .per { text-align: right; color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .nsteps { display: grid; gap: 8px; margin-top: 14px; }
+  .nstep { display: flex; gap: 12px; align-items: flex-start; border: 1px solid var(--line);
+           border-radius: var(--r); padding: 11px 14px; background: rgba(20, 17, 13, .35); }
+  .nstep .no { font: 600 11px/1.7 "Oaken Mono", ui-monospace, Consolas, monospace; color: var(--gold);
+               letter-spacing: .1em; flex: none; width: 24px; }
+  .nstep b { display: block; font-size: 14px; color: var(--parch); }
+  .nstep .d { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.5; margin-top: 2px; }
+  .nstep .st { margin-left: auto; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+               color: var(--muted); flex: none; padding-top: 2px; }
+  .nstep.done { border-color: rgba(157, 191, 122, .35); }
+  .nstep.done .st { color: var(--ok); }
+  .nstep.busy { border-color: var(--line-gold); }
+  .nstep.busy .st { color: var(--gold); }
+  .nstep.bad { border-color: rgba(224, 120, 95, .5); }
+  .nstep.bad .st { color: var(--bad); }
+  .ncards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 18px; }
+  .ncard { border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px; background: var(--panel);
+           display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+  .ncard:hover { border-color: var(--line-gold); }
+  .ncard .nm { font-family: 'Oaken Display', Georgia, serif; font-size: 19px; color: var(--parch); word-break: break-all; }
+  .ncard .nm i { color: var(--gold); font-style: normal; }
+  .ncard .meta { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .ncard .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; padding-top: 8px; }
+  .ncard .acts .btn { padding: 6px 12px; font-size: 12.5px; }
+  .nart { width: 176px; height: 176px; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden;
+          display: grid; place-items: center; background: var(--bark); flex: none; }
+  .nart img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .nart .init { font-family: 'Oaken Display', Georgia, serif; font-size: 64px; color: var(--gold); opacity: .8; }
+  .nprofile { display: flex; gap: 22px; align-items: flex-start; flex-wrap: wrap; }
+  .nprofile .kv { flex: 1; min-width: 260px; }
+  .nrec { display: grid; grid-template-columns: 130px 1fr; gap: 8px 16px; font-size: 13.5px; }
+  .nrec dt { color: var(--muted); }
+  .nrec dd { word-break: break-all; }
+  .nrecent { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+  .nrecent a { display: flex; flex-direction: column; gap: 3px; border: 1px solid var(--line);
+               border-radius: var(--r); padding: 12px 14px; color: var(--parch); min-width: 0; }
+  .nrecent a:hover { border-color: var(--line-gold); text-decoration: none; }
+  .nrecent .nm { font-family: 'Oaken Display', Georgia, serif; font-size: 16.5px; word-break: break-all; }
+  .nrecent .nm i { color: var(--gold); font-style: normal; }
+  .nrecent .meta { font-size: 12px; color: var(--muted); }
+  .nstat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line);
+           border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+  .nstat > div { background: var(--panel); padding: 16px 18px; }
+  .nstat .v { font-family: 'Oaken Display', Georgia, serif; font-size: 26px; color: var(--gold); line-height: 1; }
+  .nstat .k { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+
+  /* ── the brass registry plaque ─────────────────────────────────────── */
+  .names-head { min-height: clamp(360px, 48vh, 540px); }
+  .names-head .ph-in {
+    padding-top: clamp(70px, 11vh, 118px);
+    padding-bottom: clamp(56px, 8vh, 92px);
+  }
+  .names-head .ph-bg video, .names-head .ph-bg img { object-position: 60% 46%; }
+  .names-head .ph-scrim {
+    background: linear-gradient(90deg, rgba(14, 11, 8, .95) 0%, rgba(14, 11, 8, .78) 42%, rgba(14, 11, 8, .26) 74%, rgba(14, 11, 8, .42) 100%),
+                linear-gradient(0deg, rgba(14, 11, 8, .86), transparent 42%);
+  }
+  .nregistry {
+    scroll-margin-top: 120px;
+    position: relative; overflow: hidden; isolation: isolate;
+    padding: 26px 30px 22px;
+    border: 1px solid rgba(217, 163, 67, .5); border-radius: 8px;
+    background-image:
+      linear-gradient(180deg, rgba(16, 11, 6, .58), rgba(16, 11, 6, .72)),
+      url('/app/media/plate-face.jpg');
+    background-size: auto, cover;
+    background-position: center, center;
+    background-repeat: no-repeat;
+    color: #f1e3c8;
+    box-shadow: 0 30px 80px -32px rgba(0, 0, 0, .95), inset 0 0 0 1px rgba(255, 240, 205, .1), inset 0 0 80px rgba(0, 0, 0, .5);
+  }
+  .nregistry::before {
+    content: ''; position: absolute; inset: -60% -30%; pointer-events: none; z-index: 0;
+    background: linear-gradient(105deg, transparent 39%, rgba(255, 236, 190, .2) 48%, rgba(255, 236, 190, .06) 54%, transparent 64%);
+    transform: translateX(-55%); opacity: 0;
+    animation: plateSweep 11s ease-in-out infinite; mix-blend-mode: screen;
+  }
+  .nregistry::after {
+    content: ''; position: absolute; inset: 6px; border: 1px solid rgba(217, 163, 67, .22);
+    border-radius: 5px; pointer-events: none;
+  }
+  .nregistry > * { position: relative; z-index: 1; }
+  .nregistry-top { display: flex; align-items: center; gap: 16px; justify-content: space-between; flex-wrap: wrap; }
+  .nplate-eyebrow {
+    font-family: "Oaken Mono", ui-monospace, Consolas, monospace; font-size: 10.5px; font-weight: 600;
+    letter-spacing: .22em; color: rgba(232, 184, 92, .86);
+  }
+  .nplate-status {
+    display: inline-flex; align-items: center; gap: 8px; font-family: "Oaken Mono", ui-monospace, Consolas, monospace;
+    font-size: 10.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--gold);
+    border: 1px solid rgba(217, 163, 67, .45); border-radius: 999px; padding: 7px 12px;
+    background: rgba(20, 14, 6, .55);
+  }
+  .nplate-status .pdot {
+    width: 7px; height: 7px; border-radius: 50%; flex: none;
+    background: var(--gold); box-shadow: 0 0 0 3px rgba(217, 163, 67, .15);
+  }
+  .nregistry.is-available .nplate-status { color: var(--ok); border-color: rgba(157, 191, 122, .5); background: rgba(18, 28, 12, .62); }
+  .nregistry.is-available .pdot { background: var(--ok); box-shadow: 0 0 0 3px rgba(157, 191, 122, .16); }
+  .nregistry.is-taken .nplate-status { color: var(--gold-2); border-color: rgba(217, 163, 67, .5); background: rgba(30, 20, 8, .62); }
+  .nregistry.is-taken .pdot { background: var(--gold-2); box-shadow: 0 0 0 3px rgba(232, 184, 92, .16); }
+  .nregistry.is-bad .nplate-status { color: var(--bad); border-color: rgba(224, 120, 95, .55); background: rgba(36, 16, 10, .62); }
+  .nregistry.is-bad .pdot { background: var(--bad); box-shadow: 0 0 0 3px rgba(224, 120, 95, .14); }
+  .nregistry.is-reading .pdot { animation: platePulse 1.2s ease-in-out infinite; }
+  .nplate-name {
+    margin-top: 18px; font-family: 'Oaken Display', Georgia, serif;
+    font-size: clamp(38px, 6.2vw, 72px); line-height: 1.02; letter-spacing: .01em;
+    color: var(--parch); word-break: break-all;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, .5), 0 0 30px rgba(0, 0, 0, .4);
+  }
+  .nplate-name i { color: var(--gold-2); font-style: normal; }
+  .nplate-name.tick { animation: plateTick .55s ease-out; }
+  .nplate-sub { margin-top: 4px; font-size: 13.5px; color: rgba(240, 228, 208, .66); }
+  .nregistry .nsearch { margin-top: 20px; }
+  .nregistry .field {
+    background: rgba(18, 13, 7, .87); border-color: rgba(217, 163, 67, .38);
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, .55);
+  }
+  .nregistry .btn-p { box-shadow: 0 12px 30px -16px rgba(0, 0, 0, .8); }
+  .nplate-foot {
+    display: grid; grid-template-columns: 1.02fr .98fr; gap: 26px; align-items: start;
+    margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(217, 163, 67, .22);
+  }
+  .nplate-foot .nstat { border-color: rgba(217, 163, 67, .22); background: rgba(217, 163, 67, .18); }
+  .nplate-foot .nstat > div { background: rgba(16, 11, 6, .58); padding: 13px 16px; }
+  .nplate-foot .nstat .v { color: var(--gold); font-size: 24px; }
+  .nplate-foot .nstat .k { color: rgba(240, 228, 208, .55); font-size: 10px; }
+  .nplate-note p { margin: 0; font-size: 12.5px; line-height: 1.6; color: rgba(240, 228, 208, .68); max-width: 60ch; }
+  .nplate-index {
+    margin-top: 8px; font-family: "Oaken Mono", ui-monospace, Consolas, monospace;
+    font-size: 10.5px; line-height: 1.5; color: rgba(240, 228, 208, .48);
+  }
+  .nplate-hint { margin-top: 14px; }
+  .nregistry.is-reading .nplate-sub { color: rgba(240, 228, 208, .48); }
+  @keyframes plateSweep {
+    0%, 16% { transform: translateX(-55%); opacity: 0; }
+    28% { opacity: 1; }
+    58% { transform: translateX(55%); opacity: 1; }
+    72%, 100% { transform: translateX(55%); opacity: 0; }
+  }
+  @keyframes platePulse { 0%, 100% { transform: scale(1); opacity: .7; } 50% { transform: scale(1.35); opacity: 1; } }
+  @keyframes plateTick {
+    0% { transform: translateY(5px) scale(.995); opacity: .5; text-shadow: 0 0 28px rgba(255, 246, 214, .95); }
+    100% { transform: none; opacity: 1; }
+  }
+
+  /* ── mid-page seal band ────────────────────────────────────────────── */
+  .nband {
+    display: grid; grid-template-columns: 1.06fr .94fr; gap: 40px; align-items: center;
+    padding: 40px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  }
+  .nband-facts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 20px; }
+  .nband-art {
+    position: relative; border: 1px solid var(--line-gold); border-radius: var(--r);
+    overflow: hidden; background: #0d0a07; aspect-ratio: 1 / 1;
+    box-shadow: 0 34px 90px -42px #000;
+  }
+  .nband-art > img {
+    width: 100%; height: 100%; object-fit: cover; display: block; opacity: .94;
+    animation: bandFloat 12s ease-in-out infinite;
+  }
+  .nband-art::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at 50% 42%, transparent 32%, rgba(14, 11, 8, .58) 100%);
+  }
+  .nband-embers { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+  .nband-cap {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 15px 18px;
+    font-family: "Oaken Mono", ui-monospace, Consolas, monospace; font-size: 10.5px;
+    letter-spacing: .18em; text-transform: uppercase; color: rgba(240, 228, 208, .68);
+    background: linear-gradient(0deg, rgba(14, 11, 8, .9), transparent);
+  }
+  @keyframes bandFloat {
+    0%, 100% { transform: scale(1.03) translateY(0); }
+    50% { transform: scale(1.06) translateY(-8px); }
+  }
+
+  /* ── the registration stamp ────────────────────────────────────────── */
+  .stamp-veil {
+    position: fixed; inset: 0; z-index: 98; display: grid; place-items: center;
+    background: rgba(10, 7, 4, .56); backdrop-filter: blur(3px);
+    opacity: 0; pointer-events: none; transition: opacity .35s ease;
+  }
+  .stamp-veil.in { opacity: 1; pointer-events: auto; cursor: pointer; }
+  .stamp-card { text-align: center; transform: scale(1.2) rotate(-7deg); opacity: 0; max-width: 90vw;
+    transition: transform .55s cubic-bezier(.2, .9, .25, 1.2), opacity .25s ease; }
+  .stamp-veil.in .stamp-card { transform: scale(1) rotate(-3deg); opacity: 1; }
+  .stamp-die {
+    width: 170px; height: 170px; margin: 0 auto 16px; border-radius: 50%; overflow: hidden;
+    border: 2px solid rgba(232, 184, 92, .82);
+    box-shadow: 0 0 0 8px rgba(217, 163, 67, .12), 0 24px 55px -20px #000;
+  }
+  .stamp-die img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .stamp-label { font-family: 'Oaken Display', Georgia, serif; font-size: 30px; color: var(--parch);
+    word-break: break-all; max-width: 88vw; margin: 0 auto; }
+  .stamp-label i { color: var(--gold); font-style: normal; }
+  .stamp-sub {
+    margin-top: 8px; font-family: "Oaken Mono", ui-monospace, Consolas, monospace;
+    font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: rgba(240, 228, 208, .6);
+  }
+  .stamp-veil::after {
+    content: ''; position: absolute; width: 190px; height: 190px; border-radius: 50%;
+    border: 1px solid rgba(232, 184, 92, .55); opacity: 0;
+    animation: stampRing .9s ease-out .12s;
+  }
+  @keyframes stampRing { 0% { transform: scale(.72); opacity: .85; } 100% { transform: scale(1.7); opacity: 0; } }
+
+  @media (max-width: 940px) { .nlay { grid-template-columns: 1fr; } .ncards { grid-template-columns: repeat(2, 1fr); }
+    .nplate-foot { grid-template-columns: 1fr; gap: 16px; }
+    .nband { grid-template-columns: 1fr; gap: 26px; }
+    .nband-art { max-width: 520px; }
+  }
+  /* The result header is a flex row on desktop; on a phone the long name and the side note
+     would share one line and break the name into slivers. Stack them. */
+  @media (max-width: 720px) {
+    #result .panel .head { flex-wrap: wrap; row-gap: 8px; }
+    #result .panel .head .pill { order: 1; }
+    #result .panel .head h3 { order: 2; flex: 1 1 100%; font-size: 21px !important; word-break: break-all; }
+    #result .panel .head > .muted { order: 3; flex: 1 1 100%; margin-left: 0 !important; }
+    .nregistry { padding: 22px 20px 20px; }
+    .nplate-eyebrow { font-size: 9.5px; letter-spacing: .16em; }
+    .nplate-status { font-size: 9.5px; padding: 6px 10px; }
+    .nplate-name { font-size: clamp(32px, 10vw, 52px); }
+    .nplate-foot .nstat .v { font-size: 22px; }
+    .nplate-foot .nstat .k { font-size: 9px; }
+    .nband { padding: 30px 0; }
+  }
+  @media (max-width: 620px) {
+    .nsearch .btn { width: 100%; }
+    .stamp-die { width: 140px; height: 140px; }
+    .stamp-label { font-size: 24px; }
+  }
+  @media (max-width: 520px) {
+    .nregistry-top { gap: 9px; }
+    .nplate-status { font-size: 9px; letter-spacing: .06em; }
+    .nplate-foot .nstat .v { font-size: 20px; }
+  }
+  @media (max-width: 700px) {
+    #result { scroll-margin-top: 150px; }
+    #nregistry { scroll-margin-top: 150px; }
+  }
+  @media (max-width: 520px) {
+    #result { scroll-margin-top: 175px; }
+    #nregistry { scroll-margin-top: 175px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nregistry::before, .nband-art > img, .nplate-name.tick, .nregistry.is-reading .pdot { animation: none !important; }
+    .stamp-card, .stamp-veil { transition: none !important; }
+    .stamp-veil::after { animation: none !important; }
+  }
+  @media (max-width: 760px) { .nrecent { grid-template-columns: 1fr; } }
+  @media (max-width: 620px) { .ncards { grid-template-columns: 1fr; } .nart { width: 100%; height: 200px; } }
+</style>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead names-head">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/nameplate.jpg"><source src="/app/media/nameplate-head.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Names · .hood on Robinhood Chain</div>
+    <h1 class="reveal">A name for your wallet.</h1>
+    <p class="ph-lede reveal">Register a <span class="mono">.hood</span> name, point it at the address you actually use,
+      and let people pay you without copying forty-two characters. Every read below comes from the chain.</p>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <div class="nregistry reveal" id="nregistry">
+      <div class="nregistry-top">
+        <span class="nplate-eyebrow">OAKEN NAMES · THE .HOOD REGISTRY</span>
+        <span class="nplate-status" id="plate-status"><i class="pdot"></i><span id="plate-status-text">Search a name</span></span>
+      </div>
+      <div class="nplate-name" id="plate-name" aria-live="polite">
+        <span id="plate-label">your name</span><i>.hood</i>
+      </div>
+      <div class="nplate-sub" id="plate-sub">Every read comes from the registry on Robinhood Chain.</div>
+      <div class="nsearch">
+        <div class="field">
+          <input id="q" aria-label="Search for a .hood name" placeholder="Search for a name" autocomplete="off" spellcheck="false" maxlength="80">
+          <span class="suffix">.hood</span>
+        </div>
+        <button class="btn btn-p" id="go" type="button">Search</button>
+      </div>
+      <div class="nplate-foot">
+        <div class="nstat" id="nstat">
+          <div><div class="v" id="s-total">—</div><div class="k">Names registered</div></div>
+          <div><div class="v" id="s-holders">—</div><div class="k">Wallets holding one</div></div>
+          <div><div class="v" id="s-day">—</div><div class="k">Last 7 days</div></div>
+        </div>
+        <div class="nplate-note">
+          <p>The name is an ERC-1155 NFT in your wallet. OAKEN is the front end; the registry and registrar are
+            HD Protocol's contracts on Robinhood Chain. We never custody a name and take no fee on registration.</p>
+          <div class="nplate-index" id="stat-note">Reading the registry index…</div>
+        </div>
+      </div>
+    </div>
+    <div class="hint nplate-hint">Lowercase letters, numbers and hyphens. Checking availability is free and needs no
+      wallet. Registration is one transaction, signed by you; there is no commit-reveal on this registrar, so a name can
+      be taken between your search and your signature. Names live on Robinhood Chain (4663) — the site-wide chain
+      switcher does not change this page, and the wallet is switched to 4663 before any signature.</div>
+
+    <div id="result" aria-live="polite" style="margin-top:28px;scroll-margin-top:124px"></div>
+    <section id="mynames" style="margin-top:52px">
+      <div class="between" style="margin-bottom:14px">
+        <div>
+          <div class="eyebrow">My names</div>
+          <h2 class="sec" style="margin-top:8px;font-size:26px">What your wallet holds.</h2>
+        </div>
+        <button class="btn btn-s" type="button" id="mine-refresh">Refresh</button>
+      </div>
+      <div id="mine-out" aria-live="polite"></div>
+    </section>
+
+    <section id="recent-wrap" style="margin-top:52px">
+      <div class="between" style="margin-bottom:14px">
+        <div>
+          <div class="eyebrow">The registry</div>
+          <h2 class="sec" style="margin-top:8px;font-size:26px">Recently claimed.</h2>
+        </div>
+        <button class="btn btn-s" type="button" id="recent-refresh">Refresh</button>
+      </div>
+      <div class="nrecent" id="recent"><div class="hint">Reading the registry index…</div></div>
+      <div class="hint" style="margin-top:12px" id="recent-note">The list is built from the registrar's
+        <span class="mono">NameRegistered</span> events, then checked against current ownership.</div>
+    </section>
+
+    <section class="nband reveal" style="margin-top:56px">
+      <div class="nband-copy">
+        <div class="eyebrow">01 / A name, not a number</div>
+        <h2 class="sec" style="font-size:30px;margin-top:10px">A name is the shortest contract you can write.</h2>
+        <p class="muted" style="margin-top:14px;max-width:52ch;font-size:15px;line-height:1.7">It says: this address
+          is me. The registry stores it, your resolver answers it, and your wallet holds it. Nothing here depends on
+          OAKEN staying online — the name is an NFT in your wallet, and anyone who can read the chain can read it.</p>
+        <div class="nband-facts">
+          <span class="pill lock">IN YOUR WALLET</span>
+          <span class="pill lock">NO CUSTODIAN</span>
+          <span class="pill lock">READ FROM CHAIN</span>
+        </div>
+        <a class="btn btn-s" href="#nregistry" style="margin-top:20px">Search the registry →</a>
+      </div>
+      <div class="nband-art">
+        <img src="/app/media/stamp.jpg" alt="A blank brass stamp die resting on dark amber wax" loading="lazy" width="1200" height="1200">
+        <canvas class="nband-embers" data-embers aria-hidden="true"></canvas>
+        <div class="nband-cap">The die is blank. The name is yours.</div>
+      </div>
+    </section>
+
+    <section style="margin-top:56px">
+      <div class="eyebrow">How it works</div>
+      <h2 class="sec" style="margin-top:8px;font-size:26px">Four steps. Most names stop at step two.</h2>
+      <div class="nsteps" style="margin-top:18px">
+        <div class="nstep"><span class="no">01</span><div><b>Search</b><span class="d">Check availability and the exact on-chain price. No wallet needed.</span></div></div>
+        <div class="nstep"><span class="no">02</span><div><b>Register</b><span class="d">One transaction mints the name straight into your wallet.</span></div></div>
+        <div class="nstep"><span class="no">03</span><div><b>Wire it up</b><span class="d">Deploy the name's own resolver, link it, and write your address into it.</span></div></div>
+        <div class="nstep"><span class="no">04</span><div><b>Set it as your primary name</b><span class="d">Interfaces that support reverse lookup then show the name instead of 0x…</span></div></div>
+      </div>
+      <div class="note" style="margin-top:20px;border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;color:var(--muted);font-size:13.5px;line-height:1.6">
+        <b style="color:var(--parch)">What this is not.</b> OAKEN does not issue .hood names, cannot freeze them, and
+        cannot recover one for you. The registry is <span class="mono">HD Protocol</span>'s contract on Robinhood Chain
+        (chain 4663). A name is an NFT: whoever holds it can move or sell it. If you register one and stop at step 2,
+        it exists but nothing resolves to it — that is the state most names on this chain are in. Verification is not
+        an audit, and a name is not a guarantee of identity.
+      </div>
+    </section>
+  </section>
+</main>
+
+<script src="/app/vendor/ethers.umd.min.js" defer></script>
+<script type="module">
+  import {
+    shell, CHAIN, provider, wallet, toast, txNotice, explorerHref, showReadFail, emptyState,
+    reveal, onWallet, onChainSwitch, humanizeWalletError, emberField,
+  } from '/app/oaken.js';
+
+  shell({ active: 'names' });
+  /* This page is pinned to Robinhood Chain. A site-wide chain switch must not reload it — the
+     registry only exists on 4663, and the wallet is switched to 4663 before any write. */
+  onChainSwitch(() => {});
+
+  const $ = (id) => document.getElementById(id);
+  const ZERO = '0x0000000000000000000000000000000000000000';
+  const ZERO32 = '0x' + '0'.repeat(64);
+  const ROLE_BITMAP = (1n << 0n) | (1n << 128n) | (1n << 4n) | (1n << 132n);
+  const START_BLOCK = 5785243;
+  const SNAP_URL = '/app/names-index.json';
+  const INDEX_CACHE = 'oaken.names.index.v1';
+  const CHUNK = 5000000;
+  const YEAR = 31536000;
+  const DURATIONS = [
+    { years: 1, seconds: 31536000n },
+    { years: 2, seconds: 63072000n },
+    { years: 3, seconds: 94608000n },
+    { years: 5, seconds: 157680000n },
+  ];
+  const RECORD_KEYS = ['url', 'avatar', 'description', 'twitter', 'github', 'telegram', 'discord', 'email'];
+
+  /* HD Protocol's contracts on Robinhood Chain — verified against chain code and live
+     transactions. The same registry the .hood names live in; OAKEN is the front end. */
+  const C = {
+    registry: '0xd1a6f766577a0cd3c0f9f30b4add8623a49c5e41',
+    registrar: '0xef136bd95cde0cfe2438f6f920ae60cc275c8fa0',
+    reverseRegistrar: '0x7614e0f829e2c7a0c093005ae887ff117d9e1df4',
+    verifiableFactory: '0x7ad6be4f4a6fbfdbe36571d69919b1f90ef1008f',
+    resolverImpl: '0x7ddfb9789646f8633677601e339e578b638c8045',
+  };
+
+  const REGISTRY_ABI = [
+    'function ownerOf(uint256 id) view returns (address)',
+    'function balanceOf(address account, uint256 id) view returns (uint256)',
+    'function uri(uint256 id) view returns (string)',
+    'function getExpiry(uint256 anyId) view returns (uint64)',
+    'function getResolver(string label) view returns (address)',
+    'function getTokenId(uint256 anyId) view returns (uint256)',
+    'function setResolver(uint256 anyId, address resolver)',
+    'event TransferSingle(address indexed operator, address indexed from, address indexed to, uint256 id, uint256 value)',
+  ];
+  const REGISTRAR_ABI = [
+    'function isAvailable(string label) view returns (bool)',
+    'function getRegisterPrice(string label, uint64 duration) view returns (uint256 base, uint256 premium)',
+    'function registerBatch(string[] labels, address owner, address subregistry, address resolver, uint64 duration, bytes32 referrer) payable returns (uint256[])',
+    'event NameRegistered(uint256 indexed tokenId, string label, address owner, address subregistry, address resolver, uint64 duration, bytes32 indexed referrer, uint256 base, uint256 premium)',
+    'error LabelHasUppercase(string label)',
+    'error NameNotAvailable(string label)',
+    'error UnexpiredCommitmentExists(bytes32 commitment)',
+    'error InvalidBatchSize(uint256 size)',
+    'error InsufficientPayment(uint256 required, uint256 provided)',
+  ];
+  const RESOLVER_ABI = [
+    'function initialize(address admin, uint256 roleBitmap, bytes[] setters)',
+    'function addr(bytes32 node) view returns (address)',
+    'function text(bytes32 node, string key) view returns (string)',
+    'function setAddr(bytes32 node, address addr_)',
+    'function setText(bytes32 node, string key, string value)',
+  ];
+  const REVERSE_ABI = [
+    'function nameForAddr(address addr) view returns (string)',
+    'function setName(string name)',
+  ];
+  const FACTORY_ABI = ['function deployProxy(address implementation, uint256 salt, bytes data) returns (address)'];
+
+  /* Stable event topics. Kept as literals so nothing touches window.ethers at module
+     evaluation time — if the 514 KB ethers script is slow or blocked, the page still loads
+     and tells the user reads failed instead of dying before the first line. */
+  const REG_TOPIC = '0xaf3a41370c141b67665ad99afc9f7919c3266f9e105fc9aaa635d8371787eaa0';
+  const TR_TOPIC = '0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62';
+  let _ifaces = null;
+  function ifaces() {
+    if (!_ifaces) {
+      if (!window.ethers) throw new Error('The chain library did not load — reload the page.');
+      _ifaces = {
+        read: new window.ethers.Interface(REGISTRY_ABI),
+        reg: new window.ethers.Interface(REGISTRAR_ABI),
+        resolver: new window.ethers.Interface(RESOLVER_ABI),
+      };
+    }
+    return _ifaces;
+  }
+
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+  const short6 = (a) => (a ? String(a).slice(0, 8) + '…' + String(a).slice(-4) : '—');
+  const eth = (wei) => {
+    if (wei == null) return '—';
+    try { return window.ethers.formatEther(wei); } catch { return '—'; }
+  };
+  const trimEth = (v) => {
+    const s = Number(v);
+    if (!Number.isFinite(s)) return '—';
+    return s.toLocaleString('en-US', { maximumFractionDigits: 6 });
+  };
+  const dateUTC = (sec) => {
+    const n = Number(sec);
+    if (!n) return '—';
+    return new Date(n * 1000).toLocaleString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC', timeZoneName: 'short',
+    });
+  };
+  const until = (sec) => {
+    const n = Number(sec);
+    if (!n) return '—';
+    const d = Math.ceil((n * 1000 - Date.now()) / 86400000);
+    if (d <= 0) return 'expired';
+    return d + (d === 1 ? ' day' : ' days') + ' left';
+  };
+  const ago = (ts) => {
+    if (!ts) return '';
+    const s = Math.max(0, Math.floor(Date.now() / 1000) - Number(ts));
+    if (s < 60) return s + 's ago';
+    if (s < 3600) return Math.floor(s / 60) + 'm ago';
+    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+    if (s < 86400 * 30) return Math.floor(s / 86400) + 'd ago';
+    return new Date(ts * 1000).toISOString().slice(0, 10);
+  };
+  const cleanLabel = (v) => String(v || '').toLowerCase()
+    .replace(/\.hood$/i, '').replace(/[^a-z0-9-]/g, '').replace(/^-+/, '').slice(0, 63);
+  const validLabel = (label) => {
+    if (!label) return 'Enter a name.';
+    if (label.length > 63) return '63 characters maximum.';
+    if (/[A-Z]/.test(label)) return 'Lowercase only — the contract rejects uppercase.';
+    if (!/^[a-z0-9-]+$/.test(label)) return 'Only a–z, 0–9 and hyphens.';
+    if (/^-|-$/.test(label)) return 'Cannot start or end with a hyphen.';
+    return '';
+  };
+  const safeImage = (v) => {
+    const s = String(v == null ? '' : v).trim();
+    return /^data:image\/(svg\+xml|png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/i.test(s)
+      || /^https:\/\//i.test(s) ? s : null;
+  };
+  const safeHref = (v) => (/^https?:\/\//i.test(String(v == null ? '' : v).trim())
+    ? String(v).trim() : null);
+  const errText = (e) => String((e && (e.shortMessage || e.message)) || e || 'Transaction failed').slice(0, 220);
+  /** Every place an ethers/wallet error can hide its message. The wallet wraps contract
+      reverts oddly ("could not coalesce error"), so shortMessage alone is not enough. */
+  const errBundle = (e) => [
+    e && e.shortMessage, e && e.message, e && e.reason,
+    e && e.info && e.info.error && e.info.error.message, e && e.info && e.info.error && e.info.error.data,
+    e && e.error && e.error.message, e && e.error && e.error.data, e && e.data,
+  ].filter(Boolean).map(String).join(' | ');
+  const isRevertError = (e) => {
+    if (!e) return false;
+    const code = e.code;
+    if (code === 'CALL_EXCEPTION' || code === 3 || e.revert) return true;
+    return /revert|execution reverted/i.test(String(e.shortMessage || e.message || ''));
+  };
+  const ERR_TAKEN = '0x477707e8';          // NameNotAvailable(string)
+  const ERR_INSUFFICIENT = '0xb99e2ab7';   // InsufficientPayment(uint256,uint256)
+  const txErrText = (e) => {
+    const code = e && (e.code != null ? e.code : (e.info && e.info.error && e.info.error.code));
+    const raw = errBundle(e);
+    if (code === 4001 || /user rejected|rejected the request|denied/i.test(raw)) {
+      return 'Transaction rejected in the wallet.';
+    }
+    const pick = (e && e.reason)
+      || (e && e.info && e.info.error && e.info.error.message)
+      || (e && e.error && e.error.message)
+      || (e && e.shortMessage)
+      || (e && e.message)
+      || 'Transaction failed';
+    return String(pick).slice(0, 220);
+  };
+  /**
+   * One transaction, one toast: Pending → sent(hash) → confirmed / failed. If the wallet
+   * rejects before a hash exists, the pending toast must be closed — otherwise "confirm in
+   * your wallet…" sits there forever (this bit the mock rejection test). Callers can check
+   * `e.__toastShown` so they do not stack a second copy of the same error.
+   */
+  async function sendTx(label, send, okText) {
+    const note = txNotice(CHAIN, label);
+    try {
+      const tx = await send();
+      note.sent(tx.hash);
+      await tx.wait();
+      note.ok(okText || (label + ' confirmed.'));
+      return tx;
+    } catch (e) {
+      const msg = txErrText(e);
+      try { note.fail(msg); } catch { /* toast already gone */ }
+      try {
+        e.__toastShown = true;
+        e.__note = note;
+      } catch { /* frozen error object */ }
+      throw e;
+    }
+  }
+
+  let account = null;
+  let state = { label: '', years: 1, prices: null, busy: false };
+
+  /* ── the brass plaque ─────────────────────────────────────────────── */
+  const PLATE_DEFAULT = 'your name';
+  const PLATE_SUB = 'Every read comes from the registry on Robinhood Chain.';
+  function setPlateName(label, { tick = false } = {}) {
+    const labelEl = $('plate-label');
+    const host = $('plate-name');
+    if (!labelEl) return;
+    const next = label || PLATE_DEFAULT;
+    if (labelEl.textContent === next) return;
+    labelEl.textContent = next;
+    if (tick && host) {
+      host.classList.remove('tick');
+      void host.offsetWidth;   // restart the CSS animation
+      host.classList.add('tick');
+    }
+  }
+  function setPlateStatus(text, mode = '') {
+    const t = $('plate-status-text');
+    if (t) t.textContent = text;
+    const reg = $('nregistry');
+    if (reg) {
+      reg.classList.remove('is-available', 'is-taken', 'is-bad', 'is-reading');
+      if (mode) reg.classList.add('is-' + mode);
+    }
+  }
+  function setPlateSub(text) {
+    const el = $('plate-sub');
+    if (el) el.textContent = text || PLATE_SUB;
+  }
+  /** The registration "thunk": a short, decorative stamp. The toast already announces success,
+      so this overlay is aria-hidden and skipped under reduced motion. */
+  function stampMoment(label) {
+    if (!label || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    document.querySelector('.stamp-veil')?.remove();
+    const el = document.createElement('div');
+    el.className = 'stamp-veil';
+    el.setAttribute('aria-hidden', 'true');
+    el.innerHTML = `<div class="stamp-card">
+      <div class="stamp-die"><img src="/app/media/stamp-die.jpg" alt=""></div>
+      <div class="stamp-label">${esc(label)}<i>.hood</i></div>
+      <div class="stamp-sub">Registered on Robinhood Chain</div>
+    </div>`;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('in'));
+    let done = false;
+    const close = () => {
+      if (done) return;
+      done = true;
+      el.classList.remove('in');
+      setTimeout(() => el.remove(), 520);
+    };
+    el.addEventListener('click', close, { once: true });
+    setTimeout(close, 2800);
+  }
+
+  const rp = () => {
+    if (!window.ethers) throw new Error('The chain library did not load — reload the page.');
+    return provider(CHAIN);
+  };
+  const registryRead = () => {
+    if (!window.ethers) throw new Error('The chain library did not load — reload the page.');
+    return new window.ethers.Contract(C.registry, REGISTRY_ABI, rp());
+  };
+  const registrarRead = () => {
+    if (!window.ethers) throw new Error('The chain library did not load — reload the page.');
+    return new window.ethers.Contract(C.registrar, REGISTRAR_ABI, rp());
+  };
+  const reverseRead = () => {
+    if (!window.ethers) throw new Error('The chain library did not load — reload the page.');
+    return new window.ethers.Contract(C.reverseRegistrar, REVERSE_ABI, rp());
+  };
+
+  /* ── reads ─────────────────────────────────────────────────────────── */
+  async function nameInfo(label) {
+    const registry = registryRead();
+    const name = label + '.hood';
+    const out = { label, name, registered: false, resolverKnown: true, addrKnown: true, recordsKnown: true, artKnown: true };
+    let tokenId;
+    try {
+      tokenId = await registry.getTokenId(BigInt(window.ethers.keccak256(window.ethers.toUtf8Bytes(label))));
+    } catch (e) {
+      /* A revert for an unknown label means "not registered"; a network error is a read
+         failure and must not be shown as "available" or "not open". */
+      if (isRevertError(e)) return out;
+      throw e;
+    }
+    if (!tokenId) return out;
+    out.tokenId = tokenId.toString();
+    let owner, expiry = null;
+    const [ownerR, expiryR] = await Promise.allSettled([
+      registry.ownerOf(tokenId),
+      registry.getExpiry(tokenId),
+    ]);
+    if (ownerR.status === 'rejected') {
+      if (isRevertError(ownerR.reason)) return out;
+      throw ownerR.reason;
+    }
+    owner = ownerR.value;
+    if (expiryR.status === 'fulfilled') expiry = expiryR.value;
+    else if (!isRevertError(expiryR.reason)) throw expiryR.reason;
+    out.registered = !!owner && owner.toLowerCase() !== ZERO;
+    if (!out.registered) return out;
+
+    out.owner = owner;
+    out.expiry = expiry ? Number(expiry) : 0;
+    let resolverAddr = null;
+    try { resolverAddr = await registry.getResolver(label); }
+    catch (e) { if (!isRevertError(e)) out.resolverKnown = false; }
+    const primary = await reverseRead().nameForAddr(owner).catch(() => null);
+    out.resolver = out.resolverKnown && resolverAddr && resolverAddr !== ZERO ? resolverAddr : ZERO;
+    out.hasResolver = out.resolver !== ZERO;
+    out.primaryKnown = primary !== null;
+    out.ownerPrimaryName = primary || '';
+    out.resolvesTo = ZERO;
+    out.records = {};
+    if (out.resolverKnown && out.hasResolver) {
+      const res = new window.ethers.Contract(out.resolver, RESOLVER_ABI, rp());
+      const node = window.ethers.namehash(name);
+      const settled = await Promise.allSettled([
+        res.addr(node),
+        ...RECORD_KEYS.map((k) => res.text(node, k)),
+      ]);
+      const addrRes = settled[0];
+      if (addrRes.status === 'fulfilled') {
+        out.resolvesTo = addrRes.value && addrRes.value !== ZERO ? addrRes.value : ZERO;
+      } else {
+        out.addrKnown = false;
+      }
+      out.recordsKnown = settled.slice(1).every((s) => s.status === 'fulfilled');
+      RECORD_KEYS.forEach((k, i) => {
+        const s = settled[i + 1];
+        if (s.status === 'fulfilled' && s.value) out.records[k] = s.value;
+      });
+    }
+    const uri = await registry.uri(tokenId).catch(() => null);
+    if (uri === null) out.artKnown = false;
+    if (uri) {
+      const m = String(uri).match(/^data:application\/json;base64,(.*)$/s);
+      if (m) {
+        try {
+          const meta = JSON.parse(atob(m[1]));
+          out.meta = meta;
+          out.image = safeImage(meta && meta.image);
+        } catch { /* malformed metadata is not fatal */ }
+      }
+    }
+    return out;
+  }
+
+  async function quote(label) {
+    const reg = registrarRead();
+    const rows = await Promise.all(DURATIONS.map(async (d) => {
+      try {
+        const [base, premium] = await reg.getRegisterPrice(label, d.seconds);
+        const total = base + premium;
+        return { ...d, wei: total, eth: Number(window.ethers.formatEther(total)), error: null };
+      } catch (e) {
+        /* A revert is the registrar saying "not priced" (reserved label). A network error
+           is not an answer, so let it reach the read-failure path instead of showing "—". */
+        if (!isRevertError(e)) throw e;
+        return { ...d, wei: null, eth: null, error: 'not priced' };
+      }
+    }));
+    return rows;
+  }
+
+  async function checkLabel(label) {
+    const why = validLabel(label);
+    if (why) return { status: 'invalid', label, reason: why };
+    const reg = registrarRead();
+    let free;
+    try { free = await reg.isAvailable(label); }
+    catch (e) {
+      if (!isRevertError(e)) throw e;
+      free = false;
+    }
+    if (!free) {
+      const info = await nameInfo(label);
+      return info.registered ? { status: 'taken', label, info } : { status: 'reserved', label };
+    }
+    const prices = await quote(label);
+    if (!prices.some((p) => p.wei !== null)) return { status: 'error', label, reason: 'The registrar did not quote a price.' };
+    return { status: 'available', label, prices };
+  }
+
+  /* ── rendering: search result ───────────────────────────────────────── */
+  function priceRows(label, rows, years) {
+    return rows.map((r) => `
+      <tr data-years="${r.years}" class="${r.years === years ? 'on' : ''}" tabindex="0" role="button"
+          aria-pressed="${r.years === years}" aria-label="${r.years} ${r.years === 1 ? 'year' : 'years'}">
+        <td>${r.years} ${r.years === 1 ? 'year' : 'years'}</td>
+        <td class="eth">${r.wei === null ? '—' : esc(trimEth(r.eth)) + ' ETH'}</td>
+        <td class="per">${r.wei === null ? 'not priced' : esc(trimEth(r.eth / r.years)) + ' / year'}</td>
+      </tr>`).join('');
+  }
+
+  function selectDuration(years) {
+    state.years = Number(years) || 1;
+    $('pricetable')?.querySelectorAll('tr[data-years]').forEach((x) => {
+      const on = Number(x.dataset.years) === state.years;
+      x.classList.toggle('on', on);
+      x.setAttribute('aria-pressed', String(on));
+    });
+    paintPayline();
+  }
+
+  function renderAvailable(result) {
+    state.label = result.label;
+    state.prices = result.prices;
+    setPlateName(result.label, { tick: true });
+    const row = result.prices.find((p) => p.years === state.years) || result.prices[0];
+    if (!row || row.years !== state.years) state.years = row ? row.years : 1;
+    $('result').innerHTML = `
+      <div class="panel reveal">
+        <div class="head">
+          <span class="pill ok">AVAILABLE</span>
+          <h3 style="font-size:24px;word-break:break-all">${esc(result.label)}<span style="color:var(--gold)">.hood</span></h3>
+          <span class="muted" style="margin-left:auto;font-size:13px">Nobody has taken this one yet.</span>
+        </div>
+        <div class="body">
+          <div class="nlay">
+            <div>
+              <div class="eyebrow">Price, quoted by the registrar</div>
+              <table class="nprice" id="pricetable" style="margin-top:10px">${priceRows(result.label, result.prices, state.years)}</table>
+              <div class="hint" style="margin-top:10px">Priced on-chain by character count — shorter costs more. The multi-year
+                discount caps at 3 years, so 5 years is the same per year. Any overpayment is refunded by the contract.</div>
+            </div>
+            <div>
+              <div class="eyebrow">What you get</div>
+              <div class="note" style="margin-top:10px;border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;color:var(--muted);font-size:13px;line-height:1.6">
+                An ERC-1155 name in your wallet. Registration is one transaction; making it resolve takes three more.
+                OAKEN walks you through all of them right after the mint — and you can stop after any step.
+              </div>
+              <div style="margin-top:14px">
+                <div class="hint" style="margin:0 0 8px">Pay with ETH on Robinhood Chain. This registrar has no
+                  commit-reveal and no queue: signing is the only protection against someone taking it first.</div>
+                <button class="btn btn-p" type="button" id="reg" style="width:100%" ${state.busy ? 'disabled' : ''}>Register this name</button>
+                <div class="hint" id="payline" style="margin-top:10px"></div>
+              </div>
+            </div>
+          </div>
+          <div class="err" id="regerr" role="alert" aria-live="assertive"></div>
+        </div>
+      </div>`;
+    paintPayline();
+    $('pricetable')?.querySelectorAll('tr[data-years]').forEach((tr) => {
+      tr.onclick = () => selectDuration(tr.dataset.years);
+      tr.onkeydown = (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); selectDuration(tr.dataset.years); }
+      };
+    });
+    $('reg').onclick = registerName;
+    reveal();
+  }
+
+  function paintPayline() {
+    const row = (state.prices || []).find((p) => p.years === state.years);
+    const el = $('payline');
+    const btn = $('reg');
+    if (!el) return;
+    if (!row || row.wei === null) {
+      el.innerHTML = '<span style="color:var(--bad)">The registrar did not quote a price for this duration. Pick another.</span>';
+      if (btn) btn.disabled = true;
+      setPlateStatus('Not priced for this duration', 'bad');
+      setPlateSub('Choose another duration — the registrar did not quote this one.');
+      return;
+    }
+    if (btn) btn.disabled = !!state.busy;
+    el.innerHTML = 'You pay <b style="color:var(--gold)">' + esc(trimEth(row.eth)) + ' ETH</b> for '
+      + row.years + ' ' + (row.years === 1 ? 'year' : 'years') + ' — one transaction to register.';
+    setPlateStatus('Available · ' + trimEth(row.eth) + ' ETH for ' + row.years + ' ' + (row.years === 1 ? 'year' : 'years'), 'available');
+    setPlateSub('Nobody has taken this name — sign once to mint it into your wallet.');
+  }
+
+  function profileHtml(info) {
+    const isOwner = account && info.owner && info.owner.toLowerCase() === account.toLowerCase();
+    const wired = info.resolvesTo && info.resolvesTo !== ZERO;
+    const expired = info.expiry && Number(info.expiry) * 1000 < Date.now();
+    const recs = Object.entries(info.records || {});
+    const art = info.image
+      ? `<img src="${esc(info.image)}" alt="On-chain art for ${esc(info.name)}">`
+      : `<span class="init">${esc((info.label || '?').slice(0, 1).toUpperCase())}</span>`;
+    const artCaption = info.artKnown === false ? 'On-chain art could not be read' : 'On-chain art';
+    const pointsHtml = info.resolverKnown === false
+      ? '<span class="muted">Could not read the resolver — try again.</span>'
+      : info.addrKnown === false
+        ? '<span class="muted">Could not read where this name points — try again.</span>'
+        : wired
+          ? `<span class="pill ok">WIRED</span> <a class="mono" href="${esc(explorerHref('/address/' + info.resolvesTo, CHAIN) || '#')}" target="_blank" rel="noopener noreferrer">${esc(short6(info.resolvesTo))}</a>`
+          : '<span class="pill">NOT WIRED</span> <span class="muted">Nothing resolves to this name yet.</span>';
+    const resolverHtml = info.resolverKnown === false
+      ? '<span class="muted">read failed — try again</span>'
+      : info.hasResolver
+        ? esc(info.resolver)
+        : '<span class="muted">none</span>';
+    const primary = info.primaryKnown
+      ? (info.ownerPrimaryName
+          ? `<a href="/names/?q=${encodeURIComponent(info.ownerPrimaryName.replace(/\.hood$/i, ''))}" data-q="${esc(info.ownerPrimaryName.replace(/\.hood$/i, ''))}">${esc(info.ownerPrimaryName)}</a>`
+          : '<span class="muted">Not set</span>')
+      : '<span class="muted">Read failed — try again</span>';
+    const ownerLine = `<a href="${esc(explorerHref('/address/' + info.owner, CHAIN) || '#')}" target="_blank" rel="noopener noreferrer" class="mono">${esc(short6(info.owner))}</a>`;
+    const recsHtml = recs.length
+      ? `<dl class="nrec">${recs.map(([k, v]) => {
+          const href = safeHref(v);
+          return `<dt>${esc(k)}</dt><dd>${href
+            ? `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(v)}</a>`
+            : esc(v)}</dd>`;
+        }).join('')}</dl>`
+      : '<span class="muted">No text records.</span>';
+    const recordsHtml = info.recordsKnown === false
+      ? '<span class="muted">Could not read text records — try again.</span>'
+      : recsHtml;
+    return `
+      <div class="nprofile">
+        <div>
+          <div class="nart">${art}</div>
+          <div class="hint" style="text-align:center;margin-top:6px">${esc(artCaption)}</div>
+        </div>
+        <div style="flex:1;min-width:260px">
+          <dl class="kv">
+            <dt>Owner</dt><dd>${ownerLine}</dd>
+            <dt>Expires</dt><dd>${esc(dateUTC(info.expiry))} <span class="muted">· ${esc(until(info.expiry))}</span></dd>
+            <dt>Points at</dt><dd>${pointsHtml}</dd>
+            <dt>Primary name of owner</dt><dd>${primary}</dd>
+            <dt>Resolver</dt><dd class="mono">${resolverHtml}</dd>
+            <dt>Records</dt><dd>${recordsHtml}</dd>
+            <dt>Token ID</dt><dd class="mono">${esc(info.tokenId || '—')}</dd>
+            <dt>Contract</dt><dd><a class="mono" href="${esc(explorerHref('/token/' + C.registry, CHAIN) || '#')}" target="_blank" rel="noopener noreferrer">${esc(C.registry)}</a></dd>
+          </dl>
+          ${expired ? '<p class="hint" style="color:var(--bad);margin-top:12px">This name has expired. The registry still shows the last owner, but the registrar can sell the name again.</p>' : ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+        ${isOwner ? '<button class="btn btn-p" type="button" id="setup-one">' + (wired ? 'Re-run setup' : 'Activate this name') + '</button>' : ''}
+        ${isOwner ? '<button class="btn btn-s" type="button" id="primary-one">Set as primary name</button>' : ''}
+        ${isOwner ? '<button class="btn btn-s" type="button" id="record-toggle">Edit records</button>' : ''}
+        <a class="btn btn-s" href="https://opensea.io/item/robinhood/${esc(C.registry)}/${esc(info.tokenId || '0')}" target="_blank" rel="noopener">View on OpenSea ↗</a>
+        ${!isOwner ? '<span class="hint" style="margin:10px 0 0">Connect the owner wallet to change anything here.</span>' : ''}
+      </div>
+      <div id="actbox"></div>
+      <div id="recordbox" class="hide" style="margin-top:16px"></div>`;
+  }
+
+  function renderTaken(result) {
+    const info = result.info;
+    state.label = info.label;
+    state.prices = null;
+    const expired = info.expiry && Number(info.expiry) * 1000 < Date.now();
+    setPlateName(info.label, { tick: true });
+    setPlateStatus((expired ? 'Expired · ' : 'Registered · ') + short6(info.owner), 'taken');
+    const wiring = info.resolverKnown === false
+      ? ' · some fields could not be read'
+      : info.resolvesTo && info.resolvesTo !== ZERO
+        ? ' · reaches ' + short6(info.resolvesTo)
+        : ' · not wired yet';
+    setPlateSub('Expires ' + dateUTC(info.expiry) + ' · ' + until(info.expiry) + wiring + '.');
+    $('result').innerHTML = `
+      <div class="panel reveal">
+        <div class="head">
+          <span class="pill ${expired ? 'bad' : 'lock'}">${expired ? 'EXPIRED' : 'REGISTERED'}</span>
+          <h3 style="font-size:24px;word-break:break-all">${esc(info.label)}<span style="color:var(--gold)">.hood</span></h3>
+          <span class="muted" style="margin-left:auto;font-size:13px">${esc(until(info.expiry))}</span>
+        </div>
+        <div class="body">${profileHtml(info)}</div>
+      </div>`;
+    wireProfileActions(info);
+    reveal();
+  }
+
+  function wireProfileActions(info) {
+    $('setup-one')?.addEventListener('click', () => {
+      $('actbox').innerHTML = activationHtml(info.label, true);
+      wireActivation(info.label);
+      $('actbox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    $('primary-one')?.addEventListener('click', () => setPrimaryFlow(info.label));
+    $('record-toggle')?.addEventListener('click', () => {
+      const box = $('recordbox');
+      box.classList.toggle('hide');
+      if (!box.classList.contains('hide')) box.innerHTML = recordFormHtml(info);
+      wireRecordForm(info);
+    });
+  }
+
+  function renderInvalid(label, reason) {
+    setPlateName(label || '', { tick: true });
+    setPlateStatus('Not usable', 'bad');
+    setPlateSub(reason || 'This name cannot be registered.');
+    $('result').innerHTML = `
+      <div class="panel reveal">
+        <div class="head"><span class="pill">NOT USABLE</span><h3 style="word-break:break-all">${esc(label || '—')}.hood</h3></div>
+        <div class="body"><p class="muted">${esc(reason)}</p></div>
+      </div>`;
+    reveal();
+  }
+
+  function renderReserved(label) {
+    setPlateName(label, { tick: true });
+    setPlateStatus('Not open for registration', 'bad');
+    setPlateSub('The registrar will not sell this label right now.');
+    $('result').innerHTML = `
+      <div class="panel reveal">
+        <div class="head"><span class="pill lock">NOT OPEN</span><h3 style="word-break:break-all">${esc(label)}<span style="color:var(--gold)">.hood</span></h3></div>
+        <div class="body"><p class="muted">The registrar will not sell this label right now. It is not owned by anyone
+          the registry reports; it is either reserved or outside the rules the pricing oracle enforces.</p></div>
+      </div>`;
+    reveal();
+  }
+
+  /* ── rendering: activation ──────────────────────────────────────────── */
+  function activationHtml(label, justRegistered) {
+    return `
+      <div class="panel reveal" style="margin-top:18px">
+        <div class="head"><h3>${justRegistered ? 'Registered. Now make it work.' : 'Make this name work'}</h3>
+          <span class="pill lock" style="margin-left:auto">4 TRANSACTIONS</span></div>
+        <div class="body">
+          <p class="muted" style="font-size:13.5px;line-height:1.6;margin-bottom:4px">
+            The NFT exists, but nothing points at it and it points at nothing. These steps are what turn a collectible
+            into an address people can pay. One wallet confirmation each — you can stop after any of them.
+          </p>
+          <div class="nsteps" id="nsteps">
+            <div class="nstep" data-step="1"><span class="no">01</span><div><b>Deploy the name's resolver</b><span class="d">A small contract that stores where this name points.</span></div><span class="st">PENDING</span></div>
+            <div class="nstep" data-step="2"><span class="no">02</span><div><b>Link the resolver to the name</b><span class="d">Tells the registry to use that resolver for this name.</span></div><span class="st">PENDING</span></div>
+            <div class="nstep" data-step="3"><span class="no">03</span><div><b>Write your address into it</b><span class="d">Payments to the name land at the address you sign with.</span></div><span class="st">PENDING</span></div>
+            <div class="nstep" data-step="4"><span class="no">04</span><div><b>Set it as your primary name</b><span class="d">Reverse lookup in interfaces that support it.</span></div><span class="st">PENDING</span></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+            <button class="btn btn-p" type="button" id="setup-all">Set it all up</button>
+            <button class="btn btn-s" type="button" id="setup-wire">Only wire it up</button>
+            <button class="btn btn-s" type="button" id="setup-primary">Only set it as primary</button>
+          </div>
+          <div class="hint" id="setup-hint" style="margin-top:10px">You sign each transaction in your wallet; the page
+            only prepares them. If a step is already done, it is skipped.</div>
+          <div class="err" id="acterr" role="alert" aria-live="assertive"></div>
+        </div>
+      </div>`;
+  }
+
+  function setStep(n, text, cls) {
+    const el = document.querySelector('#nsteps [data-step="' + n + '"]');
+    if (!el) return;
+    el.classList.remove('busy', 'done', 'bad');
+    if (cls) el.classList.add(cls);
+    const st = el.querySelector('.st');
+    if (st) st.textContent = text;
+  }
+
+  function wireActivation(label) {
+    $('setup-all').onclick = () => runSetup(label, { primary: true });
+    $('setup-wire').onclick = () => runSetup(label, { primary: false });
+    $('setup-primary').onclick = () => setPrimaryFlow(label);
+  }
+
+  async function ensureWallet() {
+    const acct = await wallet.connect(CHAIN);
+    if (!acct) throw new Error('No wallet selected.');
+    await wallet.ensureChain(CHAIN);
+    account = acct;
+    return acct;
+  }
+
+  async function runSetup(label, { primary }) {
+    if (state.busy) return;
+    const buttons = ['setup-all', 'setup-wire', 'setup-primary'].map((id) => $(id)).filter(Boolean);
+    buttons.forEach((b) => { b.disabled = true; });
+    state.busy = true;
+    const err = $('acterr');
+    const hintEl = $('setup-hint');
+    const DEFAULT_HINT = 'You sign each transaction in your wallet; the page only prepares them. If a step is already done, it is skipped.';
+    if (err) err.textContent = '';
+    if (hintEl) hintEl.textContent = 'Waiting for your wallet…';
+    try {
+      const acct = await ensureWallet();
+      if (hintEl) hintEl.textContent = 'Preparing the transactions…';
+      const registry = new window.ethers.Contract(C.registry, REGISTRY_ABI, await wallet.signer());
+      const tokenId = await registry.getTokenId(BigInt(window.ethers.keccak256(window.ethers.toUtf8Bytes(label))));
+      const owner = await registry.ownerOf(tokenId).catch(() => null);
+      if (!owner || owner.toLowerCase() !== acct.toLowerCase()) {
+        throw new Error('This wallet does not own ' + label + '.hood.');
+      }
+
+      let resolver = await registry.getResolver(label).catch(() => ZERO);
+      if (!resolver || resolver === ZERO) {
+        setStep(1, 'PREPARING…', 'busy');
+        const factory = new window.ethers.Contract(C.verifiableFactory, FACTORY_ABI, await wallet.signer());
+        const initData = ifaces().resolver.encodeFunctionData('initialize', [acct, ROLE_BITMAP, []]);
+        const salt = BigInt('0x' + window.ethers.hexlify(window.ethers.randomBytes(6)).slice(2));
+        const predicted = await factory.deployProxy.staticCall(C.resolverImpl, salt, initData);
+        setStep(1, 'CONFIRM…', 'busy');
+        await sendTx('Deploy the resolver',
+          () => factory.deployProxy(C.resolverImpl, salt, initData, { gasLimit: 2_000_000n }),
+          'Resolver deployed.');
+        resolver = predicted;
+        setStep(1, 'DONE', 'done');
+      } else {
+        setStep(1, 'ALREADY DONE', 'done');
+      }
+
+      const linked = await registry.getResolver(label).catch(() => ZERO);
+      if (!linked || linked === ZERO) {
+        setStep(2, 'CONFIRM…', 'busy');
+        await sendTx('Link the resolver',
+          () => registry.setResolver(tokenId, resolver, { gasLimit: 300_000n }),
+          'Resolver linked.');
+        setStep(2, 'DONE', 'done');
+      } else {
+        resolver = linked;
+        setStep(2, 'ALREADY DONE', 'done');
+      }
+
+      const res = new window.ethers.Contract(resolver, RESOLVER_ABI, await wallet.signer());
+      const node = window.ethers.namehash(label + '.hood');
+      const current = await res.addr(node).catch(() => ZERO);
+      if (!current || current.toLowerCase() !== acct.toLowerCase()) {
+        setStep(3, 'CONFIRM…', 'busy');
+        await sendTx('Point the name at your wallet',
+          () => res.setAddr(node, acct, { gasLimit: 300_000n }),
+          'The name now points at your wallet.');
+        setStep(3, 'DONE', 'done');
+      } else {
+        setStep(3, 'ALREADY DONE', 'done');
+      }
+
+      if (primary) {
+        setStep(4, 'CONFIRM…', 'busy');
+        await setPrimaryTx(label);
+        setStep(4, 'DONE', 'done');
+      } else {
+        setStep(4, 'SKIPPED', '');
+      }
+
+      toast(primary ? label + '.hood is fully activated.' : label + '.hood now reaches your wallet.', 'ok');
+      await afterWrite(label);
+      if (state.label === label) {
+        setPlateStatus(primary ? 'Active · primary name set' : 'Wired · this name reaches your wallet', 'available');
+        setPlateSub(primary
+          ? 'Reverse lookup now shows ' + label + '.hood for your address.'
+          : 'The name points at ' + short6(acct) + '.');
+      }
+    } catch (e) {
+      const msg = txErrText(e);
+      const busy = document.querySelector('#nsteps .nstep.busy');
+      if (busy) { busy.classList.remove('busy'); busy.classList.add('bad'); const st = busy.querySelector('.st'); if (st) st.textContent = 'FAILED'; }
+      if ($('acterr')) $('acterr').textContent = msg;
+      if (!e.__toastShown) toast(msg, 'bad');
+    } finally {
+      state.busy = false;
+      buttons.forEach((b) => { b.disabled = false; });
+      if (hintEl && hintEl.isConnected) hintEl.textContent = DEFAULT_HINT;
+    }
+  }
+
+  async function setPrimaryTx(label) {
+    const rev = new window.ethers.Contract(C.reverseRegistrar, REVERSE_ABI, await wallet.signer());
+    return sendTx('Set the primary name',
+      () => rev.setName(label + '.hood', { gasLimit: 300_000n }),
+      'Primary name set.');
+  }
+
+  async function setPrimaryFlow(label) {
+    if (state.busy) return;
+    state.busy = true;
+    try {
+      await ensureWallet();
+      await setPrimaryTx(label);
+      toast(label + '.hood is now your primary name.', 'ok');
+      await afterWrite(label);
+      if (state.label === label) {
+        setPlateStatus('Active · primary name set', 'available');
+        setPlateSub('Reverse lookup now shows ' + label + '.hood for your address.');
+      }
+    } catch (e) {
+      if (!e.__toastShown) toast(txErrText(e), 'bad');
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  /* ── registration ───────────────────────────────────────────────────── */
+  async function registerName() {
+    if (state.busy || !state.label || !state.prices) return;
+    const label = state.label;
+    let row = state.prices.find((p) => p.years === state.years);
+    const btn = $('reg');
+    const err = $('regerr');
+    if (err) err.textContent = '';
+    if (!row || row.wei === null) {
+      if (err) err.textContent = 'Pick a duration with a quoted price first.';
+      return;
+    }
+    state.busy = true;
+    if (btn) btn.disabled = true;
+    try {
+      const acct = await ensureWallet();
+      /* The wallet panel can stay open for a while — re-read the duration the user actually chose,
+         and re-quote right before signing. Use the higher of the two quotes; the contract refunds
+         any overpayment. */
+      const chosen = DURATIONS.find((d) => d.years === state.years) || DURATIONS[0];
+      row = state.prices.find((p) => p.years === chosen.years) || row;
+      const regRead = registrarRead();
+      let stillFree = null;
+      try { stillFree = await regRead.isAvailable(label); } catch { stillFree = null; }
+      if (stillFree === null) throw new Error('Could not confirm the name is still available — try again.');
+      if (!stillFree) {
+        toast(label + '.hood was taken before this transaction. Pick another name.', 'bad');
+        await searchFor(label, { scroll: false });
+        return;
+      }
+      let quoteWei = row.wei;
+      try {
+        const [base, premium] = await regRead.getRegisterPrice(label, chosen.seconds);
+        const fresh = base + premium;
+        if (fresh > quoteWei) quoteWei = fresh;
+      } catch { /* keep the earlier quote */ }
+      const value = (quoteWei * 1015n) / 1000n;
+      const reg = new window.ethers.Contract(C.registrar, REGISTRAR_ABI, await wallet.signer());
+      await sendTx('Register ' + label + '.hood',
+        () => reg.registerBatch([label], acct, ZERO, ZERO, chosen.seconds, ZERO32, {
+          value,
+          gasLimit: 900_000n,
+        }),
+        label + '.hood is yours.');
+      toast('Registered. Now make it work.', 'ok');
+      await afterWrite(label, { justRegistered: true });
+    } catch (e) {
+      const raw = errBundle(e);
+      const msg = txErrText(e);
+      const taken = /NameNotAvailable|already registered|not available/i.test(raw) || raw.includes(ERR_TAKEN);
+      const priceMoved = /InsufficientPayment|insufficient payment/i.test(raw) || raw.includes(ERR_INSUFFICIENT);
+      if (taken) {
+        try { e.__note?.close(); } catch { /* gone */ }
+        toast(label + '.hood was taken before this transaction.', 'bad');
+        await searchFor(label, { scroll: false });
+      } else if (priceMoved) {
+        try { e.__note?.close(); } catch { /* gone */ }
+        toast('The price moved. The new quote is on screen — sign again if it still works for you.', 'bad');
+        await searchFor(label, { scroll: false });
+      } else {
+        if (err) err.textContent = msg;
+        if (!e.__toastShown) toast(msg, 'bad');
+      }
+    } finally {
+      state.busy = false;
+      const now = $('reg');
+      if (now) now.disabled = false;
+      paintPayline();
+    }
+  }
+
+  async function afterWrite(label, { justRegistered = false } = {}) {
+    dropIndex();
+    const info = await nameInfo(label).catch(() => null);
+    const live = !!(info && info.registered);
+    if (justRegistered) {
+      $('result').innerHTML = `
+        <div class="panel reveal">
+          <div class="head"><span class="pill ok">REGISTERED</span>
+            <h3 style="font-size:24px;word-break:break-all">${esc(label)}<span style="color:var(--gold)">.hood</span></h3>
+            <span class="muted" style="margin-left:auto;font-size:13px">in your wallet</span></div>
+          <div class="body">
+            ${live ? profileHtml(info)
+              : `<p class="muted">The transaction confirmed, but this read did not come back with the name yet.
+                   Chain reads can lag a block behind the receipt.</p>
+                 <button class="btn btn-s" type="button" id="reread">Re-read this name</button>`}
+          </div>
+        </div>`;
+      if (live) {
+        wireProfileActions(info);
+        const own = account && info.owner && info.owner.toLowerCase() === account.toLowerCase();
+        if (own && $('actbox')) {
+          $('actbox').innerHTML = activationHtml(label, true);
+          wireActivation(label);
+        }
+      } else {
+        $('reread')?.addEventListener('click', () => searchFor(label));
+      }
+      setPlateName(label, { tick: true });
+      setPlateStatus('Registered · sealed to your wallet', 'taken');
+      setPlateSub('The name is yours. Finish the steps below to make it resolve.');
+      setTimeout(() => stampMoment(label), 220);
+      reveal();
+    } else if (live) {
+      renderTaken({ info });
+    }
+    loadMine().catch(() => {});
+    loadStatsAndRecent().catch(() => {});
+  }
+
+  /* ── records ────────────────────────────────────────────────────────── */
+  function recordFormHtml(info) {
+    return `
+      <div class="panel">
+        <div class="head"><h3>Text records</h3><span class="hint" style="margin-left:auto">Stored in the name's resolver</span></div>
+        <div class="body">
+          <div class="grid2" style="margin-top:0;gap:14px">
+            <div>
+              <label class="f" for="reckey">Key</label>
+              <select class="i" id="reckey">${RECORD_KEYS.map((k) => `<option value="${k}">${k}</option>`).join('')}</select>
+            </div>
+            <div>
+              <label class="f" for="recval">Value</label>
+              <input class="i" id="recval" placeholder="https://…" autocomplete="off">
+            </div>
+          </div>
+          <div class="hint">Only <span class="mono">http(s)</span> links become clickable. A blank value is not written.</div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:12px">
+            <button class="btn btn-s" type="button" id="recsave">Save record</button>
+            <span class="hint" style="margin:0" id="recnote"></span>
+          </div>
+          <div class="err" id="recerr" role="alert" aria-live="assertive"></div>
+        </div>
+      </div>`;
+  }
+
+  function wireRecordForm(info) {
+    const save = $('recsave');
+    if (!save) return;
+    $('reckey').onchange = () => {
+      const v = info.records && info.records[$('reckey').value];
+      $('recval').value = v || '';
+    };
+    $('reckey').onchange();
+    save.onclick = async () => {
+      const key = $('reckey').value;
+      const val = $('recval').value.trim();
+      if (!val) { $('recerr').textContent = 'Write a value first.'; return; }
+      if (!info.hasResolver) { $('recerr').textContent = 'This name has no resolver yet — activate it first.'; return; }
+      save.disabled = true;
+      $('recerr').textContent = '';
+      try {
+        await ensureWallet();
+        const res = new window.ethers.Contract(info.resolver, RESOLVER_ABI, await wallet.signer());
+        await sendTx('Save ' + key + ' record',
+          () => res.setText(window.ethers.namehash(info.name), key, val, { gasLimit: 300_000n }),
+          'Record saved.');
+        await afterWrite(info.label);
+      } catch (e) {
+        const msg = txErrText(e);
+        $('recerr').textContent = msg;
+        if (!e.__toastShown) toast(msg, 'bad');
+      } finally {
+        save.disabled = false;
+      }
+    };
+  }
+
+  /* ── index: snapshot + forward scan ─────────────────────────────────── */
+  let _seed = null;
+  let _index = null;
+  let _indexPromise = null;
+  let _indexEpoch = 0;
+
+  async function loadSnapshot() {
+    if (_seed) return _seed;
+    try {
+      const r = await fetch(SNAP_URL, { cache: 'no-cache', signal: AbortSignal.timeout(15000) });
+      if (!r.ok) return null;
+      if (!/json/i.test(r.headers.get('content-type') || '')) return null;
+      const j = await r.json();
+      if (!j || !j.names) return null;
+      _seed = j;
+      return j;
+    } catch { return null; }
+  }
+
+  function dropIndex() { _indexEpoch++; _index = null; _indexPromise = null; }
+
+  function readIndexCache() {
+    try {
+      const j = JSON.parse(sessionStorage.getItem(INDEX_CACHE) || 'null');
+      return j && j.names && j.lastBlock ? j : null;
+    } catch { return null; }
+  }
+  function writeIndexCache(index) {
+    try {
+      sessionStorage.setItem(INDEX_CACHE, JSON.stringify({
+        lastBlock: index.lastBlock,
+        head: index.head,
+        names: index.names,
+      }));
+    } catch { /* quota or private mode — the page still works without it */ }
+  }
+
+  async function logsSafe(filter, from, to, depth = 0) {
+    try {
+      return await rp().getLogs({ ...filter, fromBlock: from, toBlock: to });
+    } catch (e) {
+      /* Split until the endpoint answers. Do not return [] on a real failure: that would make an
+         incomplete index look complete (and "you own no names" would be a false statement). */
+      if (depth > 6 || to - from < 2000) throw e;
+      const mid = Math.floor((from + to) / 2);
+      const a = await logsSafe(filter, from, mid, depth + 1);
+      const b = await logsSafe(filter, mid + 1, to, depth + 1);
+      return a.concat(b);
+    }
+  }
+
+  async function buildIndex({ force = false } = {}) {
+    if (_indexPromise) return _indexPromise;
+    if (_index && !force) return _index;
+    const epoch = _indexEpoch;
+    _indexPromise = (async () => {
+      const seed = await loadSnapshot();
+      const cached = readIndexCache();
+      const base = (seed && cached)
+        ? (Number(cached.lastBlock) > Number(seed.lastBlock) ? cached : seed)
+        : (cached || seed);
+      const names = base && base.names ? { ...base.names } : {};
+      let lastBlock = Number(base && base.lastBlock) || START_BLOCK - 1;
+      try {
+        const head = Number(await rp().getBlockNumber());
+        const I = ifaces();
+        for (let from = lastBlock + 1; from <= head; from += CHUNK) {
+          const to = Math.min(from + CHUNK - 1, head);
+          const [regs, transfers] = await Promise.all([
+            logsSafe({ address: C.registrar, topics: [REG_TOPIC] }, from, to),
+            logsSafe({ address: C.registry, topics: [TR_TOPIC] }, from, to),
+          ]);
+          for (const log of regs) {
+            try {
+              const p = I.reg.parseLog({ topics: log.topics, data: log.data });
+              const id = p.args.tokenId.toString();
+              const prev = names[id] || {};
+              names[id] = {
+                ...prev,
+                label: p.args.label,
+                owner: prev.owner || p.args.owner,
+                block: Number(log.blockNumber),
+                ts: prev.ts == null ? null : prev.ts,
+              };
+            } catch { /* skip malformed */ }
+          }
+          for (const log of transfers) {
+            try {
+              const p = I.read.parseLog({ topics: log.topics, data: log.data });
+              const id = p.args.id.toString();
+              const cur = names[id];
+              if (!cur) names[id] = { label: null, owner: p.args.to, block: Number(log.blockNumber), ts: null };
+              else cur.owner = p.args.to;
+            } catch { /* skip malformed */ }
+          }
+          lastBlock = to;
+        }
+
+        const need = Object.values(names)
+          .filter((v) => v.label && v.ts == null && v.block)
+          .sort((a, b) => b.block - a.block)
+          .slice(0, 12);
+        await Promise.all(need.map(async (v) => {
+          const b = await rp().getBlock(v.block).catch(() => null);
+          if (b) v.ts = b.timestamp;
+        }));
+
+        const out = { names, lastBlock, head };
+        /* A write may have invalidated this scan while it was running; never let a stale result
+           replace the newer index or write it back to the session cache. */
+        if (epoch === _indexEpoch) {
+          _index = out;
+          writeIndexCache(out);
+        }
+        return out;
+      } catch (e) {
+        if (epoch === _indexEpoch) _indexPromise = null;
+        throw e;
+      }
+    })();
+    return _indexPromise;
+  }
+
+  function indexStats(index) {
+    const list = Object.values(index.names).filter((v) => v.label);
+    const holders = new Set(list
+      .map((v) => (v.owner || '').toLowerCase())
+      .filter((a) => a && a !== ZERO));
+    const weekBlocks = (7 * 86400) / 0.1;
+    const last7 = list.filter((v) => v.block > index.head - weekBlocks).length;
+    return { total: list.length, holders: holders.size, last7 };
+  }
+
+  function paintStats(index) {
+    const s = indexStats(index);
+    $('s-total').textContent = s.total.toLocaleString('en-US');
+    $('s-holders').textContent = s.holders.toLocaleString('en-US');
+    $('s-day').textContent = s.last7.toLocaleString('en-US');
+    $('stat-note').textContent = 'Indexed to block ' + index.head.toLocaleString('en-US') + '. Registration counts come from the registrar, owners from transfers.';
+  }
+
+  function paintRecent(index) {
+    const list = Object.values(index.names)
+      .filter((v) => v.label)
+      .sort((a, b) => b.block - a.block)
+      .slice(0, 6);
+    const host = $('recent');
+    if (!list.length) {
+      host.innerHTML = '<div class="hint">No registrations indexed yet.</div>';
+      return;
+    }
+    host.innerHTML = list.map((v) => `
+      <a href="/names/?q=${encodeURIComponent(v.label)}" data-q="${esc(v.label)}">
+        <span class="nm">${esc(v.label)}<i>.hood</i></span>
+        <span class="meta">${esc(short6(v.owner))}${v.ts ? ' · ' + esc(ago(v.ts)) : ''}</span>
+      </a>`).join('');
+  }
+
+  async function loadStatsAndRecent({ force = false } = {}) {
+    const btn = $('recent-refresh');
+    if (btn) btn.disabled = true;
+    let painted = false;
+    try {
+      if (_index) {
+        paintStats(_index);
+        paintRecent(_index);
+        painted = true;
+      } else if (!force) {
+        const snap = await loadSnapshot();
+        if (snap && snap.names && Number(snap.lastBlock)) {
+          const quick = { names: snap.names, head: Number(snap.lastBlock) };
+          paintStats(quick);
+          paintRecent(quick);
+          painted = true;
+        }
+      }
+      const index = await buildIndex({ force });
+      paintStats(index);
+      paintRecent(index);
+    } catch (e) {
+      if (painted) {
+        $('stat-note').textContent = 'The live index scan did not finish — showing the last loaded index. Search still reads the registry directly.';
+      } else {
+        $('stat-note').textContent = 'The index could not be read right now — search still works, it talks to the registry directly. Use Refresh to retry.';
+        $('recent').innerHTML = '<div class="hint">Could not read the registry index. Search still works: it reads the name directly from the chain.</div>';
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  /* ── my names ───────────────────────────────────────────────────────── */
+  let _mineSeq = 0;
+  async function loadMine({ force = false } = {}) {
+    const seq = ++_mineSeq;
+    const host = $('mine-out');
+    if (!account) {
+      host.innerHTML = `
+        <div class="panel">
+          <div class="body">
+            <p class="muted" style="margin:0 0 12px">Connect a wallet to see which .hood names it holds — and which of
+              them actually reach it. OAKEN reads the names off the chain; it never sees your keys.</p>
+            <button class="btn btn-p" type="button" id="mine-connect">Connect wallet</button>
+          </div>
+        </div>`;
+      $('mine-connect').onclick = async () => {
+        try {
+          account = await ensureWallet();
+          await loadMine({ force: true });
+          toast('Connected', 'ok');
+        } catch (e) { toast(humanizeWalletError(e), 'bad'); }
+      };
+      return;
+    }
+
+    host.innerHTML = '<div class="panel"><div class="body muted">Reading your names from the chain…</div></div>';
+    let index;
+    try {
+      index = await buildIndex({ force });
+    } catch (e) {
+      if (seq !== _mineSeq) return;
+      showReadFail(host, {
+        what: 'your names',
+        detail: errText(e),
+        chain: CHAIN,
+        onRetry: () => loadMine({ force: true }),
+      });
+      return;
+    }
+    if (seq !== _mineSeq) return;
+
+    const allMine = Object.entries(index.names)
+      .filter(([, v]) => v.label && (v.owner || '').toLowerCase() === account.toLowerCase())
+      .sort((a, b) => (Number(b[1].block) || 0) - (Number(a[1].block) || 0));
+    const mine = allMine.slice(0, 60);
+    if (!mine.length) {
+      host.innerHTML = emptyState({
+        title: 'This wallet owns no .hood names',
+        body: 'Search for one above. Registration is one transaction; activation is three more, and this page walks you through them.',
+        actions: [{ label: 'Search a name', href: '#q', primary: true }],
+      });
+      host.querySelector('a[href="#q"]')?.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        $('q').focus();
+        $('q').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+      return;
+    }
+
+    let readFailures = 0;
+    const details = await Promise.all(mine.map(async ([tokenId, v]) => {
+      const registry = registryRead();
+      const id = BigInt(tokenId);
+      let owner;
+      try { owner = await registry.ownerOf(id); }
+      catch { readFailures++; return null; }
+      if (!owner || owner.toLowerCase() !== account.toLowerCase()) return null;
+      const [expiryR, resolverR] = await Promise.allSettled([
+        registry.getExpiry(id),
+        registry.getResolver(v.label),
+      ]);
+      const resolverFail = resolverR.status === 'rejected';
+      const resolverAddr = resolverR.status === 'fulfilled' ? resolverR.value : ZERO;
+      let resolvesTo = ZERO;
+      let addrFail = false;
+      if (!resolverFail && resolverAddr && resolverAddr !== ZERO) {
+        const res = new window.ethers.Contract(resolverAddr, RESOLVER_ABI, rp());
+        try { resolvesTo = await res.addr(window.ethers.namehash(v.label + '.hood')); }
+        catch { addrFail = true; }
+      }
+      return {
+        label: v.label,
+        tokenId,
+        expiry: expiryR.status === 'fulfilled' ? Number(expiryR.value) : 0,
+        expiryKnown: expiryR.status === 'fulfilled',
+        resolver: resolverAddr && resolverAddr !== ZERO ? resolverAddr : ZERO,
+        resolvesTo: resolvesTo && resolvesTo !== ZERO ? resolvesTo : ZERO,
+        resolverFail,
+        addrFail,
+      };
+    }));
+    const list = details.filter(Boolean);
+    const unknown = list.filter((n) => n.resolverFail || n.addrFail);
+    const unwired = list.filter((n) => !n.resolverFail && !n.addrFail && (!n.resolvesTo || n.resolvesTo === ZERO));
+    let primary = null, primaryKnown = true;
+    try { primary = await reverseRead().nameForAddr(account); }
+    catch { primaryKnown = false; }
+    if (seq !== _mineSeq) return;
+
+    host.innerHTML = `
+      <div class="between" style="margin-bottom:12px">
+        <div class="hint" style="margin:0">
+          <span class="mono">${esc(short6(account))}</span> holds ${allMine.length} name${allMine.length === 1 ? '' : 's'}
+          ${allMine.length > mine.length ? ' · showing the newest ' + mine.length : ''}
+          ${primaryKnown
+            ? (primary ? ' · primary <b style="color:var(--gold)">' + esc(primary) + '</b>' : ' · no primary name set')
+            : ' · primary name could not be read'}
+        </div>
+        ${unknown.length
+          ? `<span class="pill" style="color:var(--gold);border-color:var(--line-gold)">${unknown.length} UNREAD</span>`
+          : unwired.length
+            ? `<span class="pill" style="color:var(--gold);border-color:var(--line-gold)">${unwired.length} NOT WIRED</span>`
+            : '<span class="pill ok">ALL WIRED</span>'}
+      </div>
+      ${(readFailures || unknown.length)
+        ? '<div class="hint" style="color:var(--gold);margin:0 0 10px">Some names could not be read just now — press Refresh. Unread fields stay marked instead of showing a guess.</div>'
+        : ''}
+      <div class="ncards">
+        ${list.map((n) => {
+          const wired = n.resolvesTo && n.resolvesTo !== ZERO;
+          const readBad = n.resolverFail || n.addrFail;
+          const points = readBad
+            ? 'Could not read where this name points — refresh.'
+            : wired
+              ? 'Points at <span class="mono">' + esc(short6(n.resolvesTo)) + '</span>'
+              : 'Nothing resolves to this name yet.';
+          const expiryText = n.expiryKnown
+            ? 'Expires ' + esc(dateUTC(n.expiry)) + ' · ' + esc(until(n.expiry))
+            : 'Expiry could not be read — refresh.';
+          return `<div class="ncard">
+            <div class="nm">${esc(n.label)}<i>.hood</i></div>
+            <div class="meta">${points}</div>
+            <div class="meta">${expiryText}</div>
+            <div class="acts">
+              <button class="btn btn-s" type="button" data-open="${esc(n.label)}">${!readBad && !wired ? 'Open & activate' : 'Open'}</button>
+              <button class="btn btn-s" type="button" data-primary="${esc(n.label)}" ${primaryKnown && primary && primary.toLowerCase() === (n.label + '.hood').toLowerCase() ? 'disabled' : ''}>Set primary</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    host.querySelectorAll('[data-open]').forEach((b) => b.addEventListener('click', () => searchFor(b.dataset.open)));
+    host.querySelectorAll('[data-primary]').forEach((b) => b.addEventListener('click', () => setPrimaryFlow(b.dataset.primary)));
+    reveal();
+  }
+
+  /* ── search wiring ──────────────────────────────────────────────────── */
+  let _searchSeq = 0;
+  async function searchFor(label, { scroll = true } = {}) {
+    const seq = ++_searchSeq;
+    label = cleanLabel(label);
+    $('q').value = label;
+    if (!label) {
+      state.label = '';
+      state.prices = null;
+      setPlateName('');
+      setPlateStatus('Search a name');
+      setPlateSub(PLATE_SUB);
+      $('result').innerHTML = '';
+      try { history.replaceState(null, '', location.pathname); } catch { /* ignore */ }
+      return;
+    }
+    try { history.replaceState(null, '', location.pathname + (label ? '?q=' + encodeURIComponent(label) : '')); } catch { /* ignore */ }
+    setPlateName(label, { tick: true });
+    setPlateStatus('Reading the registry…', 'reading');
+    setPlateSub('Asking the registrar for availability and price.');
+    $('result').innerHTML = '<div class="panel"><div class="body muted">Reading the registry…</div></div>';
+    if (scroll) $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    try {
+      const r = await checkLabel(label);
+      if (seq !== _searchSeq) return;
+      if (r.status === 'available') renderAvailable(r);
+      else if (r.status === 'taken') renderTaken(r);
+      else if (r.status === 'reserved') renderReserved(label);
+      else if (r.status === 'invalid') renderInvalid(label, r.reason);
+      else renderInvalid(label, r.reason || 'The chain did not answer.');
+    } catch (e) {
+      if (seq !== _searchSeq) return;
+      setPlateStatus('Could not read the chain', 'bad');
+      setPlateSub('The endpoint did not answer — use Retry below.');
+      showReadFail($('result'), {
+        what: 'this name',
+        detail: errText(e),
+        chain: CHAIN,
+        onRetry: () => searchFor(label),
+      });
+    }
+  }
+
+  $('go').onclick = () => searchFor($('q').value);
+  $('q').addEventListener('input', () => {
+    const clean = cleanLabel($('q').value);
+    if (clean !== $('q').value) $('q').value = clean;
+    setPlateName(clean, { tick: true });
+    if (clean === state.label) return;
+    /* The result below belongs to the previous name — drop it rather than let a new
+       label sit above an old answer. */
+    if (state.label) {
+      state.label = '';
+      state.prices = null;
+      $('result').innerHTML = '';
+    }
+    if (!clean) {
+      setPlateStatus('Search a name');
+      setPlateSub(PLATE_SUB);
+    } else {
+      setPlateStatus('Press Search to check');
+      setPlateSub('Availability and price are read from the registrar.');
+    }
+  });
+  $('q').addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); searchFor($('q').value); }
+  });
+  $('mine-refresh').onclick = async () => {
+    const b = $('mine-refresh');
+    b.disabled = true; b.textContent = 'Reading…';
+    try { await loadMine({ force: true }); } finally { b.disabled = false; b.textContent = 'Refresh'; }
+  };
+  $('recent-refresh').onclick = async () => {
+    const b = $('recent-refresh');
+    b.disabled = true; b.textContent = 'Reading…';
+    try { await loadStatsAndRecent({ force: true }); } finally { b.disabled = false; b.textContent = 'Refresh'; }
+  };
+
+  /* Any name rendered anywhere (primary-name links, recent list) can be opened with a click. */
+  document.addEventListener('click', (ev) => {
+    if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey || ev.button !== 0) return;
+    const a = ev.target.closest && ev.target.closest('[data-q]');
+    if (!a) return;
+    ev.preventDefault();
+    searchFor(a.dataset.q);
+  });
+
+  /* ── boot ───────────────────────────────────────────────────────────── */
+  requestAnimationFrame(() => emberField(document.querySelector('.nband-embers')));
+  (async () => {
+    const [a] = await wallet.accounts().catch(() => []);
+    account = a || null;
+    const q = new URLSearchParams(location.search).get('q');
+    if (q) { $('q').value = cleanLabel(q); searchFor(q); }
+    loadStatsAndRecent().catch(() => {});
+    loadMine().catch(() => {});
+  })();
+
+  onWallet('accounts', async (a) => {
+    account = a || null;
+    dropIndex();
+    loadMine().catch(() => {});
+    if (state.label) searchFor(state.label, { scroll: false });
+  });
+</script>
+</body>
+</html>

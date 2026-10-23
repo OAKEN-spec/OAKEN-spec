@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multi-sender · OAKEN</title>
+<meta name="description" content="Send native currency or an ERC-20 to up to 400 addresses in one transaction.">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+<style>
+  .flow { display: grid; grid-template-columns: 1.15fr .85fr; gap: 26px; align-items: start; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; flex-wrap: wrap; }
+  .seg button { background: transparent; border: 0; color: var(--muted); font: 600 13.5px/1 "Segoe UI", system-ui, sans-serif;
+                padding: 11px 16px; cursor: pointer; }
+  .seg button.on { background: rgba(217,163,67,.12); color: var(--gold); }
+  textarea.i { width: 100%; min-height: 180px; background: var(--bark); border: 1px solid var(--line); border-radius: var(--r);
+               color: var(--parch); font: 13px/1.7 ui-monospace, Consolas, monospace; padding: 12px 14px; outline: none; resize: vertical; }
+  textarea.i:focus { border-color: var(--line-gold); }
+  .summary { background: var(--panel); border: 1px solid var(--line-gold); border-radius: var(--r); padding: 20px 22px; }
+  .summary b { color: var(--gold); }
+  /* 逐行红标：输入框里没法上色，所以在它下面把有问题的行一条条列出来 */
+  #lineproblems { margin-top: 8px; display: grid; gap: 4px; }
+  .linerow { display: flex; gap: 9px; align-items: baseline; font-size: 12.5px; color: var(--bad);
+             background: rgba(224,120,95,.07); border: 1px solid rgba(224,120,95,.3); border-radius: 4px; padding: 6px 10px; }
+  .linerow .lineno { font: 700 11px/1.6 "Segoe UI", system-ui, sans-serif; letter-spacing: .04em;
+                     color: var(--bad); text-transform: uppercase; flex: none; }
+  @media (max-width: 940px) { .flow { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/send.webp"><source src="/app/media/send-head.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Multi-sender</div>
+    <h1 class="reveal">One transaction, four hundred recipients.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <p class="muted" style="margin-top:12px;max-width:64ch">Paste a list — one address and an amount per line — and pay
+      them all at once. The contract holds nothing between calls: no recipient list is stored, there is no fee, and no
+      one can pause it. A line with a zero amount is skipped; a line with a zero address stops the whole batch, because
+      tokens sent there are gone.</p>
+
+    <div class="flow" style="margin-top:30px">
+      <div class="panel">
+        <div class="head"><h3>Batch</h3><span class="steps-mini" style="margin-left:auto" id="modehint"></span></div>
+        <div class="body">
+          <label class="f">Chain</label>
+          <div class="seg" id="chainseg"><button type="button" class="on">Loading…</button></div>
+          <div class="hint" id="chainhint">The batch goes out on the chain your wallet is on.</div>
+
+          <label class="f">What to send</label>
+          <div class="seg" id="assetseg">
+            <button type="button" data-asset="native" class="on">Native currency</button>
+            <button type="button" data-asset="erc20">ERC-20</button>
+          </div>
+
+          <div id="p-erc20" class="hide">
+            <label class="f" for="token">Token address</label>
+            <input class="i" id="token" placeholder="0x… ERC-20" autocomplete="off">
+            <div class="hint" id="tokenmeta"></div>
+            <label class="f">Approval</label>
+            <div class="seg" id="appmode">
+              <button type="button" data-a="exact" class="on">Exact amount</button>
+              <button type="button" data-a="unlimited">Unlimited</button>
+            </div>
+            <div class="hint" id="apphint">Exact approves just this batch's total; unlimited covers every later batch
+              of the same token — you can revoke it from any wallet any time.</div>
+          </div>
+
+          <label class="f">How the amounts are given</label>
+          <div class="seg" id="amountseg">
+            <button type="button" data-mode="list" class="on">Per line</button>
+            <button type="button" data-mode="equal">Same for everyone</button>
+          </div>
+
+          <div id="p-equal" class="hide">
+            <label class="f" for="each">Amount each</label>
+            <input class="i" id="each" placeholder="0.0" inputmode="decimal" autocomplete="off">
+          </div>
+
+          <label class="f" for="list">Recipients</label>
+          <textarea class="i" id="list" spellcheck="false"
+            placeholder="0x1111…  0.5&#10;0x2222…  1.25&#10;# lines starting with # are ignored"></textarea>
+          <div id="lineproblems" class="hide"></div>
+          <div class="hint" id="zeronote"></div>
+          <div class="hint" id="listhint">One per line: address then amount, separated by a comma or spaces. <a href="data:text/csv;charset=utf-8,0x1111111111111111111111111111111111111111%2C0.5%0A0x2222222222222222222222222222222222222222%2C1.25" download="oaken-multisender-sample.csv">Download a sample CSV</a> — the uploader on the right takes that exact shape.</div>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:8px">
+            <input class="i" id="csv" type="file" accept=".csv,.txt,text/csv,text/plain" style="display:none">
+            <label class="btn btn-s filebtn" for="csv">Choose a CSV…</label>
+            <span class="hint" style="margin:0">…or
+              <a id="samplecsv" download="oaken-batch-sample.csv"
+                 href="data:text/csv;charset=utf-8,address,amount%0A0x1111111111111111111111111111111111111111,0.5%0A0x2222222222222222222222222222222222222222,1.25%0A">download a sample</a> —
+              one address and amount per line.</span>
+          </div>
+          <div class="hint" id="csvhint"></div>
+
+          <label class="f">Transaction mode</label>
+          <div class="seg" id="txmode">
+            <button type="button" data-m="batch" class="on">One transaction</button>
+            <button type="button" data-m="safe">One per recipient</button>
+          </div>
+          <div class="hint" id="txmodehint">One transaction is cheaper and atomic — but one bad row reverts the whole
+            batch. One per recipient costs more gas and more confirmations, and a bad row cannot block the others
+            (that is the "safe mode" the big launchpads offer). Failed rows stay listed so you can retry just those.</div>
+          <div class="grid2" style="margin-top:12px;gap:10px">
+            <div class="hint" style="border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin:0">
+              <b style="color:var(--parch)">Atomic batch</b><br>Cheapest. Every row lands, or none does — a revert sends nothing.</div>
+            <div class="hint" style="border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin:0">
+              <b style="color:var(--parch)">Safe mode</b><br>One transaction per recipient. More gas, but a bad row cannot block the rest.</div>
+          </div>
+
+          <div class="err hide" id="err"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="summary" id="summary">
+          <div class="eyebrow" style="margin-bottom:12px">Before you sign</div>
+          <div id="sumtext" class="muted">Paste the list — the summary appears here, in one sentence.</div>
+          <div class="hint" id="gasline" style="margin-top:10px"></div>
+        </div>
+        <div style="display:grid;gap:10px;margin-top:16px">
+          <button class="btn btn-p" id="go" style="width:100%" disabled>Connect a wallet</button>
+          <div class="hint" id="steps"></div>
+        </div>
+        <div class="panel hide" id="done" style="margin-top:16px">
+          <div class="head"><h3>Sent</h3></div>
+          <div class="body" id="donebody"></div>
+        </div>
+        <div class="panel" style="margin-top:16px">
+          <div class="head"><h3>Reading the list</h3></div>
+          <div class="body muted" style="font-size:13.5px">
+            Amounts are exact strings, never floats: <span class="mono">0.1</span> stays
+            <span class="mono">0.1</span> rather than becoming <span class="mono">0.1000000000000000055</span>.
+            The batch is capped at 400 lines — a batch that does not fit in a block reverts after paying for everything
+            before it, so the front end splits longer lists into two calls instead.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+    <div class="panel" style="margin-top:16px"><div class="head"><h3>If it fails — self-check</h3></div>
+      <div class="body muted" style="font-size:13.5px">
+        <ul style="list-style:none;display:grid;gap:10px">
+          <li><b style="color:var(--parch)">One bad line rejects the whole batch.</b> A zero address, a non-number or a mismatched list reverts atomically — nothing is sent. The line is marked in the form.</li>
+          <li><b style="color:var(--parch)">ERC-20 needs an allowance first.</b> Choose exact or unlimited; the page shows which one the next batch needs.</li>
+          <li><b style="color:var(--parch)">More than 400 lines?</b> The page splits the list into sequential calls; each one is a separate transaction and a separate gas cost.</li>
+          <li><b style="color:var(--parch)">A failed transaction costs gas, not tokens.</b> The transfer that reverted did not happen.</li>
+        </ul>
+      </div>
+    </div>
+</main>
+
+<script src="/app/vendor/ethers.umd.min.js" defer></script>
+<script type="module">
+  import { shell, wallet, chains, currentChain, erc20, tokenMeta, fmtAmount, toast, explorerHref, reveal,
+    safeRead, provider, txNotice, humanizeTxError, onWallet, showChainSegFailed , onChainSwitch, chainIcon} from '/app/oaken.js';
+  import { ADDR, contract } from '/app/tools.js';
+
+  shell({ active: 'tools' });
+
+  const $ = (id) => document.getElementById(id);
+  /** 本地链没有 explorer —— 硬拼出来的 `/tx/0x…` 是同源 404（链接检查器会报出来）。 */
+  const exLink = (path, label, cls = 'btn btn-s') => {
+    const h = explorerHref(path, state.chain);
+    return h ? `<a class="${cls}" target="_blank" rel="noopener" href="${h}">${label}</a>` : '';
+  };
+  const state = {
+    chain: null, asset: 'native', mode: 'list',
+    token: null, tokenSymbol: '', tokenDecimals: 18, tokenBalance: null,
+    addr: null, busy: false, parsed: { rows: [], problems: [] },
+    txMode: 'batch', approveMode: 'exact',   // 一笔全发 / 一人一笔（safe）；授权：精确 / 无限
+  };
+
+  /* ── 链 ──────────────────────────────────────────────────────────── */
+  async function bootChains() {
+    const live = await chains();
+    if (!live.length) { showChainSegFailed('chainseg', 'chainhint', bootChains); return; }
+    state.chain = await currentChain();
+    const seg = $('chainseg');
+    seg.innerHTML = live.map((c) => `<button type="button" data-id="${c.id}" class="${c.id === state.chain.id ? 'on' : ''}"><span class="chain-ico">${chainIcon(c.id, 13)}</span>${c.name}</button>`).join('');
+    seg.onclick = async (ev) => {
+      const b = ev.target.closest('button'); if (!b) return;
+      const c = live.find((x) => x.id === Number(b.dataset.id));
+      if (!c || c.id === state.chain.id) return;
+      state.chain = c;
+      for (const x of seg.querySelectorAll('button')) x.classList.toggle('on', x === b);
+      if (state.addr) { try { await wallet.ensureChain(c); } catch (e) { toast(String(e.message || e), 'bad'); } }
+      if (state.token) loadToken();
+      update();
+    };
+    /* 2026-10-16：钱包自己换链（或用户在顶栏切的）→ **走同一个入口**点一下链选择器，
+       这一页就按新链重画 —— 不再整页 location.reload() 白闪那一下。 */
+    onChainSwitch((id) => { const b = seg.querySelector('button[data-id="' + id + '"]'); if (b) b.click(); });
+    update();
+  }
+  bootChains();
+
+  /* ── 模式 ────────────────────────────────────────────────────────── */
+  $('assetseg').onclick = (ev) => {
+    const b = ev.target.closest('button[data-asset]'); if (!b) return;
+    state.asset = b.dataset.asset;
+    for (const x of $('assetseg').querySelectorAll('button')) x.classList.toggle('on', x === b);
+    $('p-erc20').classList.toggle('hide', state.asset !== 'erc20');
+    update();
+  };
+  $('amountseg').onclick = (ev) => {
+    const b = ev.target.closest('button[data-mode]'); if (!b) return;
+    state.mode = b.dataset.mode;
+    for (const x of $('amountseg').querySelectorAll('button')) x.classList.toggle('on', x === b);
+    $('p-equal').classList.toggle('hide', state.mode !== 'equal');
+    $('listhint').textContent = state.mode === 'equal'
+      ? 'One address per line (nothing else needed — the amount is above).'
+      : 'One per line: address then amount, separated by a comma or spaces.';
+    update();
+  };
+
+  /* ── 读代币 ──────────────────────────────────────────────────────── */
+  let tokenTimer = null;
+  $('token').addEventListener('input', () => { clearTimeout(tokenTimer); tokenTimer = setTimeout(loadToken, 420); });
+  async function loadToken() {
+    const value = $('token').value.trim();
+    state.token = null; state.tokenBalance = null;
+    $('tokenmeta').textContent = '';
+    if (!/^0x[0-9a-fA-F]{40}$/.test(value) || !state.chain) { update(); return; }
+    $('tokenmeta').textContent = 'Reading the token…';
+    try {
+      const [symbol, decimals] = await tokenMeta(value, state.chain);
+      state.token = value; state.tokenSymbol = symbol; state.tokenDecimals = decimals;
+      let bal = null;
+      if (state.addr) bal = await erc20(state.chain, value).balanceOf(state.addr);
+      state.tokenBalance = bal;
+      $('tokenmeta').innerHTML = `<span class="pill ok">${symbol}</span><span>${decimals} decimals</span>`
+        + (bal !== null ? `<span>your balance: <b style="color:var(--parch)">${fmtAmount(bal, decimals)}</b></span>` : '');
+    } catch {
+      $('tokenmeta').innerHTML = '<span class="pill" style="color:var(--bad);border-color:rgba(224,120,95,.4)">not an ERC-20 at this address</span>';
+    }
+    update();
+  }
+
+  /* ── 钱包 ────────────────────────────────────────────────────────── */
+  /**
+   * ⚠ 参数是**事件送来的地址**（`onWallet('accounts', ...)` 的载荷）。
+   *
+   * 事件的回调里**不能再 `wallet.accounts()` 回查一次** —— 真钱包在授权那一刻、
+   * 假钱包在每次 `eth_accounts` 之后都会补发 `accountsChanged`，回查就是自己喂自己：
+   * 一圈圈跑下去（2026-10-15 实测：每秒 400 次 update()，gas 预估永远排不上队，
+   * 而控制台一条错都没有）。事件给了地址用地址；没有载荷（首次调用）才去问。
+   */
+  async function refreshWallet(addrFromEvent, fromEvent = false) {
+    const a = fromEvent ? (addrFromEvent || null) : ((await wallet.accounts())[0] || null);
+    state.addr = a;
+    if (state.token) loadToken();
+    update();
+  }
+  onWallet('accounts', (a) => refreshWallet(a, true));
+  refreshWallet();
+
+  /* ── 解析与摘要 ──────────────────────────────────────────────────── */
+  /* 零地址：合约会 `ZeroRecipient(index)` 整批回滚（币不会丢，但这笔白花 gas）——
+     页面必须**先拦**，并把"哪一行"指出来。判据是合约里的那道闸，不是我们的口味。 */
+  const ZERO = '0x0000000000000000000000000000000000000000';
+  function parse() {
+    const rows = []; const problems = [];
+    // ⚠ 这里要用 **Map** 不是 Set：下面 `seen.get/set(key, 行号)` 是 Map 的 API。
+    //   写成 Set 的后果是**每一行都抛 TypeError**、整页静默发不出去（2026-10-13 抓到）。
+    const seen = new Map();
+    const lines = $('list').value.split(/\r?\n/);
+    const each = $('each').value.trim();
+    lines.forEach((raw, i) => {
+      const line = raw.trim();
+      if (!line || line.startsWith('#')) return;
+      const parts = line.split(/[,\s]+/).filter(Boolean);
+      const addr = parts[0];
+      if (!/^0x[0-9a-fA-F]{40}$/.test(addr)) { problems.push({ line: i + 1, why: 'not an address' }); return; }
+      if (addr.toLowerCase() === ZERO) { problems.push({ line: i + 1, why: 'the zero address — tokens sent there are gone, and the contract reverts the whole batch' }); return; }
+      const key = addr.toLowerCase();
+      if (seen.has(key)) { problems.push({ line: i + 1, why: 'duplicate address (also on line ' + seen.get(key) + ')' }); }
+      else seen.set(key, i + 1);
+      let amount = null;
+      try {
+        if (state.mode === 'equal') {
+          if (each) amount = window.ethers.parseUnits(each, state.asset === 'erc20' ? state.tokenDecimals : 18);
+        } else {
+          if (parts.length < 2) { problems.push({ line: i + 1, why: 'no amount' }); return; }
+          amount = window.ethers.parseUnits(parts[1], state.asset === 'erc20' ? state.tokenDecimals : 18);
+        }
+      } catch { problems.push({ line: i + 1, why: 'the amount is not a number' }); return; }
+      if (amount === null) return;                      // 等额模式下还没填数量
+      /* 零额：合约**静默跳过**（名单里常见），所以这里不报错 —— 但页面得说清它不会被转。 */
+      if (amount < 0n) { problems.push({ line: i + 1, why: 'negative amount' }); return; }
+      rows.push({ account: addr, amount, line: i + 1 });
+    });
+    return { rows, problems };
+  }
+
+  /**
+   * 逐行红标：把有问题的行**在输入框下面一条条列出来**（行号 + 原因），
+   * 而不是只在顶上写一句"3 行有问题"。输入框本身不能上色，所以这一块就是它的替身。
+   */
+  function paintLineProblems(problems) {
+    const host = $('lineproblems');
+    if (!problems.length) { host.innerHTML = ''; host.classList.add('hide'); return; }
+    host.classList.remove('hide');
+    host.innerHTML = problems.map((p) =>
+      `<div class="linerow"><span class="lineno">line ${p.line}</span><span>${escHtml(p.why)}</span></div>`).join('');
+  }
+  function escHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function update() {
+    const { rows, problems } = parse();
+    state.parsed = { rows, problems };
+    const total = rows.reduce((s, r) => s + r.amount, 0n);
+    const unit = state.asset === 'erc20' ? (state.tokenSymbol || 'tokens') : (state.chain?.native || 'ETH');
+    const decimals = state.asset === 'erc20' ? state.tokenDecimals : 18;
+    paintLineProblems(problems);
+    /* 零额行：合约**静默跳过**（名单导出里常见），所以不拦 —— 但别让用户以为它转了。 */
+    const zeroes = rows.filter((r) => r.amount === 0n).length;
+    const zn = $('zeronote');
+    if (zn) zn.textContent = zeroes
+      ? zeroes + ' line' + (zeroes === 1 ? '' : 's') + ' ask for a zero amount — the contract skips those silently (no transfer, no gas wasted on it).'
+      : '';
+
+    /* 超过 400 行**不是错误**，是"分几笔"—— 合约的 MAX_RECIPIENTS 是 400，
+       一次发不下的部分拆成下一次（合约头注释里写的也是这个做法）。 */
+    const chunks = Math.ceil(rows.length / 400);
+
+    const errs = [];
+    if (!state.chain) errs.push('Pick a chain first.');
+    if (state.asset === 'erc20' && !state.token) errs.push('Enter a token address.');
+    if (!rows.length) errs.push('Paste at least one recipient.');
+    if (problems.length) errs.push(problems[0].line ? ('line ' + problems[0].line + ': ' + problems[0].why) : problems[0]);
+    if (state.asset === 'erc20' && state.tokenBalance !== null && total > state.tokenBalance) errs.push('That is more than your token balance.');
+
+    $('err').classList.toggle('hide', errs.length === 0);
+    $('err').innerHTML = errs.slice(0, 3).map((t) => '<div>' + escHtml(t) + '</div>').join('')
+      + (errs.length > 3 ? '<div>…and ' + (errs.length - 3) + ' more</div>' : '');
+
+    /* 发送前的汇总：**收件人数 · 总额 · 链 · 预估 gas**（清单第 8.1 条）。
+       gas 是上界（我们自己给的 gasLimit × 当前价），不是报价 —— 和创建锁页一个口径。 */
+    if (rows.length) {
+      $('sumtext').className = '';
+      $('sumtext').innerHTML = `You are sending <b>${fmtAmount(total, decimals)} ${unit}</b> to
+        <b>${rows.length}</b> address${rows.length === 1 ? '' : 'es'}${state.mode === 'equal' ? ` — ${fmtAmount(rows[0].amount, decimals)} each` : ''}.`
+        + (state.chain ? ` On <b>${escHtml(state.chain.name)}</b>.` : '')
+        + (chunks > 1 ? ` That is <b>${chunks} transactions</b> — the contract takes 400 recipients per call.` : '')
+        + (state.txMode === 'safe' ? ` One transaction per recipient — <b>${rows.length}</b> confirmation${rows.length === 1 ? '' : 's'}.` : '')
+        + (problems.length ? `<br><span style="color:var(--bad)">${problems.length} line${problems.length === 1 ? '' : 's'} need attention.</span>` : '');
+    } else {
+      $('sumtext').className = 'muted';
+      $('sumtext').textContent = 'Paste the list — the summary appears here, in one sentence.';
+    }
+    $('gasline').textContent = rows.length ? 'Estimating gas…' : '';
+    scheduleGas();
+
+    $('txmodehint').innerHTML = state.txMode === 'safe'
+      ? 'One transaction <b>per recipient</b>. More gas and more confirmations, but a bad row cannot block the others — '
+        + 'failed rows stay listed so you can retry just those. This is the safe mode.'
+      : '<b>One transaction for everything</b> — cheaper, but one bad row reverts the whole batch. '
+        + 'Switch to <b>One per recipient</b> if you would rather isolate failures.';
+    state.chunks = chunks;
+    const btn = $('go');
+    btn.disabled = state.busy || errs.length > 0;
+    btn.textContent = state.busy ? 'Working…' : (!state.addr ? 'Connect a wallet' : 'Send the batch');
+  }
+
+  /* gas 预估：上界 = gasLimit × 当前 gas 价。读不到就说读不到（不编一个数）。 */
+  let gasTimer = 0;
+  function scheduleGas() { clearTimeout(gasTimer); gasTimer = setTimeout(estimateGas, 700); }
+  async function estimateGas() {
+    const { rows } = state.parsed;
+    if (!rows.length || !state.chain) return;
+    const chunks = Math.max(1, Math.ceil(rows.length / 400));
+    /* 一次性（原子）按行数估：原生 80k + 45k/人、代币 120k + 90k/人（和真发的 gasLimit 同源）；
+       一人一笔的 safe 模式按每人一笔估。 */
+    const per = state.txMode === 'safe'
+      ? rows.length
+      : chunks;
+    const gl = state.asset === 'erc20'
+      ? BigInt(120_000 * chunks + 90_000 * rows.length)
+      : BigInt(80_000 * chunks + 45_000 * rows.length);
+    try {
+      const fd = await safeRead(() => provider(state.chain).getFeeData(), { chain: state.chain, timeout: 8000 });
+      const px = fd.maxFeePerGas ?? fd.gasPrice ?? null;
+      if (!px) { $('gasline').textContent = 'Gas price unreadable on ' + state.chain.name + ' — the wallet will quote it.'; return; }
+      $('gasline').textContent = 'Estimated network fee: up to ' + fmtAmount(px * gl, 18, 6) + ' '
+        + (state.chain.native || 'ETH') + ' for ' + per + ' transaction' + (per === 1 ? '' : 's') + ' (upper bound).';
+    } catch {
+      $('gasline').textContent = 'Could not read the gas price — your wallet will quote it.';
+    }
+  }
+  for (const id of ['list', 'each']) $(id).addEventListener('input', update);
+
+  /* 交易模式（学 PinkSale 的 safe / unsafe）：一笔全发，还是一人一笔。 */
+  for (const b of document.querySelectorAll('#txmode button')) {
+    b.onclick = () => {
+      state.txMode = b.dataset.m;
+      for (const x of document.querySelectorAll('#txmode button')) x.classList.toggle('on', x === b);
+      update();
+    };
+  }
+  /* 授权额度：精确 / 无限（它家也让人选）。 */
+  for (const b of document.querySelectorAll('#appmode button')) {
+    b.onclick = () => {
+      state.approveMode = b.dataset.a;
+      for (const x of document.querySelectorAll('#appmode button')) x.classList.toggle('on', x === b);
+      update();
+    };
+  }
+  /* CSV：读进来**原样填进框**（解析还是走同一条 parseList —— 一份代码，两种入口）。 */
+  $('csv').addEventListener('change', async () => {
+    const f = $('csv').files && $('csv').files[0];
+    if (!f) return;
+    $('csvhint').textContent = 'Reading ' + f.name + '…';
+    try {
+      const text = await f.text();
+      $('list').value = text;
+      $('list').dispatchEvent(new Event('input', { bubbles: true }));
+      $('csvhint').textContent = 'Loaded ' + f.name + ' (' + (f.size / 1024).toFixed(1) + ' KB).';
+    } catch (e) {
+      $('csvhint').textContent = 'Could not read that file: ' + String((e && e.message) || e).slice(0, 80);
+    }
+  });
+
+  /* ── 发送 ──────────────────────────────────────────────────────────
+   * 三种走法，都要**看得见结局**（清单 8.1 + 通用第 3 条）：
+   *   · 原子 · ≤400 行 —— 一笔交易；
+   *   · 原子 · >400 行 —— 按 400 拆成连续的几笔（合约的 MAX_RECIPIENTS 是硬顶，
+   *     一次发不下；合约头注释里写的也是"前端拆成两次"）；
+   *   · safe —— 一人一笔，**失败的行留下来**，给一个"只重发失败项"的按钮。
+   * 每一笔都走全局交易通知（Pending 带浏览器链接 → Success / Fail）。
+   */
+  const short = (a) => a.slice(0, 10) + '…' + a.slice(-4);
+
+  /** 原子模式发一批（最多 400 行）。返回 { hash, count }。 */
+  async function sendBatch(multi, rows, chain, dec, unit) {
+    const addresses = rows.map((r) => r.account);
+    const amounts = rows.map((r) => r.amount);
+    const total = amounts.reduce((s, x) => s + x, 0n);
+    const note = txNotice(chain, 'Batch of ' + rows.length);
+    try {
+      const tx = state.asset === 'erc20'
+        ? await multi.disperseToken(state.token, addresses, amounts, { gasLimit: BigInt(120_000 + 90_000 * rows.length) })
+        : await multi.disperseEther(addresses, amounts, { value: total, gasLimit: BigInt(80_000 + 45_000 * rows.length) });
+      note.sent(tx.hash);
+      await tx.wait();
+      note.ok(rows.length + ' recipients paid — ' + fmtAmount(total, dec) + ' ' + unit + '.');
+      return tx;
+    } catch (e) {
+      /* ⚠ 这条通知是**在这批里面**建的那一条 —— 失败必须由它自己收场，
+         否则屏幕上会永远挂着一条 "…waiting for the block…"（用户以为还卡着）。 */
+      note.fail(humanizeTxError(e, chain));
+      throw e;
+    }
+  }
+
+  $('go').onclick = async () => {
+    const { rows, problems } = state.parsed;
+    if (problems.length || !rows.length) {
+      toast(problems.length ? ('line ' + problems[0].line + ': ' + problems[0].why) : 'Nothing to send', 'bad');
+      return;
+    }
+    state.busy = true; update();
+    let note = null;
+    try {
+      if (!state.addr) { await wallet.connect(); await refreshWallet(); }
+      await wallet.ensureChain(state.chain);
+      const signer = await wallet.signer();
+      const multi = contract(state.chain, 'multiSender', ADDR.multiSender, signer);
+      const unit = state.asset === 'erc20' ? (state.tokenSymbol || 'tokens') : (state.chain.native || 'ETH');
+      const dec = state.asset === 'erc20' ? state.tokenDecimals : 18;
+
+      /* ① 授权（ERC-20）：精确额度或无限 —— 它家也让人选，无限覆盖之后所有批次。 */
+      if (state.asset === 'erc20') {
+        const total = rows.reduce((s, r) => s + r.amount, 0n);
+        const allowed = await safeRead(() => erc20(state.chain, state.token).allowance(state.addr, ADDR.multiSender),
+          { chain: state.chain, timeout: 10_000, retries: 1, label: 'allowance' });
+        if (allowed < total) {
+          $('steps').textContent = 'Step 1 of 2 — approving the token '
+            + (state.approveMode === 'unlimited' ? '(unlimited)' : '(exactly this batch)') + '…';
+          const approveFor = state.approveMode === 'unlimited' ? window.ethers.MaxUint256 : total;
+          const token = erc20(state.chain, state.token, signer);
+          note = txNotice(state.chain, 'Token approval');
+          const at = await token.approve(ADDR.multiSender, approveFor, { gasLimit: 120_000n });
+          note.sent(at.hash);
+          await at.wait();
+          note.ok('Approval confirmed.');
+          note = null;
+        }
+      }
+
+      /* ② 发送 */
+      if (state.txMode === 'safe') {
+        $('steps').textContent = '';
+        $('done').classList.remove('hide');
+        /* 结果表按**行**画，并记住哪一行属于哪一条 —— "重发失败项"要的是这个映射。 */
+        state.safeRows = rows.map((r) => ({ ...r, status: 'idle', msg: '' }));
+        paintSafeRows(dec, unit);
+        reveal();
+        await runSafe(multi, dec, unit);
+      } else {
+        const chunks = [];
+        for (let i = 0; i < rows.length; i += 400) chunks.push(rows.slice(i, i + 400));
+        for (let i = 0; i < chunks.length; i++) {
+          $('steps').textContent = chunks.length > 1
+            ? `Sending batch ${i + 1} of ${chunks.length} (${chunks[i].length} recipients)…`
+            : 'Sending…';
+          try {
+            await sendBatch(multi, chunks[i], state.chain, dec, unit);
+          } catch (e) {
+            /* 拆开的多笔里有一笔失败：把**还没发的那几笔**如实说清，别假装整单成了 */
+            if (chunks.length > 1) {
+              toast('Batch ' + (i + 1) + ' of ' + chunks.length + ' failed — the first ' + i
+                + ' landed, the rest were not sent.', 'bad');
+            }
+            throw e;
+          }
+        }
+        $('done').classList.remove('hide');
+        $('donebody').innerHTML = '<div>Sent to <b>' + rows.length + '</b> recipients in '
+          + chunks.length + ' transaction' + (chunks.length === 1 ? '' : 's') + '.</div>'
+          + '<div style="margin-top:12px"><a class="btn btn-s" href="/tools/multisender">Send another batch</a></div>';
+        reveal();
+      }
+    } catch (e) {
+      const msg = humanizeTxError(e, state.chain);
+      $('err').classList.remove('hide');
+      $('err').textContent = msg;
+      if (note) note.fail(msg); else toast(msg.slice(0, 120), 'bad');
+    } finally {
+      state.busy = false;
+      $('steps').textContent = '';
+      update();
+    }
+  };
+
+  /** safe 模式的结果表（每次状态变了就整表重画 —— 行数最多 400，够便宜）。 */
+  function paintSafeRows(dec, unit, running = false) {
+    const rows = state.safeRows || [];
+    const done = rows.filter((r) => r.status === 'ok').length;
+    const bad = rows.filter((r) => r.status === 'bad').length;
+    $('donebody').innerHTML = '<div style="display:grid;gap:6px">'
+      + rows.map((r, i) => '<div style="display:flex;gap:10px;align-items:baseline;font-size:13.5px">'
+        + '<span class="mono muted" style="min-width:150px">' + short(r.account) + '</span>'
+        + '<span>' + fmtAmount(r.amount, dec) + ' ' + unit + '</span>'
+        + '<span class="pill' + (r.status === 'ok' ? ' ok' : '') + '" data-safe="' + i + '"'
+        + (r.status === 'bad' ? ' style="color:var(--bad);border-color:rgba(224,120,95,.45)"' : '') + '>'
+        + (r.status === 'idle' ? 'pending' : r.status === 'sending' ? 'sending…'
+          : r.status === 'sent' ? 'sent — waiting' : r.status === 'ok' ? 'confirmed'
+            : 'failed: ' + String(r.msg).slice(0, 40)) + '</span></div>').join('')
+      + '</div><div class="hint" id="safesum" style="margin-top:12px">'
+      + (running ? (done + ' confirmed · ' + bad + ' failed of ' + rows.length)
+        : (done + ' confirmed · ' + bad + ' failed of ' + rows.length
+          + (bad ? ' — retry just the failed ones below.' : '.')))
+      + '</div>'
+      + (bad && !running
+        ? '<div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">'
+          + '<button class="btn btn-p" type="button" id="retryfailed">Retry ' + bad + ' failed row' + (bad === 1 ? '' : 's') + '</button>'
+          + '<button class="btn btn-s" type="button" id="keepok">Remove the confirmed rows from the list</button></div>'
+        : '');
+    const rb = document.getElementById('retryfailed');
+    if (rb) rb.onclick = retryFailed;
+    const kb = document.getElementById('keepok');
+    if (kb) kb.onclick = () => {
+      /* 把已确认的行从输入框里删掉，留下失败的 —— 用户可以直接再点发送。
+         按**行号**删，不是按地址：同一个地址在名单里本来就只出现一次。 */
+      const lines = $('list').value.split(/\r?\n/);
+      const keep = new Set(state.safeRows.filter((r) => r.status !== 'ok').map((r) => r.line));
+      $('list').value = lines.filter((_, i) => keep.has(i + 1)).join('\n');
+      $('list').dispatchEvent(new Event('input', { bubbles: true }));
+      toast('Confirmed rows removed — the failed ones are still in the list.');
+    };
+    reveal();
+  }
+
+  async function runSafe(multi, dec, unit, only = null) {
+    const rows = state.safeRows || [];
+    const targets = only || rows.map((_, i) => i);
+    const list = $('list').value;
+    $('steps').textContent = 'One transaction per recipient — your wallet will ask for each.';
+    for (const i of targets) {
+      const r = rows[i];
+      r.status = 'sending'; r.msg = '';
+      paintSafeRows(dec, unit, true);
+      try {
+        const tx = state.asset === 'erc20'
+          ? await multi.disperseToken(state.token, [r.account], [r.amount], { gasLimit: 250_000n })
+          : await multi.disperseEther([r.account], [r.amount], { value: r.amount, gasLimit: 180_000n });
+        r.status = 'sent'; paintSafeRows(dec, unit, true);
+        await tx.wait();
+        r.status = 'ok'; r.hash = tx.hash;
+      } catch (e) {
+        r.status = 'bad';
+        r.msg = humanizeTxError(e, state.chain);
+      }
+      paintSafeRows(dec, unit, true);
+    }
+    const ok = rows.filter((r) => r.status === 'ok').length;
+    const bad = rows.filter((r) => r.status === 'bad').length;
+    paintSafeRows(dec, unit, false);
+    $('steps').textContent = '';
+    if (only) toast(bad ? ('Retry done — ' + bad + ' still failing.') : ('All ' + ok + ' are through.'), bad ? 'bad' : 'ok');
+    else toast(bad ? (ok + ' sent, ' + bad + ' failed — failed rows stay listed.') : ('All ' + ok + ' sent.'), bad ? 'bad' : 'ok');
+    return { ok, bad };
+  }
+
+  /** 只重发失败的那几行（清单 8.1 点名要的那颗按钮）。 */
+  async function retryFailed() {    const rows = state.safeRows || [];
+    const idx = rows.map((r, i) => (r.status === 'bad' ? i : -1)).filter((i) => i >= 0);
+    if (!idx.length) return;
+    state.busy = true; update();
+    try {
+      if (!state.addr) { await wallet.connect(); await refreshWallet(); }
+      await wallet.ensureChain(state.chain);
+      const signer = await wallet.signer();
+      const multi = contract(state.chain, 'multiSender', ADDR.multiSender, signer);
+      const dec = state.asset === 'erc20' ? state.tokenDecimals : 18;
+      const unit = state.asset === 'erc20' ? (state.tokenSymbol || 'tokens') : (state.chain.native || 'ETH');
+      await runSafe(multi, dec, unit, idx);
+    } catch (e) {
+      toast(humanizeTxError(e, state.chain), 'bad');
+    } finally { state.busy = false; update(); }
+  }
+
+  /* ⚠ `done(tx)` 是旧的那条收尾（只发一条通知、只画一个 tx 链接）—— 现在两种模式
+     都走 `txNotice`（Pending → Success/Fail，带浏览器链接）与 `paintSafeRows`，
+     留着它只会让人以为还有第三条路径。 */
+</script>
+</body>
+</html>

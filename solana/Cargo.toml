@@ -1,0 +1,15 @@
+[workspace]
+members = ["program"]
+resolver = "2"
+
+# 部署费按字节付租金。这组 release 档实测反而把 .so 从 48.6 KB 撑到 55.6 KB
+# （SBF 工具链自己已经做过一轮优化，LTO 会把通用运行时整段链进来），所以**没有**启用：
+# [profile.release]
+# opt-level = "z"
+# lto = true
+# codegen-units = 1
+# strip = true
+# panic = "abort"
+
+# 程序是 `no-entrypoint` 的那个 crate：`cargo build`（宿主机）只用来跑单元测试，
+# 真正的部署产物由 `cargo build-sbf` 出（见 program/Cargo.toml 里的注释）。

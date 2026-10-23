@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy · OAKEN</title>
+<meta name="description" content="OAKEN privacy: no accounts, no analytics, no data selling. What your browser sends to public RPC nodes, what is stored in localStorage, and which third-party services are involved.">
+<meta property="og:title" content="Privacy — OAKEN">
+<meta property="og:description" content="No accounts, no analytics, no data selling. A plain list of what is processed and where it goes.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://oaken.one/privacy">
+<meta property="og:image" content="https://oaken.one/logo512.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/key.webp"><source src="/app/media/key.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Privacy</div>
+    <h1 class="reveal">The short version: no accounts, no analytics.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <div class="panel reveal">
+      <div class="head"><h3>Summary</h3></div>
+      <div class="body">
+        <p class="muted" style="font-size:14.5px">OAKEN does not create accounts, does not run analytics or
+          advertising scripts, and does not sell data. Your wallet address and the contents of your
+          transactions are public on the chain. The site stores a few preferences in your browser and sends
+          chain reads to public RPC providers. That is the whole picture; the details are below.</p>
+      </div>
+    </div>
+
+    <div class="grid2" data-stagger style="margin-top:26px">
+      <div class="panel">
+        <div class="head"><h3>What you provide</h3></div>
+        <div class="body">
+          <ul style="list-style:none;display:grid;gap:12px;color:var(--muted);font-size:14.5px">
+            <li><b style="color:var(--parch)">Wallet address.</b> Read from your wallet when you connect. It is
+              used to build the page (your locks, balances, positions) and is never sent to us as an account.</li>
+            <li><b style="color:var(--parch)">Transactions.</b> Everything you sign is public on the chain. We
+              cannot delete it and neither can you.</li>
+            <li><b style="color:var(--parch)">Images you upload.</b> Artwork for our own factory is stored on an
+              off-chain host and is publicly retrievable by URL. Do not upload anything private.</li>
+            <li><b style="color:var(--parch)">Messages to us.</b> If you contact us on X, that conversation is
+              handled by X under its own privacy policy.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="head"><h3>What your browser sends</h3></div>
+        <div class="body">
+          <ul style="list-style:none;display:grid;gap:12px;color:var(--muted);font-size:14.5px">
+            <li><b style="color:var(--parch)">RPC requests.</b> Chain reads go from your browser to public RPC
+              providers. They see your IP address and the addresses you query, like any block explorer does.
+              You can avoid this by using a wallet or node you control.</li>
+            <li><b style="color:var(--parch)">Hosting logs.</b> The site is served by Cloudflare Pages. Cloudflare
+              processes standard request logs (IP, user agent, path) to deliver the site and protect it.</li>
+            <li><b style="color:var(--parch)">localStorage.</b> Preferences such as the selected chain, the boot
+              animation flag and the last-used wallet type. They stay in your browser; clearing site data
+              removes them.</li>
+            <li><b style="color:var(--parch)">No cookies for tracking.</b> The site does not set advertising or
+              analytics cookies. Third-party services you open (explorers, X, launchpads) set their own.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2" data-stagger style="margin-top:26px">
+      <div class="panel">
+        <div class="head"><h3>Third-party services</h3></div>
+        <div class="body">
+          <p class="muted" style="font-size:14.5px">Depending on what you use, the site may contact:</p>
+          <ul style="list-style:none;display:grid;gap:10px;color:var(--muted);font-size:14.5px;margin-top:10px">
+            <li>· Public RPC providers listed in the chain registry.</li>
+            <li>· Cloudflare Pages (hosting) and our image host for uploaded artwork.</li>
+            <li>· WalletConnect's relay, only if you choose WalletConnect from the connect panel.</li>
+            <li>· Block explorers and Sourcify, when you click a verification link.</li>
+            <li>· Third-party launchpads (Pons, Flap, Genius, Clanker, four.meme) when you choose their route.
+              Their terms and privacy practices are theirs.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="head"><h3>Retention and your choices</h3></div>
+        <div class="body">
+          <ul style="list-style:none;display:grid;gap:12px;color:var(--muted);font-size:14.5px">
+            <li><b style="color:var(--parch)">No account data to delete.</b> There is no account database to
+              delete from.</li>
+            <li><b style="color:var(--parch)">Clear your browser.</b> Clearing site data removes localStorage
+              preferences. Disconnecting the wallet ends the page's access to your address.</li>
+            <li><b style="color:var(--parch)">Uploaded images</b> remain publicly retrievable while the image
+              host keeps them. We do not promise permanent storage.</li>
+            <li><b style="color:var(--parch)">Children.</b> The service is not directed at children and is not
+              intended for use by anyone below the legal age in their jurisdiction.</li>
+            <li><b style="color:var(--parch)">Changes.</b> If this policy changes, the current version will be
+              on this page.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel reveal" style="margin-top:26px"><div class="body" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <b>Questions?</b><span class="muted">Ask on X — that is the only official channel.</span>
+      <a class="btn btn-s" href="https://x.com/oakenhood" target="_blank" rel="noopener">@oakenhood</a>
+      <a class="btn btn-s" href="/terms">Terms &amp; Risk</a>
+      <a class="btn btn-p" style="margin-left:auto" href="/locks">See the locks</a>
+    </div></div>
+  </section>
+</main>
+
+<script type="module">
+  import { shell, reveal } from '/app/oaken.js';
+  shell();
+  reveal();
+</script>
+</body>
+</html>

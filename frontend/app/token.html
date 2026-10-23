@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token · OAKEN</title>
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below — '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead slim">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/rings.webp"><source src="/app/media/rings-head.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:44px" id="root">
+    <div class="muted">Reading the chain…</div>
+  </section>
+</main>
+<!-- defer：不让 514 KB 的 ethers 挡住首屏；顺序仍在我们自己的模块之前（模块默认 deferred） -->
+<script src="/app/vendor/ethers.umd.min.js" defer></script>
+<script type="module">
+  import { shell, locksForToken, readLock, readLocks, tokenLocksPage, tokenMeta, fmtAmount, fmtDate, short, countdown, explorer,
+    chainBySlug, currentChain, copyBtn, safeRead, showReadFail, ADAPTER , onChainSwitch} from '/app/oaken.js';
+  shell();
+
+    /* 同记录页：链来自 URL（/locks/<链>/<代币>），钱包换链不影响这一页。 */
+    onChainSwitch(() => { /* 什么都不用做（见上） */ });
+  const m = /^\/locks\/([^/]+)\/(0x[0-9a-fA-F]{40})\/?$/.exec(location.pathname);
+  const root = document.getElementById('root');
+
+  (async () => {
+    if (!m) {
+      root.innerHTML = '<div class="eyebrow">Token</div><h2 class="sec">No token address in this URL.</h2>';
+      return;
+    }
+    const chain = (await chainBySlug(m[1])) || (await currentChain());
+    if (!chain) {
+      root.innerHTML = '<div class="eyebrow">Token</div><h2 class="sec">Could not load the chain list.</h2>'
+        + '<p class="muted" style="margin-top:12px">This page needs `/api/chains` to know which chain to read. Refresh once.</p>';
+      return;
+    }
+    run(m[2], chain);
+  })();
+
+  async function run(token, chain) {
+    /**
+     * 快路径：**两轮 Multicall** 把整页读完（枚举+元数据一轮，金库/标记一轮）。
+     * 这条链没有 Multicall3 或批读失败时，退回 `tokenMeta` + 逐把读。
+     */
+    let pageData = null;
+    try { pageData = await tokenLocksPage(token, chain); } catch { pageData = null; }
+    let symbol = 'TOKEN', decimals = 18;
+    let ids = [];
+    if (pageData) {
+      symbol = pageData.symbol; decimals = pageData.decimals; ids = pageData.ids;
+      document.title = `${symbol} locks · OAKEN`;
+    } else {
+      try { [symbol, decimals] = await tokenMeta(token, chain); } catch { /* 保持 TOKEN/18 */ }
+      document.title = `${symbol} locks · OAKEN`;
+      try { ids = await safeRead(() => locksForToken(token, chain), { chain, timeout: 12_000, retries: 1, label: 'token locks' }); }
+      catch (e) {
+        /* 读不到 ≠ 这个代币没有锁（清单通用第 1 条）：统一那句 + 重试。 */
+        root.innerHTML = `<div class="eyebrow">Token</div><h2 class="sec">Could not read ${short(token)} from the chain.</h2>
+          <p class="muted" style="margin-top:12px">This page reads ${chain.name} directly; it does not fall back to a cached copy.</p>
+          <div id="tokfail" style="margin-top:16px;max-width:52ch"></div>`;
+        showReadFail(document.getElementById('tokfail'), {
+          what: short(token) + ' on ' + chain.name, detail: (e && e.message) || '', chain, onRetry: () => run(token, chain),
+        });
+        return;
+      }
+    }
+    /**
+     * 先试 **Multicall3 两轮批读**（12 把锁从 ~4.0s 降到 ~1s）；这条链没有
+     * Multicall3、或批读整体失败时，退回一把一把读 —— 批量只是快路径，
+     * 不能因为快路径坏了就让整页读不出来。
+     */
+    const rows = [];
+    let lockFails = 0;      // ⚠ 单把读不到要**数出来**，见下面那行"Nothing locked"
+    if (pageData) {
+      rows.push(...pageData.rows);
+      lockFails = pageData.failed;
+    } else {
+      let batched = null;
+      try { batched = await readLocks(ids, chain); } catch { batched = null; }
+      if (batched) {
+        rows.push(...batched.rows);
+        lockFails = batched.failed;
+      } else {
+        /**
+         * 并发读，但**限流**：每把锁是 5 个 RPC 调用，11 lock${rows.length === 1 ? '' : 's'}一次性全发出去，
+         * 公共端点会开始 429 —— 那比慢更难查。4 把在飞，够快也不冒犯端点。
+         * 索引用 `const k = i++` 取，别让两个 worker 拿到同一个 id（那会读出重复行）。
+         */
+        let i = 0;
+        const worker = async () => {
+          while (i < ids.length) {
+            const k = i++;
+            try { rows.push(await readLock(ids[k], chain)); } catch (e) { lockFails++; }
+          }
+        };
+        await Promise.all(Array.from({ length: Math.min(4, ids.length) }, worker));
+      }
+    }
+    /**
+     * ⚠ **每一把都没读出来 ≠ 这个代币没有锁**（2026-10-15 外部审计抓到）。
+     * 原来无论读失败多少把，页面上都是一句 "Nothing locked for this token yet." ——
+     * 那是把"链没答上来"说成"这里什么都没有"，是最伤的一种假数据。
+     */
+    if (ids.length && !rows.length && lockFails) {
+      root.innerHTML = `<div class="eyebrow">Token</div><h2 class="sec">Could not read the locks for ${short(token)}.</h2>
+        <p class="muted" style="margin-top:12px">The chain says this token has <b>${ids.length}</b> lock${ids.length === 1 ? '' : 's'},
+        but none of the reads came back. Nothing below would be true, so nothing is shown.</p>
+        <div id="tokfail2" style="margin-top:16px;max-width:52ch"></div>`;
+      showReadFail(document.getElementById('tokfail2'), {
+        what: 'the locks for ' + short(token), chain, detail: lockFails + ' of ' + ids.length + ' reads failed',
+        onRetry: () => run(token, chain),
+      });
+      return;
+    }
+    rows.sort((a, b) => Number(b.id) - Number(a.id));
+    /* 「金库持有」= 还没被领走的量：amount 是**当初锁进去的**，claimed 是已经出去的。
+       只加 amount 会把领过的锁也算成全额在库里 —— 那个数比链上余额大。 */
+    const held = rows.reduce((s, r) => s + (BigInt(r.amount) - BigInt(r.claimed || 0)), 0n);
+    /* 部分读不到：把这一页**读到了的**照常显示，但如实说还有几把没读到 */
+    const partial = lockFails && rows.length
+      ? `<div class="readfail" style="margin-top:14px"><b>${lockFails} of ${ids.length} locks could not be read this time.</b>
+         <span class="muted">The ones below are real; the list may be incomplete.</span>
+         <button class="btn btn-s" type="button" id="tokpartial">Retry</button></div>` : '';
+
+    root.innerHTML = `
+      <div style="display:flex;gap:16px;align-items:center">
+        <img id="tokenart" alt="" style="width:64px;height:64px;border-radius:14px;border:1px solid var(--line-gold);object-fit:cover;display:none">
+        <div>
+          <div class="eyebrow">Token · read live from ${chain.name}</div>
+          <h2 class="sec" style="margin:0">${symbol} <span class="mono muted" style="font-size:18px">${short(token, 6)}</span> ${copyBtn(token, 'copy CA')}</h2>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+        <span class="pill">${rows.length} lock${rows.length === 1 ? '' : 's'}</span>
+        <span class="pill lock">${fmtAmount(held, decimals)} ${symbol} still in the vault</span>
+        <a class="pill" target="_blank" rel="noopener" href="${explorer('/token/' + token, chain)}">explorer ↗</a>
+        <a class="pill ok" target="_blank" rel="noopener" title="the lock contracts are exact matches on Sourcify"
+           href="https://sourcify.dev/#/lookup/${ADAPTER}">source verified ↗</a>
+      </div>
+      <div class="panel" style="margin-top:26px">
+        <table class="list">
+          <thead><tr><th>Lock</th><th>Amount</th><th>Owner</th><th>Unlocks</th><th></th></tr></thead>
+          <tbody>
+            ${rows.length ? rows.map((l) => {
+              /* 用 endTime 而不是第一次释放：分档锁的第一次释放（TGE）不是"Unlocks"，
+                 拿它当这一列的日期会把一把还在按天释放的锁写成"已解锁"。 */
+              const c = countdown(l.endTime);
+              return `<tr>
+                <td class="mono">#${l.id}</td>
+                <td>${fmtAmount(l.amount, l.decimals)}</td>
+                <td class="mono muted" style="font-size:13px">${short(l.owner)}</td>
+                <td>${c.done ? '<span class="pill ok">released</span>' : `<span class="pill lock">${c.text}</span>`}
+                    ${l.steps ? `<span class="muted" style="font-size:12px"> · ${l.steps} steps</span>` : ''}
+                    <div class="muted" style="font-size:12px;margin-top:4px">${fmtDate(l.endTime)}</div></td>
+                <td style="text-align:right"><a href="/locks/${chain.slug}/record/${l.id}">View →</a></td>
+              </tr>`;
+            }).join('') : '<tr><td colspan="5" class="muted" style="padding:26px 14px">Nothing locked for this token yet.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+      <div class="hint" style="margin-top:14px">Amounts come from the same adapter and vault reads the record pages use — batched through Multicall3 where the chain has it — so the numbers agree with the pages they link to.</div>`
+      + partial;
+    const pb = document.getElementById('tokpartial');
+    if (pb) pb.onclick = () => run(token, chain);
+
+    /**
+     * 图：自有工厂的币**链上没有图槽**，图存在我们自己的图床；第三方路线（Pons /
+     * Flap / Clanker / Genius）虽然会把图带进它们的元数据，那是别人家的页面。
+     * 所以**所有路线在发射成功时都会登记**「链 + 代币 → 图」这张表，这一页据此显示。
+     * 取不到就不显示，不编、不缺省图。
+     */
+    fetch('/api/token-image/' + chain.id + '/' + token)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!j || !j.url) return;
+        const im = document.getElementById('tokenart');
+        if (!im) return;
+        im.src = j.url;
+        im.style.display = '';
+      })
+      .catch(() => { /* 没有就没有 —— 这一格不是这张页面的主体 */ });
+  }
+</script>
+</body>
+</html>

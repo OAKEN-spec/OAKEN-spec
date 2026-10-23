@@ -1,0 +1,1834 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launch a token · OAKEN</title>
+<meta name="description" content="Create a fixed-supply token on Robinhood Chain, BNB Chain, Base or Polygon. Launching and locking are separate steps.">
+<meta property="og:title" content="Launch a token · OAKEN">
+<meta property="og:description" content="Create a fixed-supply token on Robinhood Chain, BNB Chain, Base or Polygon. Launching and locking are separate steps.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://oaken.one/launch">
+<meta property="og:image" content="https://oaken.one/logo512.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+<style>
+  .flow { display: grid; grid-template-columns: 1.25fr .75fr; gap: 26px; align-items: start; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; flex-wrap: wrap; }
+  .seg button { background: transparent; border: 0; color: var(--muted); font: 600 13.5px/1 "Segoe UI", system-ui, sans-serif;
+                padding: 11px 16px; cursor: pointer; }
+  .seg button.on { background: rgba(217,163,67,.12); color: var(--gold); }
+  .seg button:disabled { opacity: .45; cursor: not-allowed; }
+  /* 链选择器：等宽格子的"表格式"一行 —— 格线画在格子上，不在容器上，
+     这样末行没占满时（手机两列、五条链）不会多出一块空白的"格子"。
+     Solana 排第一格，见 boot()。 */
+  .seg.seg-table { display: grid; width: 100%; gap: 1px; background: var(--panel);
+                   grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
+  .seg.seg-table button { display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+                          background: var(--panel); font-size: 12.5px; padding: 11px 6px; min-width: 0;
+                          white-space: nowrap; box-shadow: 1px 0 0 var(--line), 0 1px 0 var(--line); }
+  .seg.seg-table button.on { background: rgba(217,163,67,.12); }
+  .seg.seg-table button .chain-ico { margin-right: 0; }
+  .summary { background: var(--panel); border: 1px solid var(--line-gold); border-radius: var(--r); padding: 20px 22px; }
+  .summary b { color: var(--gold); }
+  .chest-art { border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; margin-bottom: 16px; }
+  .chest-art img { width: 100%; height: auto; display: block; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .warnline { color: #e0a85f; }
+  .okline { color: var(--ok, #6fbf73); }
+  /* 路线卡片：一条路线一张，说明"谁在发、我们做什么" */
+  .routes { display: grid; gap: 10px; }
+  .route { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
+           border: 1px solid var(--line); border-radius: var(--r); padding: 13px 15px; background: var(--panel); }
+  .route.on { border-color: var(--line-gold); background: rgba(217,163,67,.05); }
+  .route b { font-size: 14px; }
+  .route .sub { color: var(--muted); font-size: 12.5px; margin-top: 3px; display: block; }
+  .route button { white-space: nowrap; }
+  .track { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 8px; }
+  .track li { display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; align-items: baseline;
+              border: 1px solid var(--line); border-radius: var(--r); padding: 11px 13px; background: var(--panel); }
+  .track li .dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(240,228,208,.22); display: inline-block; }
+  .track li b { color: var(--parch); font-size: 13.5px; }
+  .track li em { display: block; font-style: normal; color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+  .track li a { color: var(--gold); font-size: 12px; }
+  .track li[data-state="wallet"] { border-color: rgba(217,163,67,.45); }
+  .track li[data-state="wallet"] .dot { background: var(--gold); animation: pulse 1.2s ease-in-out infinite; }
+  .track li[data-state="sent"] { border-color: rgba(217,163,67,.45); }
+  .track li[data-state="sent"] .dot { background: #A06A1F; animation: pulse 1.2s ease-in-out infinite; }
+  .track li[data-state="done"] .dot { background: var(--ok, #6fbf73); }
+  .track li[data-state="done"] em { color: var(--ok, #6fbf73); }
+  .track li[data-state="fail"] { border-color: rgba(224,120,95,.5); }
+  .track li[data-state="fail"] .dot { background: var(--bad, #e0785f); }
+  .track li[data-state="fail"] em { color: var(--bad, #e0785f); }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+  @media (max-width: 940px) { .flow { grid-template-columns: 1fr; } .chest-art { display: none; } }
+</style>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/acorn.webp"><source src="/app/media/acorn-live.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Launchpad</div>
+    <h1 class="reveal">Launch it. Lock it later, if you want.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <p class="muted" style="max-width:66ch">Create a fixed-supply token in <b>one transaction</b>. The supply is
+      fixed at creation: no mint, no owner, no fee. <b>Locking is a separate page</b> — this form does not lock
+      anything. Looking for token sales instead? <a href="/launchpads">That listing is here</a>.</p>
+
+    <p class="muted" style="max-width:66ch;margin-top:8px"><b>On Solana?</b>
+      <a href="/launch/solana">Launch an SPL token through OAKEN Factory or pump.fun →</a></p>
+
+    <div class="flow" style="margin-top:30px">
+      <div class="panel">
+        <div class="head"><h3>What you are launching</h3><span class="steps-mini" style="margin-left:auto" id="modehint"></span></div>
+        <div class="body">
+          <label class="f">Chain</label>
+          <div class="seg seg-table" id="chainseg"><button type="button" class="on">Loading…</button></div>
+          <div class="hint" id="chainhint">Only chains we have deployed to are listed. Solana opens its own
+            launchpad. The token lands on the chain your wallet is on, and we will ask the wallet to switch if you
+            pick another one.</div>
+
+          <label class="f" style="margin-top:18px">How it launches</label>
+          <div class="routes" id="routes"></div>
+          <!-- 新手引导：自有工厂是唯一"一笔交易、发币、不依赖任何外部服务"的路；锁仓是另一个页面。 -->
+          <div class="hint" style="margin-bottom:4px"><b style="color:var(--gold)">New here?</b> Start with
+            <b>our own factory</b>: one transaction creates the token, with no external service in the path. Locking
+            is a separate page. The other routes are there when you already want that house's market.</div>
+          <div class="hint" id="routehint"></div>
+          <!-- 报告里的"路由对比表"：一眼看清谁在跑、创建时能不能锁、谁能改。 -->
+          <details class="routetable" open>
+            <summary>Compare the routes at a glance</summary>
+            <div class="tablewrap">
+              <table>
+                <thead><tr><th>Route</th><th>Who runs it</th><th>Lock at creation</th><th>Lever on it</th></tr></thead>
+                <tbody>
+                  <tr class="own"><td>OAKEN factory</td><td>Our contracts</td><td>No — lock on the lock page</td><td>None; no owner</td></tr>
+                  <tr><td>Flap</td><td>Flap contracts</td><td>No — lock later</td><td>Flap's rules and fees; its portal can be upgraded</td></tr>
+                  <tr><td>four.meme</td><td>four.meme backend</td><td>No — lock later</td><td>Their backend signs; their rules apply</td></tr>
+                  <tr><td>Clanker</td><td>Clanker factory</td><td>LP locked forever; your slice is not</td><td>Factory owner can change hooks or switch it off</td></tr>
+                  <tr><td>Pons / Genius</td><td>Pons-family contracts</td><td>No — after graduation</td><td>Their contracts and curve</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
+          <div class="warnbox risk" id="routewarn" style="margin-top:14px"><b>Third-party routes are not ownerless.</b>
+            Pons, Flap, Genius, Clanker and four.meme run their own contracts and backends. Their teams can
+            change factories, fees, hooks or rules — Clanker's factory owner can change hooks and modules;
+            four.meme signs launches from its backend; Flap's portal is upgradeable by its team.
+            <b>Only our own factory is fully ownerless.</b> The warning for the selected route is shown in its
+            panel — read it before you sign.</div>
+
+          <div id="own" class="">
+            <label class="f" for="name">Token name</label>
+            <input class="i" id="name" placeholder="Ex: Oaken Coin" maxlength="64" autocomplete="off">
+
+            <div class="row2">
+              <div><label class="f" for="symbol">Symbol</label>
+                <input class="i" id="symbol" placeholder="OAK" maxlength="16" autocomplete="off"></div>
+              <div><label class="f" for="decimals">Decimals</label>
+                <input class="i" id="decimals" value="18" inputmode="numeric" autocomplete="off"></div>
+            </div>
+
+            <label class="f" for="supply">Total supply</label>
+            <input class="i" id="supply" placeholder="1000000" inputmode="decimal" autocomplete="off">
+            <div class="hint" id="supplyhint">Fixed forever — the token has no mint function.</div>
+            <div class="hint"><b>No market is created here, so there is no developer buy.</b> The whole supply
+              lands in your wallet; create liquidity separately if you want a market. The routes below (Flap,
+              Clanker, Pons, four.meme) do create a market and require a developer buy. <b>Locking is a separate
+              page</b> — nothing is bundled here.</div>
+
+            <label class="f" for="oart">Artwork (optional)</label>
+            <input class="i" id="oart" placeholder="https://… — or upload below" autocomplete="off">
+            <input class="i" id="oartfile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
+            <label class="btn btn-s filebtn" for="oartfile">Choose an image…</label>
+            <div class="hint" id="oartstate">Pick a square-ish image — we crop it to 512×512 and host it on our own
+              image store, then the token page here points at that URL.</div>
+            <div class="hint">Our own token contract carries no image field on-chain, so this one is stored on our
+              side and shown on the token's page here. An external URL is passed to third-party routes, but the
+              token page here only displays images uploaded to our store.
+              <b>If our image host is unavailable, the token still exists and trades — only the picture is missing.</b></div>
+
+            <div class="hint" style="margin-top:18px"><b>Locking is a separate page.</b> This route only creates
+              the token. Once it lands, lock any slice from the <a href="/locks/create">lock page</a> — there is no
+              lock step in this transaction and no lock fields to fill.</div>
+          </div>
+
+          <div id="flap" class="hide">
+            <label class="f" for="fname">Token name</label>
+            <input class="i" id="fname" placeholder="Ex: Oaken Coin" maxlength="64" autocomplete="off">
+            <div class="row2">
+              <div><label class="f" for="fsymbol">Symbol</label>
+                <input class="i" id="fsymbol" placeholder="OAK" maxlength="16" autocomplete="off"></div>
+              <div><label class="f" for="fmeta">Artwork URL (optional)</label>
+                <input class="i" id="fmeta" placeholder="https://ipfs.io/ipfs/…" autocomplete="off"></div>
+            </div>
+            <input class="i" id="ffile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
+            <label class="btn btn-s filebtn" for="ffile">Choose an image…</label>
+            <div class="hint" id="fimgstate">Pick a square-ish image — we crop it to 512×512 and host it on our own
+              image store, then the token points at that URL. You can still paste any URL above instead.</div>
+            <label class="f" for="fbuyamt">Developer buy (required)</label>
+            <input class="i" id="fbuyamt" placeholder="e.g. 0.01" inputmode="decimal" autocomplete="off">
+            <div class="hint" id="fbuyhint">The amount of the chain's native coin you buy on your own token at
+              launch. It goes into the same transaction as the create. Required — enter an amount above 0.</div>
+            <label class="f">Token type</label>
+            <div class="seg" id="ftype">
+              <button type="button" data-t="standard" class="on">Standard</button>
+              <button type="button" data-t="tax">Tax token</button>
+            </div>
+
+            <div id="ftaxbox" class="hide">
+              <div class="row2">
+                <div><label class="f" for="fbuy">Buy tax %</label>
+                  <input class="i" id="fbuy" value="3" inputmode="decimal" autocomplete="off"></div>
+                <div><label class="f" for="fsell">Sell tax %</label>
+                  <input class="i" id="fsell" value="3" inputmode="decimal" autocomplete="off"></div>
+              </div>
+              <label class="f">Where the tax goes — must add up to 100%</label>
+              <div class="row2">
+                <div><input class="i" id="fmkt" value="78" inputmode="decimal" autocomplete="off" placeholder="marketing %"></div>
+                <div><input class="i" id="flp" value="8" inputmode="decimal" autocomplete="off" placeholder="liquidity %"></div>
+              </div>
+              <div class="row2" style="margin-top:8px">
+                <div><input class="i" id="fdiv" value="8" inputmode="decimal" autocomplete="off" placeholder="dividends %"></div>
+                <div><input class="i" id="fdef" value="6" inputmode="decimal" autocomplete="off" placeholder="deflation %"></div>
+              </div>
+              <div class="hint" id="fsum"></div>
+              <div class="hint" id="fexample"></div>
+              <div class="hint">A tax token charges a cut on every trade and splits it four ways — marketing,
+                liquidity, dividends to holders, and deflation. The numbers above are the shape the most common Flap
+                tax token ships with. Flap does not document what each bucket pays out to, so treat this as what the
+                chain is being told, not as a promise about your income. A tax token's address must end in
+                <b>7777</b> (standard tokens end in <b>8888</b>) — we mine for that.</div>
+            </div>
+
+            <div class="hint" id="flaphint"></div>
+            <div class="hint">No creation fee — you pay gas only. Your wallet signs, so the creator side of the token is
+              <b>yours</b>: Flap pays the creator a share of every trade, and it goes straight to your address, never through us.
+              The parameter shape we send is the one real launches use (a bonding curve that graduates into the chain's DEX).</div>
+          </div>
+
+          <div id="fourmeme" class="hide">
+            <p class="muted" style="max-width:66ch">four.meme is the big BNB Chain launchpad: a bonding curve that graduates
+              into PancakeSwap. Fill the form here — <b>their backend signs the launch</b>, your wallet pays for it, and the
+              creator share goes straight to you.</p>
+
+            <label class="f" for="mname">Token name</label>
+            <input class="i" id="mname" placeholder="Ex: Oaken Coin" maxlength="20" autocomplete="off">
+            <div class="row2">
+              <div><label class="f" for="msymbol">Symbol</label>
+                <input class="i" id="msymbol" placeholder="OAK" maxlength="20" autocomplete="off"></div>
+              <div><label class="f" for="mlabel">Category</label>
+                <select class="i" id="mlabel"></select></div>
+            </div>
+            <label class="f" for="mdesc">Description (optional)</label>
+            <input class="i" id="mdesc" maxlength="200" autocomplete="off">
+            <label class="f" for="mimg">Artwork (optional — if you skip it we draw one from the symbol)</label>
+            <input class="i" id="mimg" type="file" accept="image/png,image/jpeg,image/webp" style="display:none">
+            <label class="btn btn-s filebtn" for="mimg">Choose an image…</label>
+            <div class="hint" id="mimgstate">No file chosen — we will draw one from the symbol if you skip it.</div>
+            <!-- 第三方那条路的图也要说清：URL 可以，尺寸推荐 512×512（我们按这个尺寸裁） -->
+            <div class="hint">A square image around <b>512x512</b> works best — we crop and resize to that.
+              No file handy? Paste any public image URL above instead; four.meme stores whatever URL it is given.</div>
+            <div class="row2">
+              <div><label class="f" for="mweb">Website (optional)</label>
+                <input class="i" id="mweb" placeholder="https://…" autocomplete="off"></div>
+              <div><label class="f" for="mtw">X / Twitter (optional)</label>
+                <input class="i" id="mtw" placeholder="https://x.com/…" autocomplete="off"></div>
+            </div>
+            <label class="f" for="mbuyamt">Developer buy (BNB, required)</label>
+            <input class="i" id="mbuyamt" placeholder="e.g. 0.01" inputmode="decimal" autocomplete="off">
+            <div class="hint" id="mbuyhint">four.meme calls this the pre-sale amount: your wallet spends it on the
+              new curve in the same transaction, plus their 1% buy fee. Required — enter an amount above 0.</div>
+
+            <label class="f">Trading tax</label>
+            <div class="seg" id="mtaxtype">
+              <button type="button" data-t="none" class="on">No tax</button>
+              <button type="button" data-t="tax">Tax token</button>
+            </div>
+            <div id="mtaxbox" class="hide">
+              <div class="row2">
+                <div><label class="f" for="mfee">Buy tax %</label>
+                  <select class="i" id="mfee"><option value="1">1</option><option value="3">3</option><option value="5" selected>5</option><option value="10">10</option></select></div>
+                <div><label class="f" for="mfeesell">Sell tax %</label>
+                  <select class="i" id="mfeesell"><option value="1">1</option><option value="3">3</option><option value="5" selected>5</option><option value="10">10</option></select></div>
+              </div>
+              <div class="row2" style="margin-top:8px">
+                <div><label class="f" for="mliq">To liquidity %</label>
+                  <input class="i" id="mliq" value="100" inputmode="decimal" autocomplete="off"></div>
+                <div><label class="f" for="mburn">Burn %</label>
+                  <input class="i" id="mburn" value="0" inputmode="decimal" autocomplete="off"></div>
+              </div>
+              <div class="row2" style="margin-top:8px">
+                <div><label class="f" for="mdiv">Dividends %</label>
+                  <input class="i" id="mdiv" value="0" inputmode="decimal" autocomplete="off"></div>
+                <div><label class="f" for="mrec">To a wallet %</label>
+                  <input class="i" id="mrec" value="0" inputmode="decimal" autocomplete="off"></div>
+              </div>
+              <label class="f" for="mrecaddr">That wallet</label>
+              <input class="i" id="mrecaddr" placeholder="0x… — needed when the row above is not 0" autocomplete="off">
+              <div class="hint" id="msum"></div>
+              <div class="hint" id="mexample"></div>
+              <div class="hint">four.meme takes this cut on every trade. Each rate can only be <b>1 / 3 / 5 / 10%</b> —
+                those are the only values its backend accepts — and burn + dividends + liquidity + wallet must add up to
+                exactly 100%.</div>
+            </div>
+
+            <div class="hint" id="fmfacts">Reading four.meme's config…</div>
+            <div class="hint">Their backend issues a one-time signature for the launch; your wallet signs a short <b>text</b>
+              message so their API knows the request is yours — no gas, no transaction. Nothing here goes through anyone
+              else's front end.</div>
+
+            <label class="f" for="fmtoken" style="margin-top:18px">Already launched on four.meme?</label>
+            <input class="i" id="fmtoken" placeholder="0x… the token — we will take you to the lock form" autocomplete="off">
+            <div id="fminfo" class="hint">Paste it and we will take you to the lock form with the address already filled in.</div>
+          </div>
+
+          <div id="clanker" class="hide">
+            <p class="muted" style="max-width:66ch">Clanker builds a <b>Uniswap V4 pool</b> and locks the initial
+              liquidity <b>forever</b> — its locker has no withdraw function at all. We encode the launch call; your
+              wallet signs it; the LP fees pay your address directly, never through us.</p>
+
+            <label class="f" for="cname">Token name</label>
+            <input class="i" id="cname" placeholder="Ex: Oaken Coin" maxlength="64" autocomplete="off">
+            <div class="row2">
+              <div><label class="f" for="csymbol">Symbol</label>
+                <input class="i" id="csymbol" placeholder="OAK" maxlength="16" autocomplete="off"></div>
+              <div><label class="f" for="clpfee">LP fee % (per side)</label>
+                <input class="i" id="clpfee" value="1" inputmode="decimal" autocomplete="off"></div>
+            </div>
+            <label class="f" for="cimage">Artwork URL (optional)</label>
+            <input class="i" id="cimage" placeholder="https://… or ipfs://…" autocomplete="off">
+            <input class="i" id="cfile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
+            <label class="btn btn-s filebtn" for="cfile">Choose an image…</label>
+            <div class="hint" id="cimgstate">Pick a square-ish image — we crop it to 512×512 and host it on our own
+              image store, then the token points at that URL. You can still paste any URL above instead.</div>
+            <label class="f" for="cdesc">Description (optional)</label>
+            <input class="i" id="cdesc" maxlength="300" autocomplete="off">
+            <div class="row2">
+              <div><label class="f" for="cweb">Website (optional)</label>
+                <input class="i" id="cweb" placeholder="https://…" autocomplete="off"></div>
+              <div><label class="f" for="cx">X / Twitter (optional)</label>
+                <input class="i" id="cx" placeholder="https://x.com/…" autocomplete="off"></div>
+            </div>
+            <label class="f" for="cbuyamt">Developer buy (required)</label>
+            <input class="i" id="cbuyamt" placeholder="e.g. 0.01" inputmode="decimal" autocomplete="off">
+            <div class="hint" id="cbuyhint">Clanker's dev-buy extension spends this much ETH/BNB on the new pool in
+              the same transaction. Required — enter an amount above 0. You can still buy again after the sniper
+              auction.</div>
+            <div class="hint" id="clankerfacts">Reading the Clanker factory…</div>
+            <div class="hint"><b>Free</b> — no launch fee, you pay gas only (the required developer buy is your own
+              purchase, not a fee). The artwork/metadata are plain URL strings (nothing is checked on-chain), so host
+              the image somewhere real. Right after launch there is a
+              <b>sniper auction</b> (~22 seconds, then 15 seconds of decaying fees) — buying in that window pays a
+              steep fee, so wait for it to pass. The trade fee is yours (minus Clanker's 20% cut of it); the initial
+              LP is locked forever and nobody — including Clanker — can pull it.</div>
+            <!-- 清单第 6 条：这条风险提示要**醒目**（warnbox），不是小字。
+                 它是这条路线与自有工厂之间唯一实质的差别，用户有权在点之前看见。 -->
+            <div class="warnbox risk"><b>Clanker's factory owner can change this launch after the fact.</b>
+              They can add or remove the hooks and modules it uses, and they can switch the factory off entirely.
+              That is their switch, not ours — nothing on this page can change it. Launch on <b>our own factory</b>
+              if you need a route with no such lever.
+              <br><br><b>Sniper auction:</b> the first ~22 seconds charge a steep fee, then ~15 seconds of decaying
+              fees. Wait it out before buying.</div>
+          </div>
+
+          <div id="pons" class="hide">
+            <div class="warnbox" id="ponslocknote" style="margin-top:0"><b>No lock at creation.</b>
+              The whole supply goes into the bonding curve. The lock form opens only after the token graduates
+              and the pool exists.</div>
+            <p class="muted" id="ponsintro" style="max-width:66ch">Pons runs its own launch: a bonding curve sells the supply, and when it
+              graduates the liquidity moves into a Uniswap V4 pool. We encode the launch call — your wallet signs it, and the
+              <b>creator fee</b> pays your address directly, never through us.</p>
+
+            <label class="f" for="pname">Token name</label>
+            <input class="i" id="pname" placeholder="Ex: Oaken Coin" maxlength="64" autocomplete="off">
+            <div class="row2">
+              <div><label class="f" for="psymbol">Symbol</label>
+                <input class="i" id="psymbol" placeholder="OAK" maxlength="16" autocomplete="off"></div>
+              <div><label class="f" for="ptax">Creator fee % (0–10)</label>
+                <input class="i" id="ptax" value="0" inputmode="decimal" autocomplete="off"></div>
+            </div>
+            <label class="f" for="pdesc">Description (optional)</label>
+            <input class="i" id="pdesc" maxlength="200" autocomplete="off">
+            <label class="f" for="plogo">Artwork URL (optional)</label>
+            <input class="i" id="plogo" placeholder="https://ipfs.io/ipfs/…" autocomplete="off">
+            <input class="i" id="pfile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
+            <label class="btn btn-s filebtn" for="pfile">Choose an image…</label>
+            <div class="hint" id="pimgstate">Pick a square-ish image — we crop it to 512×512 and host it on our own
+              image store, then the token points at that URL. You can still paste any URL above instead.</div>
+            <div class="row2">
+              <div><label class="f" for="pweb">Website (optional)</label>
+                <input class="i" id="pweb" placeholder="https://…" autocomplete="off"></div>
+              <div><label class="f" for="px">X / Twitter (optional)</label>
+                <input class="i" id="px" placeholder="https://x.com/…" autocomplete="off"></div>
+            </div>
+            <label class="f" for="pbuyamt">Developer buy (required)</label>
+            <input class="i" id="pbuyamt" placeholder="e.g. 0.01" inputmode="decimal" autocomplete="off">
+            <div class="hint" id="pbuyhint">Spends this much of the chain's native coin on the new curve in the
+              same transaction (through the launchpad's own atomic launch-and-buy router). Required — enter an
+              amount above 0.</div>
+            <div class="hint" id="ponsfacts">Reading the Pons factory…</div>
+            <div class="hint">Nothing can be locked at creation — the supply goes into the curve, so the creator holds none of
+              it. The lock comes after <b>graduation</b>, when the pool and its position exist; that is also the moment this
+              page will offer to lock it.</div>
+
+            <label class="f" for="ponstoken" style="margin-top:18px" id="ponstokenlabel">Already launched on Pons?</label>
+            <input class="i" id="ponstoken" placeholder="0x… the token — we will verify it against the factory" autocomplete="off">
+            <div id="ponsinfo" class="hint">Paste any token and we will check the Pons factory for it — then you can lock what you hold.</div>
+          </div>
+
+          <div class="err hide" id="err"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="chest-art"><img src="/app/img/chest.webp" alt="" width="1200" height="1200"></div>
+        <div class="summary" id="summary">
+          <div class="eyebrow" style="margin-bottom:12px">Before you sign</div>
+          <div id="sumtext"><span class="sumlead">What happens when you press launch</span><span class="sumstep"><b>1</b>One signature creates the token.</span><span class="sumstep"><b>2</b>The whole supply goes to your wallet.</span><span class="sumstep"><b>3</b>Locking is a separate page — nothing is bundled.</span></div>
+          <div class="hint" id="sumline2" style="margin-top:12px"></div>
+        </div>
+
+        <div class="panel" id="signcheckpanel" style="margin-top:16px">
+          <div class="head"><h3>Sign checklist</h3></div>
+          <div class="body">
+            <ul class="signcheck" id="signcheck"></ul>
+            <div class="hint" id="signchecknote"></div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:16px">
+          <div class="head"><h3>What it costs</h3></div>
+          <div class="body">
+            <dl class="kv">
+              <dt>OAKEN fee</dt><dd>0 — no fee, ever</dd>
+              <dt>Confirmations</dt><dd>1 — create and transfer to you</dd>
+              <dt>Network fee</dt><dd id="fee">—</dd>
+              <dt>Your gas balance</dt><dd id="native">—</dd>
+            </dl>
+            <div class="hint" id="costhint">Connect a wallet to see the fee and your gas balance.</div>
+          </div>
+        </div>
+
+        <div style="display:grid;gap:10px;margin-top:16px">
+          <ol class="track" id="track" style="display:none">
+            <li data-step="launch" data-state="idle"><span class="dot"></span>
+              <div><b>Create token</b><em id="t-launch">Waiting for the form</em></div>
+              <a id="tx-launch" target="_blank" rel="noopener" style="display:none">tx ↗</a></li>
+          </ol>
+          <button class="btn btn-p" id="go" style="width:100%" disabled>Connect a wallet</button>
+        </div>
+
+        <div class="panel hide" id="done" style="margin-top:16px">
+          <div class="head"><h3>Launched</h3></div>
+          <div class="body" id="donebody"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<!-- ⚠ 这一页**故意不挂** ethers 的 script 标签：514 KB 谁都要先下的话，只是来看看的人也得付。
+     它在第一次交互时才按需加载（见下面的 loadEthers），交互之前页面照样画得出来。 -->
+<script type="module">
+  import { shell, wallet, chains, currentChain, launcher, launchedFromReceipt, fmtAmount, short, toast,
+    explorerHref, nativeBalance, provider, humanizeTxError, txNotice,
+    curveSite, curveFactory, curveLaunchReadiness, curveLaunchInfo, curveTokenFromReceipt, ponsLaunchParams,
+    curveLaunchAndBuy,
+    CLANKER, clankerFactory, clankerDeployParams, clankerTokenFromReceipt, recordLaunch, copyBtn,
+    flap, flapParams, flapTaxParams, flapTokenFromReceipt, mineFlapSalt, FLAP,
+    FOURMEME, fmLogin, fmQuote, fmUpload, fmCreate, fmCreatePayload, fmTokenFromReceipt, fourMemeManager, onWallet , onChainSwitch, sealMoment, chainNow, chainIcon} from '/app/oaken.js';
+  shell({ active: 'launch' });
+
+  const $ = (id) => document.getElementById(id);
+  /** 换路线/换链时把上一条路线留下的错误行清掉，别让旧错误跟着新表单。 */
+  const clearErr = () => { const e = $('err'); if (e) { e.classList.add('hide'); e.innerHTML = ''; } };
+
+  /**
+   * **按需**加载 ethers（514 KB）。
+   *
+   * 这一页要它来做预览（合约自己的 `split()`）、建池和挖 salt；但**不是每个人都会用到** ——
+   * 只是来看看四条路线是什么的人不该先付这 514 KB。所以：
+   * 页面先画出来，第一次交互（打字/点击/选路线）才开始下，下来之后再补一次预览与成本。
+   */
+  let _ethers = null;
+  function loadEthers() {
+    if (window.ethers) return Promise.resolve(window.ethers);
+    if (_ethers) return _ethers;
+    _ethers = new Promise((res, rej) => {
+      const sc = document.createElement('script');
+      sc.src = '/app/vendor/ethers.umd.min.js';
+      sc.onload = () => res(window.ethers);
+      sc.onerror = () => rej(new Error('ethers failed to load'));
+      document.head.appendChild(sc);
+    });
+    return _ethers;
+  }
+  /**
+   * 第一次交互就开始下（once）——下完把预览和成本补上。
+   *
+   * ⚠ 下载**失败**也要有人收场（2026-10-15 用户报"表单一直 Loading…"）：原来 `.catch(() => {})`
+   * 一吞，按钮就永远停在 "Loading…"，页面上一个字都不说为什么。现在把失败记下来，
+   * `validate()` 据此给出人话，按钮变成"重载再试"。
+   */
+  function kickEthers() {
+    loadEthers()
+      .then(() => { if (state) state.ethersFailed = false; paintRoutes(); refreshCosts(); update(); })
+      .catch(() => { state.ethersFailed = true; update(); });
+  }
+  document.addEventListener('input', kickEthers, { once: true });
+  document.addEventListener('click', kickEthers, { once: true });
+  document.addEventListener('keydown', kickEthers, { once: true });
+  // 连钱包/切链这些也是"要用"，先起来
+  onWallet('accounts', () => kickEthers());
+  const state = { chain: null, route: 'own', busy: false, gas: null, fee: null, addr: null, split: null, nowSec: null,
+    ponsReady: null, ponsReading: false, fmReady: null, fmReading: false, fmToken: null, fmTax: false,
+    /**
+     * ⚠ **"读失败"必须和"还没读"分开**（2026-10-15 探针抓到的真 bug）。
+     * 失败之后只把 ready 置空的话，paintRoutes() 下一次就会再进"还没读"那条分支 ——
+     * 于是页面在"Reading…"和降级文案之间来回闪，而且每画一次就多发一轮 RPC。
+     * 现在：失败 = 停在降级文案等用户点 Retry，paintRoutes 不再自己重来。
+     */
+    clankerFailed: false, ponsFailedFor: null, fmFailed: false, ethersFailed: false };
+
+  /**
+   * 全局交易通知（和页面自己的三步追踪器并行）：Pending（带浏览器链接）→ Success / Fail。
+   * 追踪器说的是"这一步到哪了"，提示条说的是"你那笔在链上是什么状态" —— 两个都要有，
+   * 因为用户切去钱包再回来时，只会看见提示条那一条。
+   */
+  const ROUTE_LABEL = { own: 'OAKEN launch', flap: 'Flap launch', clanker: 'Clanker launch',
+    pons: 'Pons launch', genius: 'Genius launch', fourmeme: 'four.meme launch' };
+  let note = null;
+  function noteSent(tx) {
+    note = txNotice(state.chain, ROUTE_LABEL[state.route] || 'Launch');
+    note.sent(tx.hash);
+  }
+  function noteOk(msg) { if (note) { note.ok(msg); note = null; } else toast(msg); }
+
+  /** 路线表。**四条都能发**：自有工厂与 Flap/Pons 是我们编码、用户签名；four.meme 只能去它家发（签发在它后端）。
+   *  不在当前链上的显示 "not on this chain" —— 不做成能点但点了没反应的假控件。 */
+  const ROUTES = [
+    { key: 'own', name: 'OAKEN factory', sub: 'We create it in one transaction. Fixed supply, no tax, no owner. Locking is a separate page.', live: true },
+    { key: 'pons', name: 'Pons v2', sub: 'Robinhood Chain only — bonding curve, graduates into a Uniswap V4 pool. We encode the launch; your wallet signs it.', live: true, chains: [4663] },
+    { key: 'clanker', name: 'Clanker', sub: 'Base and Robinhood Chain — a Uniswap V4 pool with the LP locked forever. We encode the launch; your wallet signs. Free — you pay gas only.', live: true, chains: [8453, 4663] },
+    { key: 'genius', name: 'Genius', sub: 'BNB Chain — a Pons-family bonding curve that graduates into PancakeSwap Infinity. We encode the launch; your wallet signs it, and the built-in 0.25% creator fee pays your address.', live: true, chains: [56] },
+    { key: 'fourmeme', name: 'four.meme', sub: 'BNB Chain only — bonding curve, graduates to PancakeSwap. We fill the form here; their backend signs, your wallet sends.', live: true, chains: [56] },
+    { key: 'flap', name: 'Flap', sub: 'Bonding curve, graduates to the chain\'s DEX. We encode the launch; you sign it, and the creator share is yours. BNB Chain, Robinhood, Base (Base: tax tokens only).', live: true, chains: [56, 4663, 8453] },
+  ];
+
+  /** Route-aware warning shown right under the selector. Own = green; third-party = red. */
+  function routeWarning(key) {
+    if (key === 'own') return '<b>No external service.</b> One transaction creates the token. Fixed supply, no owner '
+      + 'over the token — and OAKEN takes <b>0 fee</b>. This route does <b>not</b> lock anything: locking is a separate '
+      + 'page. It also creates no market, so there is no developer buy here.';
+    if (key === 'flap') return '<b>Flap&#39;s rules, not ours.</b> Flap creates and runs the token; the tax buckets and '
+      + 'their payouts are set by its contracts. Tax tokens end in <b>7777</b>, standard tokens in <b>8888</b>. '
+      + 'Treat the split as what the chain is told, not as a promise about income.';
+    if (key === 'fourmeme') return '<b>Their backend signs.</b> four.meme issues the launch signature; your wallet signs '
+      + 'a text message and the transaction. Tax rates are limited to <b>1 / 3 / 5 / 10%</b>, and the four buckets must '
+      + 'add up to exactly <b>100%</b>.';
+    if (key === 'clanker') return '<b>The factory owner has a lever.</b> Clanker can change hooks/modules or switch the '
+      + 'factory off. The <b>sniper auction</b> runs ~22s + ~15s of decaying fees — wait it out before buying.';
+    return '<b>No lock at creation.</b> The whole supply goes into the bonding curve; the lock form opens only after '
+      + 'the token graduates and the pool exists.';
+  }
+
+  /* ── 链 ─────────────────────────────────────────────────────────────── */
+  async function boot() {
+    const live = await chains();
+    if (!live.length) {
+      /* ⚠ 链表读不到时**不能就停在那儿**：那个 "Loading…" 按钮会永远挂着、路线区一片空白，
+         只有一行小字让人刷新。给一颗真的重试按钮（2026-10-15 外部审计）。 */
+      $('chainseg').innerHTML = '<button type="button" id="rtrychains" class="on">Retry</button>';
+      $('chainhint').innerHTML = '<span class="warnline">Could not load the chain list.</span> '
+        + 'Nothing below would know which chain it is talking about, so nothing is shown until it loads.';
+      const rb = document.getElementById('rtrychains');
+      if (rb) rb.onclick = () => { $('chainseg').innerHTML = '<button type="button" class="on">Loading…</button>'; boot(); };
+      return;
+    }
+    state.chain = await currentChain();
+    chainNow(state.chain).then((t) => { state.nowSec = t; }).catch(() => { /* 读不到就退回设备时钟 */ });
+    const seg = $('chainseg');
+    let walletChainId = await wallet.chainId();
+    const paint = () => {
+      /* Solana 的发射表单在独立页：这里放一颗同形的链格子，点它就去那边。
+         **排在第一格** —— 它和其它四条 EVM 链并列时最容易被漏掉，放最左边一眼就能找到；
+         其余控件/状态仍按 EVM 的 chain 对象走，点 Solana 只做跳转、不参与选择。 */
+      seg.innerHTML = '<button type="button" data-sol="1" title="Solana launchpad"><span class="chain-ico">' + chainIcon('solana', 13) + '</span>Solana</button>'
+        + live.map((c) => '<button type="button" data-id="' + c.id + '" class="' + (c.id === state.chain.id ? 'on' : '') + '"><span class="chain-ico">' + chainIcon(c.id, 13) + '</span>' + c.name + '</button>').join('');
+      const walletOn = live.find((c) => c.id === walletChainId);
+      $('chainhint').innerHTML =
+        walletOn && walletOn.id !== state.chain.id
+          ? 'Your wallet is on <b>' + walletOn.name + '</b> — it will be asked to switch to <b>' + state.chain.name + '</b> before signing.'
+          : (walletChainId !== null && !walletOn)
+            ? 'Your wallet is on chain id <b>' + walletChainId + '</b>, which we have not deployed to. Pick one below and it will be asked to switch.'
+            : 'The token is created on <b>' + state.chain.name + '</b>. Locking is a separate page.';
+    };
+    paint();
+    seg.onclick = async (ev) => {
+      const b = ev.target.closest('button');
+      if (!b) return;
+      if (b.dataset.sol) { location.href = '/launch/solana'; return; }
+      const c = live.find((x) => x.id === Number(b.dataset.id));
+      if (!c || c.id === state.chain.id) return;
+      state.chain = c; walletChainId = c.id; state.flapSalt = null; state.flapMining = false; state.ponsReady = null; state.nowSec = null;
+      chainNow(c).then((t) => { state.nowSec = t; }).catch(() => { /* 读不到就退回设备时钟 */ });
+      paint();
+      if (state.addr) { try { await wallet.ensureChain(c); } catch (e) { toast(String(e.message || e), 'bad'); } }
+      clearErr(); paintRoutes(); refreshCosts(); update();
+    };
+    /* 2026-10-16：钱包自己换链（或用户在顶栏切的）→ **走同一个入口**点一下链选择器，
+       这一页就按新链重画 —— 不再整页 location.reload() 白闪那一下。 */
+    onChainSwitch((id) => { const b = seg.querySelector('button[data-id="' + id + '"]'); if (b) b.click(); });
+    paintRoutes();
+    refreshCosts();
+  }
+  boot();
+
+  /** 这条链上 Flap 实际可选的币种 —— **Base 只开了税币**（官方地址表里没有非税实现）。 */
+  function flapKind() {
+    const cfg = FLAP[state.chain && state.chain.id];
+    if (!cfg) return 'standard';
+    if (cfg.taxOnly) return 'tax';
+    return state.flapKind || 'standard';
+  }
+  /** 把"普通/税币"这组按钮画成当前链**允许**的样子（Base 上 Standard 直接禁用）。 */
+  function syncFlapType() {
+    const cfg = FLAP[state.chain && state.chain.id];
+    if (!cfg) return;
+    const kind = flapKind();
+    for (const b of document.querySelectorAll('#ftype button')) {
+      const t = b.dataset.t;
+      const off = !!(cfg.taxOnly && t === 'standard');
+      b.classList.toggle('on', t === kind);
+      b.disabled = off;
+      b.title = off ? 'Flap on this chain only supports tax tokens' : '';
+    }
+    $('ftaxbox').classList.toggle('hide', kind !== 'tax');
+  }
+
+  /** 外部工厂/后端的读取**一律 8 秒上限** —— 卡住就降级（自有工厂照用），别让页面转圈。 */
+  /* 外部工厂的读：8 秒 → **6 秒**。挂住的公共 RPC 下，"Reading the Clanker factory…"
+     每次少两秒，降级文案与 Retry 更早出现（实测 8.1 秒 → 约 6.1 秒）。 */
+  const withTimeout = (p, ms = 6000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+
+  function paintRoutes() {
+    syncFlapType();
+    /** 开发者首买是必填的；这里只看"填了且大于 0"，真正的解析错误由提交时的人话报。 */
+    const hasDevBuy = (id) => {
+      const v = ($(id).value || '').trim();
+      return v !== '' && Number.isFinite(Number(v)) && Number(v) > 0;
+    };
+    const host = $('routes');
+    host.innerHTML = ROUTES.map((r) => {
+      const onChain = !r.chains || (state.chain && r.chains.includes(state.chain.id));
+      const disabled = !r.live || !onChain;
+      const why = !r.live ? 'soon' : (!onChain ? 'not on this chain' : '');
+      const third = r.key !== 'own';
+      return '<div class="route ' + (state.route === r.key ? 'on ' : '') + (third ? 'third' : 'own') + '">'
+        + '<div class="route-main"><div class="route-title"><b>' + r.name + '</b>'
+        + (third ? '<span class="pill third-tag">third-party</span>' : '<span class="pill rec">Recommended</span>')
+        + '</div><span class="sub">' + r.sub + '</span>'
+        + (third ? '' : '<span class="route-points">One transaction · no external service · fully ownerless</span>')
+        + '</div>'
+        + (disabled
+            ? '<span class="pill">' + why + '</span>'
+            : '<button type="button" class="btn btn-s" data-route="' + r.key + '">' + (state.route === r.key ? 'Selected' : 'Use this') + '</button>')
+        + '</div>';
+    }).join('');
+    for (const b of host.querySelectorAll('button[data-route]')) {
+      b.onclick = () => { state.route = b.dataset.route; state.flapSalt = null; state.flapMining = false; state.ponsReady = null; clearErr(); paintRoutes(); refreshCosts(); update(); };
+    }
+    const r = ROUTES.find((x) => x.key === state.route);
+    const isCurve = state.route === 'pons' || state.route === 'genius';
+    $('pons').classList.toggle('hide', !isCurve);
+    $('clanker').classList.toggle('hide', state.route !== 'clanker');
+    if (isCurve) {
+      $('ponsintro').innerHTML = state.route === 'genius'
+        ? 'Genius runs a Pons-family launch on BNB Chain: a bonding curve sells the supply and graduates into a <b>PancakeSwap Infinity</b> pool. We encode the launch call — your wallet signs it — and the built-in <b>creator fee (0.25% of trades)</b> pays your address directly, never through us.'
+        : 'Pons runs its own launch: a bonding curve sells the supply, and when it graduates the liquidity moves into a Uniswap V4 pool. We encode the launch call — your wallet signs it, and the <b>creator fee</b> pays your address directly, never through us.';
+      $('ponstokenlabel').textContent = state.route === 'genius' ? 'Already launched on Genius?' : 'Already launched on Pons?';
+    }
+    $('flap').classList.toggle('hide', state.route !== 'flap');
+    $('fourmeme').classList.toggle('hide', state.route !== 'fourmeme');
+    $('own').classList.toggle('hide', state.route !== 'own');
+    $('summary').classList.toggle('hide', state.route !== 'own');   // 摘要讲的是"你要发的那个币"，别的路线不在这儿发
+    $('go').style.display = (state.route === 'own' || state.route === 'flap' || isCurve || state.route === 'clanker' || state.route === 'fourmeme') ? '' : 'none';
+    $('track').style.display = (state.route === 'own' || state.route === 'flap' || isCurve || state.route === 'clanker' || state.route === 'fourmeme') ? $('track').style.display : 'none';
+    if (state.route === 'flap') {
+      const ok = state.chain && FLAP[state.chain.id];
+      const fsum = ['fmkt', 'flp', 'fdiv', 'fdef'].reduce((n, id) => n + Number($(id).value || 0), 0);
+      const taxOk = flapKind() !== 'tax' || Math.abs(fsum - 100) < 1e-6;
+      const buyOk = hasDevBuy('fbuyamt');
+      $('go').disabled = !ok || !state.addr || !taxOk || !buyOk;
+      $('go').textContent = !ok ? 'Flap is not on this chain'
+        : (!state.addr ? 'Connect a wallet'
+          : (!taxOk ? 'Tax split must be 100%' : (!buyOk ? 'Enter the developer buy' : (state.flapSalt ? 'Launch on Flap' : 'Mining an address…'))));
+      /**
+       * **预挖**：Flap 要求新代币地址以 `8888` 结尾，挖一次要 1–4 秒（实测 29k–97k 次尝试）。
+       * 从"选中这条路线"就开始挖（分片跑、不冻页面），等表单填完点下去时多半已经好了 ——
+       * 点下去才开始挖的话，那几秒会和钱包弹窗挤在一起，看着像卡住。
+       */
+      if (!ok) { $('flaphint').textContent = ''; }
+      else if (state.flapSalt) {
+        $('flaphint').innerHTML = 'Address ready: <span class="mono">' + state.flapSalt.address + '</span> — it ends in '
+          + (FLAP[state.chain.id][flapKind()] || {}).vanity + ', which is what Flap requires. Nothing is sent until you press the button.';
+      } else if (!state.flapMining) {
+        const want = (FLAP[state.chain.id][flapKind()] || {}).vanity;
+        if (!window.ethers) { loadEthers().then(() => paintRoutes()).catch(() => {}); return; }
+        state.flapMining = true;
+        /**
+         * **世代号**：切"普通/税币"会起第二个挖矿，而第一个还在跑 —— 它的 onProgress 会把
+         * 提示改回旧尾数（选了税币却一直显示 "ends in 8888"），它的 then 还会把**旧种类**的
+         * salt 写进 state。迟到的结果一律噤声（同族：迟到的重画会擦掉提示）。
+         */
+        const gen = (state.flapMineGen = (state.flapMineGen || 0) + 1);
+        $('flaphint').textContent = 'Mining an address that ends in ' + want + ' — Flap requires it. This runs in the background; the page stays responsive.';
+        loadEthers().then(() => mineFlapSalt(state.chain, flapKind(), { onProgress: (n) => { if (state.flapMineGen === gen) $('flaphint').textContent = 'Mining an address that ends in ' + want + '… (' + n.toLocaleString() + ' tries)'; } })
+          .then((m) => {
+            if (state.flapMineGen !== gen) return;
+            state.flapMining = false;
+            state.flapSalt = m;
+            if (m) { paintRoutes(); }
+            else { $('flaphint').textContent = 'Could not find an address this time — press the button and we will try again.'; }
+          }))
+          .catch(() => { if (state.flapMineGen !== gen) return; state.flapMining = false; $('flaphint').textContent = 'Mining failed — press the button to retry.'; });
+      }
+    }
+    if (state.route === 'clanker') {
+      /** 链上就一个开关要看：工厂有没有被 owner 停掉（deprecated）。读一次给用户看。 */
+      const cfg = CLANKER[state.chain && state.chain.id];
+      const named = $('cname').value.trim() && $('csymbol').value.trim();
+      const buyOk = hasDevBuy('cbuyamt');
+      $('go').disabled = !cfg || !state.addr || !named || !buyOk;
+      $('go').textContent = !cfg ? 'Clanker is not on this chain'
+        : (!state.addr ? 'Connect a wallet'
+          : (!named ? 'Name the token first' : (!buyOk ? 'Enter the developer buy' : 'Launch on Clanker')));
+      if (!cfg) { $('clankerfacts').textContent = ''; }
+      else if (state.clankerFailed) {
+        /* 失败了就停在这句话上（上一次已经画好了），不再自动重来 —— 重来是 Retry 按钮的事 */
+      }
+      else if (state.clankerReady === true || state.clankerReady === false) {
+        $('clankerfacts').innerHTML = state.clankerReady
+          ? 'Launches are <b>open</b> on ' + state.chain.name + '. No launch fee — gas only, and the LP is locked forever.'
+          : '<span class="warnline">Clanker has switched this factory off (deprecated) — launches are closed right now.</span>';
+        if (!state.clankerReady) $('go').disabled = true;
+      } else if (!state.clankerReading) {
+        if (!window.ethers) { loadEthers().then(() => paintRoutes()).catch(() => {}); return; }
+        state.clankerReading = true;
+        $('clankerfacts').textContent = 'Reading the Clanker factory…';
+        withTimeout(clankerFactory(state.chain).deprecated())
+          .then((d) => { state.clankerReading = false; state.clankerFailed = false; state.clankerReady = !d; paintRoutes(); })
+          .catch(() => {
+            /* 降级（评审第 4 条）：外部的读不到，就说清楚 + 给出路 + 可重试，**不挡自有工厂** */
+            state.clankerReading = false; state.clankerReady = null; state.clankerFailed = true;
+            $('clankerfacts').innerHTML = '<span class="warnline">Could not reach the Clanker factory from this browser.</span> '
+              + 'You can still launch on <b>our own factory</b> — it needs no external service. '
+              + '<button class="copybtn" type="button" id="rtryclanker">Retry</button>';
+            const b = document.getElementById('rtryclanker');
+            if (b) b.onclick = () => { state.clankerFailed = false; $('clankerfacts').textContent = 'Reading the Clanker factory…'; paintRoutes(); };
+          });
+      }
+    }
+    if (isCurve) {
+      /**
+       * 三个数决定这条路线现在能不能发：发射费、创建者税率上限、开没开。
+       * 选中路线时读一次**给用户看**；**出交易前还要再读一次**
+       * —— `expectedEconomics` 是链上现算的，拿缓存值去发会被合约拒（见提交那段）。
+       */
+      const family = state.route;
+      const siteName = family === 'genius' ? 'Genius' : 'Pons';
+      const cfg = curveSite(family, state.chain);
+      const named = $('pname').value.trim() && $('psymbol').value.trim();
+      const buyOk = hasDevBuy('pbuyamt');
+      $('go').disabled = !cfg || !state.addr || !named || !buyOk;
+      $('go').textContent = !cfg ? siteName + ' is not on this chain'
+        : (!state.addr ? 'Connect a wallet'
+          : (!named ? 'Name the token first' : (!buyOk ? 'Enter the developer buy' : 'Launch on ' + siteName)));
+      if (!cfg) { $('ponsfacts').textContent = ''; }
+      else if (state.ponsReady && state.ponsReadyKey === family + ':' + state.chain.id) {
+        const rd = state.ponsReady;
+        const sym = state.chain.native || 'ETH';              // 链对象上的字段叫 native（BNB Chain → 'BNB'）
+        $('ponsfacts').innerHTML = 'Launch fee <b>' + fmtAmount(rd.fee, 18, 6) + ' ' + sym + '</b> · '
+          + (rd.maxCreatorTaxBps > 0
+              ? 'creator fee up to <b>' + (rd.maxCreatorTaxBps / 100) + '%</b>'
+              : 'creator tax is <b>fixed at 0</b> here — ' + siteName + ' pays you a built-in 0.25% creator fee instead')
+          + ' · registration is <b>' + (rd.enabled ? 'open' : 'closed right now') + '</b>. '
+          + 'The launch fee goes to ' + siteName + ', not to us; OAKEN charges nothing.';
+        // 创建者税上限 = 0 的平台上，这个输入框没有意义 —— 禁用并归零，别让用户填了个寂寞
+        $('ptax').disabled = rd.maxCreatorTaxBps === 0;
+        if (rd.maxCreatorTaxBps === 0) $('ptax').value = '0';
+      } else if (state.ponsFailedFor === family + ':' + state.chain.id) {
+        /* 同 Clanker：失败就停着，等 Retry 或换一条路线 */
+      } else if (!state.ponsReading) {
+        if (!window.ethers) { loadEthers().then(() => paintRoutes()).catch(() => {}); return; }
+        state.ponsReading = true;
+        $('ponsfacts').textContent = 'Reading the ' + siteName + ' factory…';
+        withTimeout(curveLaunchReadiness(family, state.chain))
+          .then((rd) => {
+            state.ponsReading = false;
+            if (!isCurve || state.route !== family) return;      // 迟到的读数别画到别的路线上
+            state.ponsReady = rd; state.ponsReadyKey = family + ':' + state.chain.id; state.ponsFailedFor = null;
+            paintRoutes(); refreshCosts();
+          })
+          .catch(() => {
+            state.ponsReading = false; state.ponsReady = null; state.ponsReadyKey = null;
+            state.ponsFailedFor = family + ':' + state.chain.id;
+            $('ponsfacts').innerHTML = '<span class="warnline">Could not reach the ' + siteName + ' factory from this browser.</span> '
+              + 'You can still launch on <b>our own factory</b> — it needs no external service. '
+              + '<button class="copybtn" type="button" id="rtrypons">Retry</button>';
+            const b = document.getElementById('rtrypons');
+            if (b) b.onclick = () => { state.ponsFailedFor = null; $('ponsfacts').textContent = 'Reading the ' + siteName + ' factory…'; paintRoutes(); };
+          });
+      }
+    }
+    if (state.route === 'fourmeme') {
+      /** 这条路的"能不能发"在它后端（签发），不在链上；这里读一次公共配置给用户看事实。 */
+      const cfg = state.chain && FOURMEME[state.chain.id];
+      const named = $('mname').value.trim() && $('msymbol').value.trim();
+      const msum = ['mliq', 'mburn', 'mdiv', 'mrec'].reduce((n, id) => n + Number($(id).value || 0), 0);
+      const taxOk = !state.fmTax || msum === 100;
+      const buyOk = hasDevBuy('mbuyamt');
+      $('go').disabled = !cfg || !state.addr || !named || !taxOk || !buyOk;
+      $('go').textContent = !cfg ? 'four.meme is not on this chain'
+        : (!state.addr ? 'Connect a wallet'
+          : (!named ? 'Name the token first'
+            : (!taxOk ? 'Tax split must be 100%' : (!buyOk ? 'Enter the developer buy' : 'Launch on four.meme'))));
+      if (!cfg) { $('fmfacts').textContent = ''; }
+      else if (state.fmReady) {
+        const q = state.fmReady;
+        $('fmfacts').innerHTML = 'Launches are open · the curve quotes in <b>' + q.symbol + '</b> · supply <b>'
+          + Number(q.totalAmount || 0).toLocaleString() + '</b> · no launch fee — you pay gas only. '
+          + 'Their backend signs, your wallet sends.';
+      } else if (state.fmFailed) {
+        /* 同 Clanker：失败停着，Retry 才重来 */
+      } else if (!state.fmReading) {
+        state.fmReading = true;
+        $('fmfacts').textContent = 'Reading four.meme\'s config…';
+        withTimeout(fmQuote(state.chain), 10_000)
+          .then((q) => { state.fmReading = false; state.fmFailed = false; state.fmReady = q; paintRoutes(); })
+          .catch((e) => {
+            /* 清单第 6 条：外部工厂读不到 → **说清 + 给出路 + 可重试**，不挡住自有工厂那条路。 */
+            state.fmReading = false; state.fmFailed = true;
+            $('fmfacts').innerHTML = '<span class="warnline">' + String(e.message || e).slice(0, 150) + '</span> '
+              + 'You can still launch on <b>our own factory</b> — it needs no external service. '
+              + '<button class="copybtn" type="button" id="rtryfm">Retry</button>';
+            const b = document.getElementById('rtryfm');
+            if (b) b.onclick = () => {
+              state.fmFailed = false;   // ⚠ 不清这个记号，paintRoutes 会被"失败态"分支挡住 —— 按钮点了没反应
+              state.fmReady = null;
+              $('fmfacts').textContent = 'Reading four.meme\'s config…';
+              paintRoutes();
+            };
+          });
+      }
+    }
+    $('routehint').innerHTML = r && r.live && state.route === 'own'
+      ? 'One transaction creates the token. Locking is a separate page — nothing is bundled here.'
+      : 'Pick a route to continue. Every route above is wired up on the chains it lists — a chain a route is not on says so, instead of showing you a button that does nothing.';
+    const rw = $('routewarn');
+    if (rw) {
+      const thirdNow = state.route !== 'own';
+      rw.className = 'warnbox ' + (thirdNow ? 'risk' : 'ownnote');
+      rw.innerHTML = routeWarning(state.route);
+    }
+    try { paintChecklist(readForm()); } catch { /* boot order: fields may not exist yet */ }
+  }
+
+  /* ── 表单 ───────────────────────────────────────────────────────────── */
+  /**
+   * ⚠ 参数是**事件送来的地址**（`onWallet('accounts', ...)` 的载荷）。
+   *
+   * 事件的回调里**不能再 `wallet.accounts()` 回查一次** —— 真钱包在授权那一刻、
+   * 假钱包在每次 `eth_accounts` 之后都会补发 `accountsChanged`，回查就是自己喂自己：
+   * 一圈圈跑下去（2026-10-15 实测：每秒 400 次 update()，gas 预估永远排不上队，
+   * 而控制台一条错都没有）。事件给了地址用地址；没有载荷（首次调用）才去问。
+   */
+  async function refreshWallet(addrFromEvent, fromEvent = false) {
+    const a = fromEvent ? (addrFromEvent || null) : ((await wallet.accounts())[0] || null);
+    state.addr = a;
+    refreshCosts();
+    update();
+  }
+  /**
+   * ⚠ **顶栏那颗 Connect 也要能喂到这一页**（2026-10-15 外部审计抓到）。
+   *
+   * 原来只挂了 `ethereum#initialized`，而**全站没有任何地方派发这个事件** ——
+   * 也就是说：用户从顶栏连上钱包之后，这一页的按钮还写着 "Connect a wallet"、
+   * gas 还是 "—"，看起来像"连了但没生效"。`onWallet('accounts')` 是共享运行时的扇出
+   * （connect / 换钱包 / 断开都会广播），它才是唯一的正确入口。
+   *
+   * ⚠ 只挂**一次**，而且事件送来的地址直接用（`refreshWallet(a, true)`）——
+   * 回调里回查 `wallet.accounts()` 会自激：真钱包授权那一刻、假钱包每次
+   * `eth_accounts` 之后都会补发 accountsChanged。挂两次就是两轮循环。
+   */
+  onWallet('accounts', (a) => { refreshWallet(a, true); paintRoutes(); });
+  refreshWallet();
+
+  /* ── gas 与余额（和创建页同一套：上界 = 我们的 gas limit × 当前价）────── */
+  let costTimer = null;
+  const scheduleCosts = () => { clearTimeout(costTimer); costTimer = setTimeout(refreshCosts, 700); };
+  async function refreshCosts() {
+    if (!state.chain) return;
+    const sym = state.chain.native || 'ETH';
+    if (!state.addr) {
+      $('fee').textContent = '—'; $('native').textContent = '—';
+      $('costhint').textContent = 'Connect a wallet to see the fee and your gas balance.';
+      state.fee = null; state.gas = null; return;
+    }
+    const bal = await nativeBalance(state.chain, state.addr);
+    state.gas = bal;
+    $('native').textContent = bal === null ? '—' : fmtAmount(bal, 18, 6) + ' ' + sym;
+    // 一笔发射：建币 + 建锁 + 转账。实测 4663 上 813k，留到 3M 是很宽的上界。
+    // Pons 那条不一样：真实交易的 gasUsed 3.6–5.5M（三笔实测），上界给 8M。
+    const isCurveCost = state.route === 'pons' || state.route === 'genius';
+    const isClankerCost = state.route === 'clanker';
+    const gl = (isCurveCost || isClankerCost) ? 8_000_000n : 3_000_000n;   // Clanker 实测 4.65–5.2M
+    // Pons 自己收一笔发射费（链上读），和 gas 同笔交易付出去 —— 不是我们收的，但要说进总数里
+    const extra = (isCurveCost && state.ponsReady && state.ponsReadyKey === state.route + ':' + state.chain.id) ? state.ponsReady.fee : 0n;
+    let fee = null;
+    try { const fd = await provider(state.chain).getFeeData(); const px = fd.maxFeePerGas ?? fd.gasPrice ?? null; if (px) fee = px * gl; } catch { fee = null; }
+    /* 可选首买也要算进"钱包够不够"里 —— 它和 gas/发射费是同一笔交易里的钱。 */
+    let buy = 0n;
+    try {
+      const id = state.route === 'flap' ? 'fbuyamt'
+        : state.route === 'clanker' ? 'cbuyamt'
+          : isCurveCost ? 'pbuyamt'
+            : state.route === 'fourmeme' ? 'mbuyamt' : null;
+      if (id) buy = readNative(id, 'Buy');
+    } catch { buy = 0n; }
+    /* four.meme 的首买还要付它的买入费（公开配置 buyFee，通常 1%）；一起算进余额判据。 */
+    if (state.route === 'fourmeme' && buy > 0n && state.fmReady) {
+      try {
+        const rate = window.ethers.parseUnits(String(state.fmReady.buyFee || '0'), 18);
+        const min = window.ethers.parseUnits(String(state.fmReady.minTradeFee || '0'), 18);
+        const bf = buy * rate / 10n ** 18n;
+        buy += bf > min ? bf : min;
+      } catch { /* 配置读不到就按不含买入费算 */ }
+    }
+    const total = fee === null ? null : fee + extra + buy;
+    state.fee = total;
+    $('fee').textContent = fee === null ? '— (gas price unreadable)'
+      : 'up to ' + fmtAmount(total, 18, 6) + ' ' + sym
+        + (extra > 0n ? ' (incl. ' + fmtAmount(extra, 18, 6) + ' to ' + (state.route === 'genius' ? 'Genius' : 'Pons') + ')' : '')
+        + (buy > 0n ? ' (incl. your ' + fmtAmount(buy, 18, 6) + ' buy)' : '');
+    let hint = 'One wallet confirmation creates the token and sends the whole supply to you. Locking is a separate page. The figure is an upper bound — our gas limit times the current gas price — not a quote.';
+    if (isClankerCost) hint = 'No launch fee — you pay gas only, plus the required developer buy, in one transaction.';
+    if (isCurveCost) hint = 'The launch fee, the required developer buy and gas go in the same transaction. The figure is an upper bound — our gas limit times the current gas price — not a quote.';
+    if (state.route === 'flap') hint = 'No creation fee — gas only, plus the required developer buy. The figure is an upper bound on gas, not a quote.';
+    if (state.route === 'fourmeme') hint = 'four.meme signs the launch; the transaction carries their launch fee, the required developer buy and its buy fee. The gas figure is an upper bound, not a quote.';
+    if (bal !== null && state.fee !== null && bal < state.fee) hint += ' Your balance is below that bound, so the transaction would fail — top up first.';
+    $('costhint').textContent = hint;
+    update();
+  }
+
+  /* ── 预览与校验 ─────────────────────────────────────────────────────── */
+  function readForm() {
+    return {
+      name: $('name').value.trim(),
+      symbol: $('symbol').value.trim(),
+      decimals: Number($('decimals').value),
+      supply: $('supply').value.trim(),
+    };
+  }
+
+  /** 开发者首买金额（原生币，18 位）。`required` 时空值和 0 都拒绝。 */
+  function readNative(id, label, { required = false } = {}) {
+    const v = ($(id).value || '').trim();
+    if (!v) {
+      if (required) throw new Error(label + ' is required — enter an amount above 0.');
+      return 0n;
+    }
+    if (!/^\d*\.?\d+$/.test(v)) throw new Error(label + ' must be a number.');
+    let amount;
+    try { amount = window.ethers.parseUnits(v, 18); }
+    catch { throw new Error(label + ' has too many decimal places.'); }
+    if (required && amount <= 0n) throw new Error(label + ' must be above 0.');
+    return amount;
+  }
+
+  async function validate() {
+    const f = readForm();
+    const errs = [];
+    /**
+     * ethers 还没到（用户刚打开页面、还没交互）时**什么都不判** —— 尤其不能用
+     * `parseUnits` 去解析金额（那会抛，然后被当成"这不是数字"，凭空报一个错）。
+     * ⚠ **这里不触发加载**：validate() 启动时就会跑一次，在这里 load 等于没省 ——
+     *    加载由"第一次交互"和"连钱包"来踢（见 kickEthers）。
+     */
+    if (!window.ethers) {
+      /* 还没下来 = pending（不占错误行）；**下失败了**就要如实说，不能永远写着 "Loading…" */
+      if (state.ethersFailed) {
+        return { f, errs: ['The app could not load its chain engine (ethers). Check your connection, then reload this page.'], pending: false };
+      }
+      return { f, errs: ['Loading the app…'], pending: true };
+    }
+    state.supplyWei = null;
+
+    if (!state.chain) errs.push('Pick a chain first.');
+    if (!f.name) errs.push('Give the token a name.');
+    if (!f.symbol) errs.push('Give the token a symbol.');
+    if (!Number.isInteger(f.decimals) || f.decimals < 0 || f.decimals > 18) errs.push('Decimals must be a whole number between 0 and 18.');
+    if (!f.supply) errs.push('Enter a total supply.');
+    else {
+      try { state.supplyWei = window.ethers.parseUnits(f.supply, f.decimals); }
+      catch (e) { errs.push(/decimal/i.test(String(e && e.message)) ? 'Too many decimal places for that supply.' : 'That is not a number.'); }
+    }
+    if (state.supplyWei != null && state.supplyWei <= 0n) errs.push('Enter a total supply.');
+
+    if (!state.addr) errs.push('Connect a wallet.');
+    if (state.fee !== null && state.gas !== null && state.gas < state.fee) errs.push('Not enough ' + (state.chain?.native || 'ETH') + ' for gas.');
+    try { paintChecklist(f); } catch { /* fields not ready yet */ }
+    return { f, errs };
+  }
+
+  /** Per-route checklist in the right column — the five things worth seeing before signing. */
+  function paintChecklist(f) {
+    const host = $('signcheck');
+    if (!host) return;
+    const h = (x) => String(x == null ? '' : x).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const rows = [];
+    const add = (label, value, cls = '') => rows.push('<li class="' + cls + '"><span>' + h(label) + '</span><b>' + h(value) + '</b></li>');
+    const r = ROUTES.find((x) => x.key === state.route) || { name: state.route };
+    /** 开发者首买金额的显示值：没填就是 Required，填了带上链的原生币。 */
+    const buyTxt = (id) => {
+      const v = ($(id).value || '').trim();
+      return v ? v + ' ' + (state.chain?.native || 'ETH') : 'Required — enter an amount';
+    };
+    add('Route', r.name, state.route === 'own' ? 'ok' : 'warn');
+    if (state.route === 'own') {
+      const supplyTxt = state.supplyWei != null
+        ? fmtAmount(state.supplyWei, f.decimals) + ' ' + (f.symbol || '')
+        : (f.supply ? f.supply + ' ' + (f.symbol || '') : '—');
+      add('Supply', supplyTxt, supplyTxt === '—' ? 'warn' : '');
+      add('Developer buy', '— no market is created here');
+      add('Locking', 'Separate page — not bundled', 'ok');
+      add('OAKEN fee', '0 — gas only', 'ok');
+      add('Dependency', 'None — our own contracts', 'ok');
+      $('signchecknote').textContent = 'One transaction creates the token. Locking is a separate page; nothing is bundled.';
+    } else if (state.route === 'flap') {
+      const kind = flapKind();
+      const sum = ['fmkt', 'flp', 'fdiv', 'fdef'].reduce((n, id) => n + Number($(id).value || 0), 0);
+      add('Token type', kind === 'tax' ? 'Tax token' : 'Standard', kind === 'tax' ? 'warn' : '');
+      add('Developer buy', buyTxt('fbuyamt'));
+      if (kind === 'tax') {
+        add('Buy / sell tax', $('fbuy').value + '% / ' + $('fsell').value + '%');
+        add('Tax split', sum + '%' + (Math.abs(sum - 100) < 1e-6 ? ' ✓' : ' — must be 100%'), Math.abs(sum - 100) < 1e-6 ? 'ok' : 'warn');
+      }
+      add('OAKEN fee', '0 — gas only', 'ok');
+      add('Dependency', 'Flap contracts — their rules', 'warn');
+      $('signchecknote').textContent = 'Flap creates and runs the token. Tax buckets are set at launch; OAKEN takes no cut.';
+    } else if (state.route === 'fourmeme') {
+      add('Token type', state.fmTax ? 'Tax token' : 'No tax');
+      add('Developer buy', buyTxt('mbuyamt'));
+      if (state.fmTax) {
+        const sum = ['mliq', 'mburn', 'mdiv', 'mrec'].reduce((n, id) => n + Number($(id).value || 0), 0);
+        add('Tax split', sum + '%' + (sum === 100 ? ' ✓' : ' — must be 100%'), sum === 100 ? 'ok' : 'warn');
+      }
+      add('OAKEN fee', '0 — gas only', 'ok');
+      add('Dependency', 'four.meme backend signs', 'warn');
+      $('signchecknote').textContent = 'Their backend issues the launch; your wallet signs a text message and the transaction.';
+    } else if (state.route === 'clanker') {
+      add('LP', 'Locked forever by Clanker', 'ok');
+      add('Developer buy', buyTxt('cbuyamt'));
+      add('Sniper auction', '~22s + 15s decay', 'warn');
+      add('OAKEN fee', '0 — gas only', 'ok');
+      add('Dependency', 'Clanker factory — owner can change hooks', 'warn');
+      $('signchecknote').textContent = 'Wait out the sniper auction before buying. The factory owner has a lever; we do not.';
+    } else {
+      add('Lock at creation', 'No — after graduation', 'warn');
+      add('Developer buy', buyTxt('pbuyamt'));
+      add('OAKEN fee', '0 — gas only', 'ok');
+      add('Dependency', (state.route === 'genius' ? 'Genius' : 'Pons') + ' contracts and curve', 'warn');
+      $('signchecknote').textContent = 'The whole supply goes into the curve; the lock form opens after graduation.';
+    }
+    host.innerHTML = rows.join('');
+  }
+
+  async function update() {
+    const { f, errs, pending } = await validate();
+    const sym = f.symbol || 'tokens';
+    const btn = $('go');
+    /**
+     * ⚠ 按钮与错误行**只有"我们自己的工厂"那条路线归 update() 管**。
+     * 其余路线（Flap 有自己的表单；Pons/four.meme 根本没有按钮）由 paintRoutes() 决定 ——
+     * 否则自有表单的空字段会把别的路线的按钮一直禁掉，点了没反应还看不出为什么。
+     */
+    if (state.route === 'own') {
+      /* 「只差一个钱包」不算错误 —— 按钮保持可点，点了先连钱包（和创建页一个规矩：
+         字段永远可用、按钮写着 Connect a wallet 就真的能点）。别的错误才禁用。 */
+      const onlyWallet = !state.addr && errs.length === 1 && errs[0] === 'Connect a wallet.';
+      btn.disabled = state.busy || (errs.length > 0 && !onlyWallet);
+      btn.textContent = state.busy ? 'Working…'
+        : (state.ethersFailed ? 'Reload to try again'
+          : (pending ? 'Loading the app…' : (!state.addr ? 'Connect a wallet' : 'Launch token')));
+      if (state.trackMode !== 'running' && state.trackMode !== 'done') {
+        /* pending 是"还在加载"，不是用户填错了 —— 不占错误行；onlyWallet 也不是错误。
+           错误**列出来**（最多 3 条）：只露第一条时，后面的问题会被永远挡住。 */
+        const hide = errs.length === 0 || pending || onlyWallet;
+        const errEl = $('err');
+        errEl.classList.toggle('hide', hide);
+        errEl.innerHTML = '';
+        if (!hide) for (const t of errs.slice(0, 3)) { const d = document.createElement('div'); d.textContent = t; errEl.appendChild(d); }
+      }
+    }
+
+    if (state.supplyWei == null || !f.name) {
+      $('sumtext').className = '';
+      $('sumtext').innerHTML = '<span class="sumlead">What happens when you press launch</span>'
+        + '<span class="sumstep"><b>1</b>One signature creates the token.</span>'
+        + '<span class="sumstep"><b>2</b>The whole supply goes to your wallet.</span>'
+        + '<span class="sumstep"><b>3</b>Supply is fixed — no mint, no owner, no fee.</span>'
+        + '<span class="sumstep"><b>4</b>Locking is a separate page — nothing is bundled.</span>';
+      $('sumline2').textContent = 'Fill the form — the supply appears here, in one sentence.';
+    } else {
+      $('sumtext').className = '';
+      $('sumtext').innerHTML = 'You are launching <b>' + f.name + ' (' + sym + ')</b> with '
+        + '<b>' + f.supply + '</b> supply. All of it goes to your wallet. '
+        + '<span class="muted">Locking is a separate page — nothing is bundled.</span>';
+      $('sumline2').textContent = 'One transaction, one signature. The supply is fixed and there is no mint — not even for us.';
+    }
+
+    $('supplyhint').textContent = state.supplyWei != null
+      ? 'Fixed forever: ' + fmtAmount(state.supplyWei, f.decimals) + ' ' + sym + ', no mint function.'
+      : 'Fixed forever — the token has no mint function.';
+    try { paintChecklist(f); } catch { /* fields not ready yet */ }
+    return { f, errs };
+  }
+  for (const id of ['name', 'symbol', 'decimals', 'supply']) {
+    $(id).addEventListener('input', () => { scheduleCosts(); update(); });
+  }
+  update();
+
+  /* ── Pons：页内发射 + 核实 ──────────────────────────────────────────────
+   * 发射是我们编码的（`launchToken`），参数在**这里**填、用户的钱包签字 —— 不转跳。
+   * 下面那个粘地址的框是给**别处发出来的币**准备的：读工厂的 getLaunchedToken 核实真伪，
+   * 再把人带到锁仓表单；我们自己发的币毕业之后也走同一条路去锁。
+   */
+  // 名字/符号/税率一动就重画 —— 按钮文案要说得出"还差什么"
+  for (const id of ['pname', 'psymbol', 'ptax', 'pbuyamt']) $(id).addEventListener('input', () => paintRoutes());
+  // Clanker 那条同款：名字/符号一动，按钮文案跟着走
+  for (const id of ['cname', 'csymbol', 'cbuyamt']) $(id).addEventListener('input', () => paintRoutes());
+  /* ── Flap：代币类型（普通/税币）与分税 ---------------------------------- */
+  for (const b of document.querySelectorAll('#ftype button')) {
+    b.onclick = () => {
+      if (b.disabled) return;                            // Base 上 Standard 是禁用的
+      state.flapKind = b.dataset.t;
+      state.flapSalt = null; state.flapMining = false;   // 两种币的地址尾数不同，预挖要重来
+      syncFlapType();
+      paintRoutes();
+    };
+  }
+  /**
+   * 把分税讲成一次具体成交 —— 报告里"Tax Token 说明偏技术"缺的就是这个。
+   * 只用当前输入算，不假装是收益预测；输入没凑成 100% 时由调用方把示例藏起来。
+   */
+  function taxExample(sellPct, cuts, names) {
+    const trade = 10000;
+    const cut = trade * sellPct / 100;
+    const fmt = (x) => (Math.round(x * 100) / 100).toLocaleString('en-US');
+    return 'Example: a ' + sellPct + '% sell on 10,000 tokens takes ' + fmt(cut) + ' — '
+      + cuts.map((p, i) => fmt(cut * p / 100) + ' ' + names[i]).join(' · ') + '.';
+  }
+  /** 分税四项必须合计 100% —— 链上不合计会被 InvalidTaxDistribution 拒（实测过）。 */
+  function taxSum() {
+    const n = (id) => Number($(id).value || 0);
+    const total = n('fmkt') + n('flp') + n('fdiv') + n('fdef');
+    $('fsum').className = Math.abs(total - 100) < 0.001 ? 'hint okline' : 'hint warnline';
+    $('fsum').textContent = 'Marketing ' + n('fmkt') + '% + liquidity ' + n('flp') + '% + dividends '
+      + n('fdiv') + '% + deflation ' + n('fdef') + '% = ' + total + '%'
+      + (Math.abs(total - 100) < 0.001 ? ' ✓' : ' — must be 100%');
+    const sell = Number($('fsell').value || 0);
+    $('fexample').textContent = Math.abs(total - 100) < 0.001 && sell > 0
+      ? taxExample(sell, [n('fmkt'), n('flp'), n('fdiv'), n('fdef')],
+        ['marketing', 'liquidity', 'dividends', 'deflation'])
+      : '';
+    if (state.route === 'flap') {
+      try { paintRoutes(); paintChecklist(readForm()); } catch { /* boot order */ }
+    }
+    return total;
+  }
+  for (const id of ['fmkt', 'flp', 'fdiv', 'fdef']) $(id).addEventListener('input', taxSum);
+  /* 买入/卖出税率也决定算例（以及清单里的 Buy / sell tax 一行）—— 改了要跟着重算。 */
+  for (const id of ['fbuy', 'fsell']) $(id).addEventListener('input', taxSum);
+  $('fbuyamt').addEventListener('input', () => paintRoutes());
+  taxSum();
+
+  /* ── four.meme：站内发射（我们填表 + 它后端签发 + 你的钱包发）───────────
+   * 粘地址那一步留着 —— 给"在别处发的币"用；发射本身走这里的新表单。
+   */
+  $('mlabel').innerHTML = FOURMEME[56].labels.map((l) => '<option>' + l + '</option>').join('');
+  for (const b of document.querySelectorAll('#mtaxtype button')) {
+    b.onclick = () => {
+      state.fmTax = b.dataset.t === 'tax';
+      for (const x of document.querySelectorAll('#mtaxtype button')) x.classList.toggle('on', x === b);
+      $('mtaxbox').classList.toggle('hide', !state.fmTax);
+      mTaxSum();
+    };
+  }
+  /** 分税四项必须合计 100%（它前端自己的闸门，实测照抄）。 */
+  function mTaxSum() {
+    const n = (id) => Number($(id).value || 0);
+    const total = n('mburn') + n('mdiv') + n('mliq') + n('mrec');
+    $('msum').className = 'hint ' + (total === 100 ? 'okline' : 'warnline');
+    $('msum').textContent = 'Burn ' + n('mburn') + '% + dividends ' + n('mdiv') + '% + liquidity ' + n('mliq')
+      + '% + wallet ' + n('mrec') + '% = ' + total + '%' + (total === 100 ? ' ✓' : ' — must be 100%');
+    const sell = Number($('mfeesell').value || 0);
+    $('mexample').textContent = total === 100 && sell > 0
+      ? taxExample(sell, [n('mliq'), n('mburn'), n('mdiv'), n('mrec')],
+        ['liquidity', 'burn', 'dividends', 'to a wallet'])
+      : '';
+    if (state.route === 'fourmeme') {
+      try { paintRoutes(); paintChecklist(readForm()); } catch { /* boot order */ }
+    }
+    return total;
+  }
+  for (const id of ['mburn', 'mdiv', 'mliq', 'mrec']) $(id).addEventListener('input', mTaxSum);
+  for (const id of ['mfee', 'mfeesell']) $(id).addEventListener('change', mTaxSum);
+  mTaxSum();
+  // 名字/符号一动就重画按钮（和 Pons 那条同款）
+  for (const id of ['mname', 'msymbol', 'mbuyamt']) $(id).addEventListener('input', () => paintRoutes());
+
+  /**
+   * 图片：它家的接口收 base64。给了文件就裁成 512×512 的 PNG（顺便把体积压下来）；
+   * 没给就**画一张** —— 年金底 + 符号缩写，和它自家 agent 的兜底同一个思路。
+   */
+  async function fmArtwork(input, name, symbol) {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 512;
+    const g = cv.getContext('2d');
+    const file = input.files && input.files[0];
+    if (file) {
+      if (file.size > 6 * 1024 * 1024) throw new Error('That image is over 6 MB — pick a smaller one.');
+      const img = await new Promise((res, rej) => {
+        const im = new Image();
+        const url = URL.createObjectURL(file);
+        im.onload = () => { URL.revokeObjectURL(url); res(im); };
+        im.onerror = () => { URL.revokeObjectURL(url); rej(new Error('That file is not an image this browser can read.')); };
+        im.src = url;
+      });
+      const s = Math.min(img.width, img.height);
+      g.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, 512, 512);
+    } else {
+      const grad = g.createLinearGradient(0, 0, 512, 512);
+      grad.addColorStop(0, '#16110D');
+      grad.addColorStop(1, '#4A3220');
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 512, 512);
+      g.strokeStyle = '#D9A343';
+      g.lineWidth = 16;
+      g.beginPath();
+      g.arc(256, 256, 150, 0, Math.PI * 2);
+      g.stroke();
+      g.fillStyle = '#E8B85C';
+      g.font = '700 190px "Segoe UI", system-ui, sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(((symbol || name || 'O').replace(/[^A-Za-z0-9]/g, '').slice(0, 3) || 'O').toUpperCase(), 256, 262);
+    }
+    return cv.toDataURL('image/png').split(',')[1];   // 纯 base64（不带 data: 前缀）—— 它要的就是这个
+  }
+
+  /**
+   * 上传控件（四条路线共用）：文件 → 512×512 PNG → 我们自己的图床（`POST /api/upload`）
+   * → 把 `https://<本站>/i/<id>.png` 填进旁边的 URL 框（**完整地址**，链上元数据要能直接取）。
+   * 用户仍可手改那个框；本地开发时图存在 `data/uploads/`，线上在 KV（见 tools/img-worker）。
+   */
+  function squarePng(file) {
+    return new Promise((res, rej) => {
+      if (file.size > 8 * 1024 * 1024) { rej(new Error('That image is over 8 MB — pick a smaller one.')); return; }
+      const im = new Image();
+      const url = URL.createObjectURL(file);
+      im.onload = () => {
+        URL.revokeObjectURL(url);
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = 512;
+        const g = cv.getContext('2d');
+        const s = Math.min(im.width, im.height);
+        g.drawImage(im, (im.width - s) / 2, (im.height - s) / 2, s, s, 0, 0, 512, 512);
+        res(cv.toDataURL('image/png').split(',')[1]);
+      };
+      im.onerror = () => { URL.revokeObjectURL(url); rej(new Error('That file is not an image this browser can read.')); };
+      im.src = url;
+    });
+  }
+  function wireArtwork(fileId, urlId, stateId) {
+    const input = $(fileId);
+    if (!input) return;
+    input.addEventListener('change', async () => {
+      const f = input.files && input.files[0];
+      if (!f) return;
+      const st = $(stateId);
+      const preview = document.createElement('img');
+      preview.className = 'art-preview hide';
+      preview.alt = '';
+      st.insertAdjacentElement('afterend', preview);
+      try {
+        st.textContent = 'Preparing…';
+        const b64 = await squarePng(f);
+        preview.src = b64;                 // the cropped 512×512 result, before upload
+        preview.classList.remove('hide');
+        st.textContent = 'Uploading…';
+        const j = await uploadArt(b64);
+        /* 有公开地址（absolute）就用它；线上站点本来就在公开域，退回本站 origin */
+        const full = j.absolute || (location.origin + j.url);
+        $(urlId).value = full;
+        /* 预览永远走本地那份（服务端把远端 id 也落了一份）—— 字段里放的才是公开地址 */
+        preview.src = j.url;
+        st.innerHTML = 'Uploaded — the token will point at <span class="mono">' + full + '</span>'
+          + (!j.absolute && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
+              ? '<br><span class="warnline">Local-only URL: this address will not load for anyone else. Launch from oaken.one for a public image.</span>'
+              : '');
+        paintRoutes();
+      } catch (e) {
+        preview.classList.add('hide');
+        st.innerHTML = '<span class="warnline">' + String(e.message || e).slice(0, 150) + '</span>';
+      }
+    });
+  }
+  /**
+   * 文件 → 512×512 PNG → 我们的图床。
+   * 真链的元数据会被平台和陌生人直接取 —— 图必须是**公开地址**，本地站点据此
+   * 把图同时存一份到线上图床（local chain 31337 不用，别往 KV 里塞测试图）。
+   * 返回 `{url:'/i/…', absolute:'https://oaken.one/i/…'}`；远端不可用时没有 absolute。
+   */
+  async function uploadArt(b64) {
+    const body = JSON.stringify({ data: b64, type: 'image/png', public: !!(state.chain && state.chain.id !== 31337) });
+    const post = () => fetch('/api/upload', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body,
+    });
+    let r;
+    try {
+      r = await post();
+    } catch (e) {
+      /* ⚠ 大图（>~50 KB 的 body）偶尔在**第一次**请求上被边缘/本地代理直接掐断：
+         Chrome 报 `ERR_CONNECTION_CLOSED`，页面只看到 "Failed to fetch"。同一份
+         body 立刻重发一次会成功（2026-10-22 实测：231 KB 的首请求断、第二次 200）。
+         这不是服务端拒绝——所以只在**网络层失败**时重试，HTTP 错误不重试。 */
+      await new Promise((res) => setTimeout(res, 400));
+      r = await post();
+    }
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.url) throw new Error(j.error || ('upload failed (' + r.status + ')'));
+    return j;
+  }
+  wireArtwork('ffile', 'fmeta', 'fimgstate');
+  wireArtwork('pfile', 'plogo', 'pimgstate');
+  wireArtwork('cfile', 'cimage', 'cimgstate');
+  wireArtwork('oartfile', 'oart', 'oartstate');
+  /**
+   * 把这次发射用的图登记到「链 + 代币 → 图」。**所有路线都登记**。
+   *
+   * 从前只在自有工厂那条路登记 —— 于是 Pons / Flap / Clanker 发的币在我们自己的
+   * 代币页上永远没图，哪怕图已经随交易进了它们的元数据（2026-10-22 用户实际踩到）。
+   * 只认自家图床的 `/i/…` 路径：第三方平台的 CDN 图不在这里登记（它们自己会显示）。
+   */
+  function rememberArt(raw, tokenAddr) {
+    try {
+      const m = /\/i\/[a-z0-9]{8,40}\.[a-z]{3,4}$/.exec(String(raw || '').trim());
+      if (!tokenAddr || !m) return null;
+      fetch('/api/token-image', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ chainId: state.chain.id, token: tokenAddr, url: m[0] }),
+      }).catch(() => {});
+      return m[0];     // 给全站发射记录用
+    } catch { return null; /* 图登记失败不影响发射本身 */ }
+  }
+  // four.meme 那张图是提交时才处理的 —— 至少把"选了哪个文件"当场说出来
+  $('mimg').addEventListener('change', () => {
+    const f = $('mimg').files && $('mimg').files[0];
+    $('mimgstate').textContent = f ? 'Selected: ' + f.name : 'No file chosen — we will draw one from the symbol if you skip it.';
+    let pv = document.getElementById('fmpreview');
+    if (!pv) {
+      pv = document.createElement('img');
+      pv.id = 'fmpreview'; pv.className = 'art-preview hide'; pv.alt = '';
+      $('mimgstate').insertAdjacentElement('afterend', pv);
+    }
+    if (f) { pv.src = URL.createObjectURL(f); pv.classList.remove('hide'); }
+    else pv.classList.add('hide');
+  });
+
+  /** four.meme：粘地址 → 带到锁仓表单（给在别处发的币用）。 */
+  $('fmtoken').addEventListener('input', () => {
+    const v = $('fmtoken').value.trim();
+    $('fminfo').innerHTML = /^0x[0-9a-fA-F]{40}$/.test(v)
+      ? '<a href="/locks/create?token=' + v + '">Lock a slice of it →</a>'
+      : 'Paste it and we will take you to the lock form with the address already filled in.';
+  });
+
+  let ponsTimer = null;
+  $('ponstoken').addEventListener('input', () => {
+    clearTimeout(ponsTimer);
+    ponsTimer = setTimeout(async () => {
+      const v = $('ponstoken').value.trim();
+      const host = $('ponsinfo');
+      if (!/^0x[0-9a-fA-F]{40}$/.test(v)) { host.innerHTML = ''; return; }
+      const family = state.route === 'genius' ? 'genius' : 'pons';
+      const siteName = family === 'genius' ? 'Genius' : 'Pons';
+      host.textContent = 'Checking the ' + siteName + ' factory…';
+      try {
+        const info = await curveLaunchInfo(family, v, state.chain);
+        if (!info.exists) {
+          host.innerHTML = '<span class="warnline">That address is not a ' + siteName + ' launch</span> — the ' + siteName + ' factory has never seen it. '
+            + 'You can still <a href="/locks/create?token=' + v + '">lock it as a plain ERC-20 →</a>';
+          return;
+        }
+        const phases = ['on the curve', 'curve swept', 'pool created', 'rescued'];
+        host.innerHTML = '<b>Verified: a ' + siteName + ' launch.</b> '
+          + 'Deployer <span class="mono">' + short(info.deployer) + '</span> · '
+          + 'creator fee <b>' + (info.creatorTaxBps / 100) + '%</b> · '
+          + 'buyback ' + (info.buybackEnabled ? 'on' : 'off') + ' · '
+          + 'phase: <b>' + (phases[info.phase] || info.phase) + '</b>.'
+          + '<br>Available on OAKEN right now: <a href="/locks/create?token=' + v + '">lock the tokens you hold →</a>';
+        paintRoutes();
+      } catch (e) {
+        host.innerHTML = '<span class="warnline">Could not reach the ' + siteName + ' factory from this browser.</span>';
+      }
+    }, 500);
+  });
+
+  /* ── 提交 ───────────────────────────────────────────────────────────── */
+  const track = {
+    set(st, msg, hash) {
+      const li = document.querySelector('#track li[data-step="launch"]');
+      if (!li) return;
+      li.dataset.state = st;
+      $('t-launch').textContent = msg;
+      if (hash) {
+        const url = explorerHref('/tx/' + hash, state.chain);
+        const a = $('tx-launch');
+        if (url) { a.href = url; a.style.display = ''; } else { a.textContent = hash.slice(0, 10) + '…'; a.style.display = ''; }
+      }
+    },
+    show(on) { $('track').style.display = on ? 'grid' : 'none'; },
+  };
+
+  $('go').onclick = async () => {
+    /* 引擎没下来时，这颗按钮的文案就是"Reload to try again"—— 点了就真的重载 */
+    if (state.ethersFailed) { location.reload(); return; }
+    // 每条路线各有各的表单：Flap / Pons 那条**不能**拿"自有工厂"那套校验去卡它（字段根本不是同一批）
+    let f = null;
+    if (state.route === 'flap') {
+      if (!$('fname').value.trim() || !$('fsymbol').value.trim()) { toast('Give the token a name and a symbol first.', 'bad'); return; }
+    } else if (state.route === 'pons' || state.route === 'genius') {
+      if (!$('pname').value.trim() || !$('psymbol').value.trim()) { toast('Give the token a name and a symbol first.', 'bad'); return; }
+    } else if (state.route === 'clanker') {
+      if (!$('cname').value.trim() || !$('csymbol').value.trim()) { toast('Give the token a name and a symbol first.', 'bad'); return; }
+    } else if (state.route === 'fourmeme') {
+      if (!$('mname').value.trim() || !$('msymbol').value.trim()) { toast('Give the token a name and a symbol first.', 'bad'); return; }
+    } else {
+      let r = await validate();
+      const onlyWallet = !state.addr && r.errs.length === 1 && r.errs[0] === 'Connect a wallet.';
+      if (onlyWallet) {
+        /* 只差钱包：先连上、**再校验一遍** —— 依赖 `state.addr` 的预览要在连上后重算，
+           拿"没连钱包那次"的结果会把它锁给 null。 */
+        try { await wallet.connect(); await refreshWallet(); }
+        catch (e) { toast(String((e && e.message) || e).slice(0, 140), 'bad'); return; }
+        r = await validate();
+      }
+      if (r.errs.length) { toast(r.errs[0], 'bad'); return; }
+      f = r.f;
+    }
+    state.busy = true; update();
+    state.trackMode = 'running';
+    // 步骤行的标题跟着路线走 —— 自有工厂只创建代币，锁仓是另一个页面
+    document.querySelector('#track li b').textContent =
+      state.route === 'own' ? 'Create token'
+        : (state.route === 'flap' ? 'Launch on Flap'
+          : (state.route === 'clanker' ? 'Launch on Clanker' : (state.route === 'pons' || state.route === 'genius' ? 'Launch on ' + (state.route === 'genius' ? 'Genius' : 'Pons') : 'Launch on four.meme')));
+    track.show(true);
+    track.set('idle', 'Waiting');
+    for (const el of document.querySelectorAll('.panel .body input, .panel .body .seg button')) el.disabled = true;
+    try {
+      if (!state.addr) { await wallet.connect(); await refreshWallet(); }
+      await wallet.ensureChain(state.chain);
+      const signer = await wallet.signer();
+      const c = launcher(state.chain, signer);
+
+      if (state.route === 'flap') {
+        const name = $('fname').value.trim();
+        const symbol = $('fsymbol').value.trim();
+        if (!name || !symbol) throw new Error('Give the token a name and a symbol first.');
+        const c = flap(state.chain, signer);
+        if (!c) throw new Error('Flap is not wired up on this chain yet.');
+        // 预挖好了就直接用（选中路线时就开始挖了）；没挖好就在这里分片挖，
+        // 挖的过程页面照常重画 —— tracker 上那句"正在挖"是真的看得见的
+        const devBuy = readNative('fbuyamt', 'The developer buy', { required: true });
+        const kind = flapKind();
+        let mined = state.flapSalt;
+        if (!mined || mined.kind !== kind) {
+          track.set('wallet', 'Mining the address Flap requires…');
+          mined = await mineFlapSalt(state.chain, kind, { onProgress: (n) => track.set('wallet', 'Mining the address Flap requires… (' + n.toLocaleString() + ' tries)') });
+          state.flapSalt = mined;
+        }
+        if (!mined) throw new Error('Could not mine the address Flap requires this time — press the button again.');
+        track.set('wallet', 'Confirm in your wallet — one transaction sends it to Flap.');
+        const meta = $('fmeta').value.trim();
+        const entry = (FLAP[state.chain.id][kind] || {}).entry;   // 这条链这个币种的入口（逐链不同）
+        let tx;
+        if (entry === 'newTokenV6') {
+          // 税币（BSC / Robinhood / Base 三链同一个函数名，参数结构一样）
+          // 分税四项必须合计 100%（链上不合计会被 InvalidTaxDistribution 拒）
+          const pct = (id) => Math.round(Number($(id).value || 0) * 100);
+          if (pct('fmkt') + pct('flp') + pct('fdiv') + pct('fdef') !== 10000) {
+            throw new Error('The four tax buckets must add up to exactly 100%.');
+          }
+          const p = flapTaxParams({
+            name, symbol, meta, salt: mined.salt, beneficiary: state.addr, quoteAmt: devBuy,
+            buyTaxBps: Math.round(Number($('fbuy').value || 0) * 100),
+            sellTaxBps: Math.round(Number($('fsell').value || 0) * 100),
+            mktBps: pct('fmkt'), lpBps: pct('flp'), dividendBps: pct('fdiv'), deflationBps: pct('fdef'),
+          });
+          // 首买会增加 gas（实测带 dev buy 5.58M）；先估、估不出来再用 7.5M 宽上界。
+          let gasLimit = 7_500_000n;
+          try { gasLimit = (await c.newTokenV6.estimateGas(p, { value: devBuy })) * 12n / 10n; } catch { /* 用上界 */ }
+          tx = await c.newTokenV6(p, { value: devBuy, gasLimit });
+          // ⚠ 税币创建的 gas 上限必须给足：BSC 实测 5.23M（带 dev buy 5.58M）、
+          //   4663 估 4.75M、Base 估 4.74M；4M 会在创建尾部 **OOG 回滚且没有 revert data**
+          //   （gas 白烧、看起来像合约拒绝）。这里曾经和普通币共用 3M —— 从页面发必回滚。
+        } else if (entry === 'newTokenV5') {
+          // Robinhood Chain 的非税路线（不是 V7）—— 参数形状不同，见 flapParams
+          const p = flapParams(state.chain, { name, symbol, meta, salt: mined.salt, beneficiary: state.addr, quoteAmt: devBuy });
+          let gasLimit = 5_000_000n;
+          try { gasLimit = (await c.newTokenV5.estimateGas(p, { value: devBuy })) * 12n / 10n; } catch { /* 用上界 */ }
+          tx = await c.newTokenV5(p, { value: devBuy, gasLimit });
+        } else {
+          const p = flapParams(state.chain, { name, symbol, meta, salt: mined.salt, quoteAmt: devBuy });
+          let gasLimit = 4_500_000n;
+          try { gasLimit = (await c.newTokenV7.estimateGas(p, { value: devBuy })) * 12n / 10n; } catch { /* 用上界 */ }
+          tx = await c.newTokenV7(p, { value: devBuy, gasLimit });
+        }
+        track.set('sent', 'Sent — waiting for the block…', tx.hash);
+        noteSent(tx);
+        const receipt = await tx.wait();
+        const ev = flapTokenFromReceipt(receipt, state.chain);
+        const tokenAddr = ev ? ev.token : null;
+        const art = tokenAddr ? rememberArt($('fmeta').value, tokenAddr) : null;
+        if (tokenAddr) recordLaunch({ chainId: state.chain.id, token: tokenAddr, name, symbol, route: 'Flap', creator: state.addr, txHash: tx.hash, image: art });
+        track.set('done', tokenAddr ? ('Launched ' + symbol + ' on Flap') : 'Confirmed');
+        $('done').classList.remove('hide');
+        $('donebody').innerHTML = '<div style="display:grid;gap:10px">'
+          + (tokenAddr
+              ? '<div>Token <b class="mono">' + short(tokenAddr, 6) + '</b> is live on Flap (' + state.chain.name + '). ' + copyBtn(tokenAddr, 'copy CA') + '</div>'
+              : '<div class="warnline">The transaction landed but we could not read the new token from the receipt — check it on the explorer.</div>')
+          + '<div class="hint">Flap runs the market for this token. The half we do is the lock.</div>'
+          + '<div class="mono muted" style="font-size:12px;word-break:break-all">tx ' + tx.hash + '</div>'
+          + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">'
+          + (tokenAddr ? '<a class="btn btn-p" href="/locks/create?token=' + tokenAddr + '">Lock a slice →</a>' : '')
+          + (tokenAddr ? '<a class="btn btn-s" href="/locks/' + state.chain.slug + '/' + tokenAddr + '">See the token →</a>' : '')
+          + (tokenAddr ? '<a class="btn btn-s" href="/locks/create?token=' + tokenAddr + '">Lock a slice →</a>' : '')
+          + (explorerHref('/tx/' + tx.hash, state.chain) ? '<a class="btn btn-s" href="' + explorerHref('/tx/' + tx.hash, state.chain) + '" target="_blank" rel="noopener">Explorer</a>' : '')
+          + '</div></div>';
+        state.trackMode = 'done';
+        noteOk('Launched on Flap.');
+        return;
+      }
+
+      if (state.route === 'clanker') {
+        const name = $('cname').value.trim();
+        const symbol = $('csymbol').value.trim();
+        if (!name || !symbol) throw new Error('Give the token a name and a symbol first.');
+        const c = clankerFactory(state.chain, signer);
+        if (!c) throw new Error('Clanker is not wired up on this chain yet.');
+        const feePct = Number($('clpfee').value || 0);
+        if (!Number.isFinite(feePct) || feePct < 0 || feePct > 10) throw new Error('The LP fee has to be between 0 and 10%.');
+        const devBuy = readNative('cbuyamt', 'The developer buy', { required: true });
+        /**
+         * 参数在我们这一侧编好（真实交易逐字节对过）。`value` 是各扩展 msgValue 之和：
+         * 不带 dev-buy 扩展时必须恰好 0，带扩展时必须恰好等于首买金额。
+         * `originatingChainId` 由 `clankerDeployParams` 从链上取，填错会 OnlyOriginatingChain。
+         */
+        const params = clankerDeployParams(state.chain, {
+          name, symbol,
+          image: $('cimage').value.trim(),
+          description: $('cdesc').value.trim(),
+          socials: { website: $('cweb').value.trim(), twitter: $('cx').value.trim() },
+          lpFeeBps: Math.round(feePct * 10000),      // 1e6 制：1% = 10000
+          tokenAdmin: state.addr,
+          devBuy,
+        });
+        track.set('wallet', 'Confirm in your wallet — ' + (devBuy > 0n ? 'gas plus your launch buy.' : 'gas only, no launch fee.'));
+        let gasLimit = 8_000_000n;                   // 实测 4.65–5.2M（带首买约 5.6M）
+        try { gasLimit = (await c.deployToken.estimateGas(params, { value: devBuy })) * 12n / 10n; } catch { /* 用上界 */ }
+        const tx = await c.deployToken(params, { value: devBuy, gasLimit });
+        track.set('sent', 'Sent — waiting for the block…', tx.hash);
+        noteSent(tx);
+        const receipt = await tx.wait();
+        const ev = clankerTokenFromReceipt(receipt, state.chain);
+        const tokenAddr = ev ? ev.tokenAddress : null;
+        const art = tokenAddr ? rememberArt($('cimage').value, tokenAddr) : null;
+        if (tokenAddr) recordLaunch({ chainId: state.chain.id, token: tokenAddr, name, symbol, route: 'Clanker', creator: state.addr, txHash: tx.hash, image: art });
+        track.set('done', tokenAddr ? ('Launched ' + symbol + ' on Clanker') : 'Confirmed');
+        $('done').classList.remove('hide');
+        $('donebody').innerHTML = '<div style="display:grid;gap:10px">'
+          + (tokenAddr
+              ? '<div>Token <b class="mono">' + short(tokenAddr, 6) + '</b> is live on Clanker (' + state.chain.name + '). ' + copyBtn(tokenAddr, 'copy CA') + '</div>'
+              : '<div class="warnline">The transaction landed but we could not read the new token from the receipt — check it on the explorer.</div>')
+          + '<div class="hint">Clanker runs the V4 pool and the initial liquidity is locked forever. One heads-up: the <b>sniper auction</b> is running right now (~22 seconds, then 15 seconds of decaying fees) — nobody should buy in that window.</div>'
+          + '<div class="mono muted" style="font-size:12px;word-break:break-all">tx ' + tx.hash + '</div>'
+          + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">'
+          + (tokenAddr ? '<a class="btn btn-s" href="/locks/' + state.chain.slug + '/' + tokenAddr + '">See the token →</a>' : '')
+          + (explorerHref('/tx/' + tx.hash, state.chain) ? '<a class="btn btn-s" href="' + explorerHref('/tx/' + tx.hash, state.chain) + '" target="_blank" rel="noopener">Explorer</a>' : '')
+          + '</div></div>';
+        state.trackMode = 'done';
+        noteOk('Launched on Clanker.');
+        return;
+      }
+
+      if (state.route === 'pons' || state.route === 'genius') {
+        const family = state.route;                                  // 'pons' | 'genius'（同源代码的两条曲线台）
+        const siteName = family === 'genius' ? 'Genius' : 'Pons';
+        const sym = state.chain.native || 'ETH';
+        const name = $('pname').value.trim();
+        const symbol = $('psymbol').value.trim();
+        if (!name || !symbol) throw new Error('Give the token a name and a symbol first.');
+        const c = curveFactory(family, state.chain, signer);
+        if (!c) throw new Error(siteName + ' is not wired up on this chain yet.');
+        const taxPct = Number($('ptax').value || 0);
+        if (!Number.isFinite(taxPct) || taxPct < 0) throw new Error('The creator fee has to be a number, 0 or more.');
+        const devBuy = readNative('pbuyamt', 'The developer buy', { required: true });
+        /**
+         * **现读**发射费与"经济参数哈希" —— `expectedEconomics` 是链上现算的，
+         * 缓存一分钟前的值会被合约拒（这条是探针实测出来的）。
+         */
+        track.set('wallet', 'Reading the live launch fee and economics…');
+        const [fee, economics, maxTax] = await Promise.all([
+          c.launchFee(), c.previewLaunchEconomics(0, window.ethers.ZeroAddress), c.maxCreatorTaxBps(),
+        ]);
+        if (Math.round(taxPct * 100) > Number(maxTax)) {
+          throw new Error('The creator fee cannot be more than ' + (Number(maxTax) / 100) + '% right now.');
+        }
+        const launchArgs = ponsLaunchParams({
+          name, symbol,
+          logo: $('plogo').value.trim(),
+          description: $('pdesc').value.trim(),
+          socials: { twitter: $('px').value.trim(), website: $('pweb').value.trim() },
+          creatorFeeRecipient: state.addr,          // 创作费进用户自己的地址，永远不经过我们
+          creatorTaxBps: family === 'genius' ? 0 : Math.round(taxPct * 100),   // Genius 的链上上限就是 0
+          // ⚠ 逐家族不同：Genius 的曲线**必须开买回**（false 会回 InvalidFeePolicy，二分定位过）；
+          //   Pons 的三笔真实样本全是 false。语义没验过就不给用户开关。
+          buybackEnabled: family === 'genius',
+          expectedEconomics: economics,
+        });
+        let tx;
+        if (devBuy > 0n) {
+          /* 工厂的 launchToken 不收首买（源码里 value 必须恰好等于 launchFee），
+             但两家的 launchForwarder 提供**原子** launchAndBuy：同一个交易里建曲线 + 首买。
+             ⚠ 路由的第一个参数只是 TokenParams 那一个 struct，不是工厂那 4 个参数整包。 */
+          const router = curveLaunchAndBuy(family, state.chain, signer);
+          if (!router) throw new Error(siteName + ' atomic launch-and-buy is not wired up on this chain yet.');
+          const args = [launchArgs[0], 0n, window.ethers.ZeroAddress, devBuy, 0n, state.addr, []];
+          let gasLimit = 10_000_000n;
+          try { gasLimit = (await router.launchAndBuy.estimateGas(...args, { value: fee + devBuy })) * 12n / 10n; } catch { /* 用上界 */ }
+          track.set('wallet', 'Confirm in your wallet — launch fee plus your buy, in one transaction.');
+          tx = await router.launchAndBuy(...args, { value: fee + devBuy, gasLimit });
+        } else {
+          track.set('wallet', 'Confirm in your wallet — ' + fmtAmount(fee, 18, 6) + ' ' + sym + ' launch fee plus gas.');
+          tx = await c.launchToken(...launchArgs, { value: fee, gasLimit: 8_000_000n });   // 真实 gasUsed 3.6–5.5M，8M 是宽上界
+        }
+        track.set('sent', 'Sent — waiting for the block…', tx.hash);
+        noteSent(tx);
+        const receipt = await tx.wait();
+        const ev = curveTokenFromReceipt(receipt, family, state.chain);
+        const tokenAddr = ev ? ev.token : null;
+        const art = tokenAddr ? rememberArt($('plogo').value, tokenAddr) : null;
+        if (tokenAddr) recordLaunch({ chainId: state.chain.id, token: tokenAddr, name, symbol, route: siteName, creator: state.addr, txHash: tx.hash, image: art });
+        track.set('done', tokenAddr ? ('Launched ' + symbol + ' on ' + siteName) : 'Confirmed');
+        $('done').classList.remove('hide');
+        $('donebody').innerHTML = '<div style="display:grid;gap:10px">'
+          + (tokenAddr
+              ? '<div>Token <b class="mono">' + short(tokenAddr, 6) + '</b> is live on ' + siteName + ' (' + state.chain.name + '). ' + copyBtn(tokenAddr, 'copy CA') + '</div>'
+              : '<div class="warnline">The transaction landed but we could not read the new token from the receipt — check it on the explorer.</div>')
+          + '<div class="hint">' + siteName + ' runs the curve and the market for this token. The half we do is the lock — and that part starts after graduation, when the pool and its position exist.</div>'
+          + '<div class="mono muted" style="font-size:12px;word-break:break-all">tx ' + tx.hash + '</div>'
+          + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">'
+          + (tokenAddr ? '<a class="btn btn-s" href="/locks/' + state.chain.slug + '/' + tokenAddr + '">See the token →</a>' : '')
+          + (explorerHref('/tx/' + tx.hash, state.chain) ? '<a class="btn btn-s" href="' + explorerHref('/tx/' + tx.hash, state.chain) + '" target="_blank" rel="noopener">Explorer</a>' : '')
+          + '</div></div>';
+        state.trackMode = 'done';
+        noteOk('Launched on ' + siteName + '.');
+        return;
+      }
+
+      if (state.route === 'fourmeme') {
+        const name = $('mname').value.trim();
+        const shortName = $('msymbol').value.trim();
+        if (!name || !shortName) throw new Error('Give the token a name and a symbol first.');
+        const c = fourMemeManager(state.chain, signer);
+        if (!c) throw new Error('four.meme is not wired up on this chain yet.');
+        // 税：只有 1/3/5/10 这四档，四项合计必须 100（照它前端的闸门）
+        let tax = null;
+        if (state.fmTax) {
+          const n = (id) => Number($(id).value || 0);
+          const burn = n('mburn'), divide = n('mdiv'), liquidity = n('mliq'), recipient = n('mrec');
+          if (burn + divide + liquidity + recipient !== 100) throw new Error('The four tax buckets must add up to exactly 100%.');
+          const recipientAddress = $('mrecaddr').value.trim();
+          if (recipient > 0 && !/^0x[0-9a-fA-F]{40}$/.test(recipientAddress)) throw new Error('Give the wallet that takes a cut a valid address.');
+          tax = { feeRate: Number($('mfee').value), feeRateSell: Number($('mfeesell').value), burn, divide, liquidity, recipient, recipientAddress };
+        }
+        // ① 登录：签一句文本（一次，token 记在内存里；重发不用再签）
+        let token = state.fmToken;
+        if (!token) {
+          track.set('wallet', 'Sign the four.meme login message — a text signature, no gas.');
+          token = await fmLogin(state.chain, signer);
+          state.fmToken = token;
+        }
+        // ② 图片（没有就让浏览器画一张）→ ③ 配置与 payload → ④ 它后端签发
+        track.set('wallet', 'Uploading the artwork…');
+        const artB64 = await fmArtwork($('mimg'), name, shortName);
+        const imgUrl = await fmUpload(state.chain, token, artB64);
+        /* four.meme 把图存在它自己的 CDN —— 我们的代币页只认自家图床。
+           同一张 512×512 再存一份到我们这边，发射成功后登记（失败不影响发射）。 */
+        let ourArt = null;
+        try { ourArt = await uploadArt(artB64); } catch { /* 自己的图床不可用就算了 */ }
+        const quote = await fmQuote(state.chain);
+        const preSaleWei = readNative('mbuyamt', 'The developer buy', { required: true });
+        track.set('wallet', 'Asking four.meme to sign the launch…');
+        const signed = await fmCreate(state.chain, token, fmCreatePayload({
+          name, shortName, desc: $('mdesc').value.trim(), imgUrl, quote,
+          label: $('mlabel').value,
+          socials: { web: $('mweb').value.trim(), twitter: $('mtw').value.trim() },
+          tax,
+          preSale: preSaleWei > 0n ? window.ethers.formatEther(preSaleWei) : '0',
+        }));
+        /* ⑤ 上链：value = 链上发射费 + 首买金额 + four.meme 的买入费（公开配置里的 buyFee，
+           例如 1%）。它的前端就是这么算的。少给会回滚；多给会被接受（实测
+           preSale+1%+fee 能过，只给 fee 会回 "More BNB"）。 */
+        const fee = await c._launchFee();
+        const rateWei = (s) => { try { return window.ethers.parseUnits(String(s || '0'), 18); } catch { return 0n; } };
+        const buyFee = preSaleWei > 0n
+          ? ((preSaleWei * rateWei(quote.buyFee) / 10n ** 18n) > rateWei(quote.minTradeFee)
+              ? (preSaleWei * rateWei(quote.buyFee) / 10n ** 18n) : rateWei(quote.minTradeFee))
+          : 0n;
+        const value = fee + preSaleWei + buyFee;
+        let gasLimit = 6_000_000n;
+        try { gasLimit = (await c.createToken.estimateGas(signed.createArg, signed.signature, { value })) * 13n / 10n; } catch { /* 估不出来用 6M */ }
+        track.set('wallet', 'Confirm in your wallet — the launch transaction'
+          + (preSaleWei > 0n ? ' (launch fee + ' + window.ethers.formatEther(preSaleWei) + ' BNB buy).' : (fee > 0n ? ' (' + fmtAmount(fee, 18, 6) + ' ETH launch fee).' : '.')));
+        const tx = await c.createToken(signed.createArg, signed.signature, { value, gasLimit });
+        track.set('sent', 'Sent — waiting for the block…', tx.hash);
+        noteSent(tx);
+        const receipt = await tx.wait();
+        const ev = fmTokenFromReceipt(receipt, state.chain);
+        const tokenAddr = ev ? ev.token : null;
+        const art = tokenAddr ? rememberArt(ourArt && ourArt.url, tokenAddr) : null;
+        if (tokenAddr) recordLaunch({ chainId: state.chain.id, token: tokenAddr, name, symbol: shortName, route: 'four.meme', creator: state.addr, txHash: tx.hash, image: art });
+        track.set('done', tokenAddr ? ('Launched ' + shortName + ' on four.meme') : 'Confirmed');
+        $('done').classList.remove('hide');
+        $('donebody').innerHTML = '<div style="display:grid;gap:10px">'
+          + (tokenAddr
+              ? '<div>Token <b class="mono">' + short(tokenAddr, 6) + '</b> is live on four.meme (' + state.chain.name + '). ' + copyBtn(tokenAddr, 'copy CA') + '</div>'
+              : '<div class="warnline">The transaction landed but we could not read the new token from the receipt — check it on the explorer.</div>')
+          + '<div class="hint">four.meme runs the curve and the market. If you buy tokens back off the curve, you can lock them here the same way.</div>'
+          + '<div class="mono muted" style="font-size:12px;word-break:break-all">tx ' + tx.hash + '</div>'
+          + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">'
+          + (tokenAddr ? '<a class="btn btn-s" href="/locks/' + state.chain.slug + '/' + tokenAddr + '">See the token →</a>' : '')
+          + (tokenAddr ? '<a class="btn btn-p" href="/locks/create?token=' + tokenAddr + '">Lock a slice →</a>' : '')
+          + (explorerHref('/tx/' + tx.hash, state.chain) ? '<a class="btn btn-s" href="' + explorerHref('/tx/' + tx.hash, state.chain) + '" target="_blank" rel="noopener">Explorer</a>' : '')
+          + '</div></div>';
+        state.trackMode = 'done';
+        noteOk('Launched on four.meme.');
+        return;
+      }
+
+      const params = {
+        name: f.name,
+        symbol: f.symbol,
+        decimals: f.decimals,
+        supply: state.supplyWei,
+        /* 发射和锁仓已经分开：这里永远是 0 —— 合约支持可选锁，但这一页不再锁任何东西。 */
+        lockBps: 0,
+        unlockDate: 0n,
+        description: '',
+        beneficiary: state.addr,
+      };
+      track.set('wallet', 'Confirm in your wallet — one transaction creates the token.');
+      const tx = await c.launch(params, { gasLimit: 3_000_000n });   // ⚠ 这条链必须显式给 gasLimit
+      track.set('sent', 'Sent — waiting for the block…', tx.hash);
+        noteSent(tx);
+      toast('Launch sent — waiting for the block…');
+      const receipt = await tx.wait();
+
+      const ev = launchedFromReceipt(receipt, state.chain);
+      const tokenAddr = ev ? ev.token : null;
+      /* 自有合约的币**链上没有图槽** —— 上传过的图登记到我们自己的图床，
+         代币页据此显示（只认我们自己图床的 /i/… 地址；不阻塞成功面板）。 */
+      const art = tokenAddr ? rememberArt($('oart').value, tokenAddr) : null;
+      if (tokenAddr) recordLaunch({ chainId: state.chain.id, token: tokenAddr, name: f.name, symbol: f.symbol, route: 'OAKEN factory', creator: state.addr, txHash: tx.hash, image: art });
+      track.set('done', tokenAddr ? ('Launched ' + f.symbol + ' · no lock') : 'Confirmed');
+
+      $('done').classList.remove('hide');
+      $('donebody').innerHTML = '<div style="display:grid;gap:10px">'
+        + (tokenAddr
+            ? '<div>Token <b class="mono">' + short(tokenAddr, 6) + '</b> is live on ' + state.chain.name + '. ' + copyBtn(tokenAddr, 'copy CA') + '</div>'
+            : '<div class="warnline">The transaction landed but we could not read the receipt — check it on the explorer.</div>')
+        + '<div class="muted"><b>Nothing was locked.</b> The whole supply is in your wallet. Locking is a separate page — open it when you are ready.</div>'
+        + '<div class="mono muted" style="font-size:12px;word-break:break-all">tx ' + tx.hash + '</div>'
+        + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">'
+        + (tokenAddr ? '<a class="btn btn-p" href="/locks/create?token=' + tokenAddr + '">Lock a slice →</a>' : '')
+        + (tokenAddr ? '<a class="btn btn-s" href="/locks/' + state.chain.slug + '/' + tokenAddr + '">See the token →</a>' : '')
+        + (explorerHref('/tx/' + tx.hash, state.chain) ? '<a class="btn btn-s" href="' + explorerHref('/tx/' + tx.hash, state.chain) + '" target="_blank" rel="noopener">Explorer</a>' : '')
+        + '</div></div>';
+      state.trackMode = 'done';
+      noteOk('Launched.');
+      /* 成功仪式：发射落地；锁仓是下一页的事 */
+      if (tokenAddr) {
+        sealMoment({
+          chain: state.chain.name,
+          id: null,
+          href: '/locks/' + state.chain.slug + '/' + tokenAddr,
+          title: 'Launched.',
+        });
+      }
+      refreshCosts();
+    } catch (e) {
+      const msg = humanizeTxError(e, state.chain);
+      track.set('fail', msg.slice(0, 140));
+      state.trackMode = 'done';
+      $('err').classList.remove('hide');
+      $('err').textContent = msg;
+      if (note) { note.fail(msg); note = null; } else toast(msg.slice(0, 120), 'bad');
+    } finally {
+      state.busy = false;
+      for (const el of document.querySelectorAll('.panel .body input, .panel .body .seg button')) el.disabled = false;
+      update();
+    }
+  };
+</script>
+</body>
+</html>

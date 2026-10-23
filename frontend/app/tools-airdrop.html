@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Airdrop · OAKEN</title>
+<meta name="description" content="Publish a list as a Merkle root and let people claim their own share.">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+<style>
+  .flow { display: grid; grid-template-columns: 1.1fr .9fr; gap: 26px; align-items: start; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; flex-wrap: wrap; }
+  .seg button { background: transparent; border: 0; color: var(--muted); font: 600 13.5px/1 "Segoe UI", system-ui, sans-serif;
+                padding: 11px 16px; cursor: pointer; }
+  .seg button.on { background: rgba(217,163,67,.12); color: var(--gold); }
+  textarea.i { width: 100%; min-height: 160px; background: var(--bark); border: 1px solid var(--line); border-radius: var(--r);
+               color: var(--parch); font: 13px/1.7 ui-monospace, Consolas, monospace; padding: 12px 14px; outline: none; resize: vertical; }
+  textarea.i:focus { border-color: var(--line-gold); }
+  .summary { background: var(--panel); border: 1px solid var(--line-gold); border-radius: var(--r); padding: 20px 22px; }
+  .summary b { color: var(--gold); }
+  @media (max-width: 940px) { .flow { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/seedfall.webp"><source src="/app/media/seedfall-head.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Airdrop</div>
+    <h1 class="reveal">Publish a list, let people take their own.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <p class="muted" style="margin-top:12px;max-width:64ch">You paste the list and deposit the tokens; the contract stores
+      a fingerprint of the list (a Merkle root) and nothing else. Recipients claim their own row — anyone can submit the
+      claim for them, so a project can pay the gas for people who have none. Whatever is unclaimed when the deadline
+      passes goes back to you.</p>
+
+    <div class="flow" style="margin-top:30px">
+      <div class="panel">
+        <div class="head"><h3>New campaign</h3><span class="steps-mini" style="margin-left:auto" id="modehint"></span></div>
+        <div class="body">
+          <label class="f">Chain</label>
+          <div class="seg" id="chainseg"><button type="button" class="on">Loading…</button></div>
+          <div class="hint" id="chainhint"></div>
+
+          <label class="f" for="token">Token to give away</label>
+          <input class="i" id="token" placeholder="0x… ERC-20" autocomplete="off">
+          <div class="hint" id="tokenmeta"></div>
+
+          <label class="f" for="list">The list</label>
+          <textarea class="i" id="list" spellcheck="false"
+            placeholder="0x1111…  100&#10;0x2222…  250&#10;# lines starting with # are ignored"></textarea>
+          <div class="hint" id="listhint">One per line: address then amount. The list itself never goes on chain — only its fingerprint does.</div>
+
+          <label class="f" for="deadline">Claim deadline (your local time)</label>
+          <input class="i" id="deadline" type="datetime-local">
+          <div class="hint">After this moment you can take back whatever nobody claimed. Until then nobody — including
+            you — can touch the rest.</div>
+
+          <div class="err hide" id="err"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="summary">
+          <div class="eyebrow" style="margin-bottom:12px">Before you sign</div>
+          <div id="sumtext" class="muted">Paste the list — the summary appears here, in one sentence.</div>
+        </div>
+        <div style="display:grid;gap:10px;margin-top:16px">
+          <button class="btn btn-p" id="go" style="width:100%" disabled>Connect a wallet</button>
+          <div class="hint" id="steps"></div>
+        </div>
+        <div class="panel hide" id="done" style="margin-top:16px">
+          <div class="head"><h3>Campaign live</h3></div>
+          <div class="body" id="donebody"></div>
+        </div>
+        <div class="panel" style="margin-top:16px">
+          <div class="head"><h3>The file your recipients need</h3></div>
+          <div class="body muted" style="font-size:13.5px">
+            The root commits to the list, but it cannot reproduce it — a hash is a fingerprint, not a dossier. So
+            creating a campaign writes a small JSON file: <b style="color:var(--parch)">publish it</b> (in your Discord,
+            on your site, anywhere your holders are). The claim page rebuilds the root from that file and refuses it if
+            it does not match the chain, so a wrong or edited copy cannot be used to claim.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="band" style="padding-top:44px">
+      <div class="eyebrow">Campaigns</div>
+      <h2 class="sec">Everything running right now.</h2>
+      <div style="display:flex;gap:12px;margin-top:20px;align-items:center;flex-wrap:wrap">
+        <div class="seg" id="cscope">
+          <button type="button" data-s="all" class="on">All</button>
+          <button type="button" data-s="mine">My campaigns</button>
+        </div>
+        <!-- 按状态看（清单 8.2）：领取中 / 已过期（还能领，创建者可取回）/ 已取回 -->
+        <div class="seg" id="cstate">
+          <button type="button" data-st="" class="on">Any state</button>
+          <button type="button" data-st="open">Claiming now</button>
+          <button type="button" data-st="past">Deadline passed</button>
+          <button type="button" data-st="swept">Swept</button>
+        </div>
+        <span class="hint" id="cscopehint" style="margin:0"></span>
+      </div>
+      <div class="panel" style="margin-top:12px">
+        <table class="list" id="tbl">
+          <thead><tr><th>#</th><th>Token</th><th>Chain</th><th>Pool</th><th>Claimed</th><th>Deadline</th><th></th></tr></thead>
+          <tbody><tr><td colspan="7" class="muted" style="padding:26px 14px">Reading…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="hint" id="note" style="margin-top:14px"></div>
+    </section>
+  </section>
+
+    <div class="panel" style="margin-top:16px"><div class="head"><h3>If it fails — self-check</h3></div>
+      <div class="body muted" style="font-size:13.5px">
+        <ul style="list-style:none;display:grid;gap:10px">
+          <li><b style="color:var(--parch)">Publish the claim file.</b> The chain stores only the Merkle root; without the file a claimant cannot build a proof. The download button gives you the exact file.</li>
+          <li><b style="color:var(--parch)">The root must match.</b> The page compares your file's root with the campaign's root and refuses a mismatch before anything is signed.</li>
+          <li><b style="color:var(--parch)">The claim goes to the address in the row</b>, not to whoever submits it. Anyone can pay the gas for someone else's row.</li>
+          <li><b style="color:var(--parch)">After the deadline</b> the creator can sweep only the unclaimed remainder; claims stop once it is swept.</li>
+        </ul>
+      </div>
+    </div>
+</main>
+
+<script src="/app/vendor/ethers.umd.min.js" defer></script>
+<script type="module">
+  import { shell, wallet, chains, currentChain, erc20, tokenMeta, fmtAmount, fmtDate, toast, explorer, reveal, onWallet,
+    safeRead, cachedRead, cacheDrop, rotateRpc, skeletonRows, emptyState, showReadFail, txNotice,
+    humanizeTxError, provider, raceTimeout, TOO_SLOW, stillReadingAfter, showChainSegFailed , mountDatePicker, onChainSwitch, chainNow, chainIcon} from '/app/oaken.js';
+  import { ADDR, contract, buildTree, parseList } from '/app/tools.js';
+  import { esc, shortAddr } from '/app/explore.js';
+
+  shell({ active: 'tools' });
+  // 英文 / 美式的时间选择器（原生 datetime-local 跟浏览器语言走，改不动）
+  mountDatePicker(document.getElementById('deadline'));
+
+  const $ = (id) => document.getElementById(id);
+  const state = { chain: null, token: null, tokenSymbol: '', tokenDecimals: 18, tokenBalance: null, addr: null, busy: false , campScope: 'all', campAcct: null, camps: [], campMetas: [], campState: '', campFailed: [], nowSec: null };
+
+  /* ── 链 ──────────────────────────────────────────────────────────── */
+  async function bootChains() {
+    const live = await chains();
+    if (!live.length) { showChainSegFailed('chainseg', 'chainhint', bootChains); return; }
+    state.chain = await currentChain();
+    chainNow(state.chain).then((t) => { state.nowSec = t; update(); }).catch(() => { /* 读不到就退回设备时钟 */ });
+    const seg = $('chainseg');
+    seg.innerHTML = live.map((c) => `<button type="button" data-id="${c.id}" class="${c.id === state.chain.id ? 'on' : ''}"><span class="chain-ico">${chainIcon(c.id, 13)}</span>${c.name}</button>`).join('');
+    $('chainhint').innerHTML = `The campaign lives on <b>${state.chain.name}</b>.`;
+    seg.onclick = async (ev) => {
+      const b = ev.target.closest('button'); if (!b) return;
+      const c = live.find((x) => x.id === Number(b.dataset.id));
+      if (!c || c.id === state.chain.id) return;
+      state.chain = c;
+      state.nowSec = null;
+      chainNow(c).then((t) => { state.nowSec = t; update(); }).catch(() => { /* 读不到就退回设备时钟 */ });
+      for (const x of seg.querySelectorAll('button')) x.classList.toggle('on', x === b);
+      $('chainhint').innerHTML = `The campaign lives on <b>${state.chain.name}</b>.`;
+      if (state.addr) { try { await wallet.ensureChain(c); } catch (e) { toast(String(e.message || e), 'bad'); } }
+      if (state.token) loadToken();
+      update(); loadCampaigns();
+    };
+    /* 2026-10-16：钱包自己换链（或用户在顶栏切的）→ **走同一个入口**点一下链选择器，
+       这一页就按新链重画 —— 不再整页 location.reload() 白闪那一下。 */
+    onChainSwitch((id) => { const b = seg.querySelector('button[data-id="' + id + '"]'); if (b) b.click(); });
+    loadCampaigns();
+    update();
+  }
+  bootChains();
+
+  /* ── 读代币 ──────────────────────────────────────────────────────── */
+  let tokenTimer = null;
+  $('token').addEventListener('input', () => { clearTimeout(tokenTimer); tokenTimer = setTimeout(loadToken, 420); });
+  async function loadToken() {
+    const value = $('token').value.trim();
+    state.token = null; state.tokenBalance = null;
+    $('tokenmeta').textContent = '';
+    if (!/^0x[0-9a-fA-F]{40}$/.test(value) || !state.chain) { update(); return; }
+    $('tokenmeta').textContent = 'Reading the token…';
+    try {
+      const R = { chain: state.chain, timeout: 10_000, retries: 1, label: 'token' };
+      /* 先看有没有代码 —— 免得"粘错链"被 tokenMeta 的兜底（TOKEN/18）说成读到了真币 */
+      const code = await safeRead(() => provider(state.chain).getCode(value), R);
+      if (!code || code === '0x') throw new Error('no code at this address');
+      const [symbol, decimals] = await safeRead(() => tokenMeta(value, state.chain), R);
+      state.token = value; state.tokenSymbol = symbol; state.tokenDecimals = decimals;
+      let bal = null;
+      if (state.addr) bal = await safeRead(() => erc20(state.chain, value).balanceOf(state.addr), R);
+      state.tokenBalance = bal;
+      $('tokenmeta').innerHTML = `<span class="pill ok">${symbol}</span><span>${decimals} decimals</span>`
+        + (bal !== null ? `<span>your balance: <b style="color:var(--parch)">${fmtAmount(bal, decimals)}</b></span>` : '');
+    } catch (e) {
+      if (/no code at this address/.test(String(e && e.message))) {
+        $('tokenmeta').innerHTML = '<span class="pill" style="color:var(--bad);border-color:rgba(224,120,95,.4)">not an ERC-20 at this address</span>';
+      } else {
+        showReadFail($('tokenmeta'), { what: 'that token', detail: (e && e.message) || '', chain: state.chain, onRetry: () => loadToken() });
+      }
+    }
+    update();
+  }
+
+  /* ── 钱包 ────────────────────────────────────────────────────────── */
+  /**
+   * ⚠ 参数是**事件送来的地址**（`onWallet('accounts', ...)` 的载荷）。
+   *
+   * 事件的回调里**不能再 `wallet.accounts()` 回查一次** —— 真钱包在授权那一刻、
+   * 假钱包在每次 `eth_accounts` 之后都会补发 `accountsChanged`，回查就是自己喂自己：
+   * 一圈圈跑下去（2026-10-15 实测：每秒 400 次 update()，gas 预估永远排不上队，
+   * 而控制台一条错都没有）。事件给了地址用地址；没有载荷（首次调用）才去问。
+   */
+  async function refreshWallet(addrFromEvent, fromEvent = false) {
+    const a = fromEvent ? (addrFromEvent || null) : ((await wallet.accounts())[0] || null);
+    state.addr = a;
+    if (state.token) loadToken();
+    update();
+  }
+  onWallet('accounts', (a) => refreshWallet(a, true));
+  refreshWallet();
+
+  /* ── 摘要 ────────────────────────────────────────────────────────── */
+  function parsed() {
+    return parseList($('list').value, state.token ? state.tokenDecimals : 18);
+  }
+  function update() {
+    const { rows, problems } = parsed();
+    const total = rows.reduce((s, r) => s + r.amount, 0n);
+    const deadline = $('deadline').value ? new Date($('deadline').value) : null;
+
+    const errs = [];
+    if (!state.chain) errs.push('Pick a chain first.');
+    if (!state.token) errs.push('Enter the token address.');
+    if (!rows.length) errs.push('Paste at least one recipient.');
+    if (problems.length) errs.push(problems[0]);
+    if (state.tokenBalance !== null && total > state.tokenBalance) errs.push('That is more than your token balance.');
+    if (!deadline || isNaN(deadline)) errs.push('Pick a claim deadline.');
+    else if (deadline.getTime() <= (state.nowSec ? state.nowSec * 1000 : Date.now()) + 60_000) errs.push('The deadline must be in the future.');
+
+    $('err').classList.toggle('hide', errs.length === 0);
+    { const errEl = $('err'); errEl.innerHTML = '';
+      for (const x of errs.slice(0, 3)) { const d = document.createElement('div'); d.textContent = x; errEl.appendChild(d); }
+      if (errs.length > 3) { const d = document.createElement('div'); d.textContent = `…and ${errs.length - 3} more`; errEl.appendChild(d); } }
+
+    if (rows.length && state.token) {
+      $('sumtext').className = '';
+      $('sumtext').innerHTML = `You are giving <b>${fmtAmount(total, state.tokenDecimals)} ${esc(state.tokenSymbol)}</b>
+        to <b>${rows.length}</b> address${rows.length === 1 ? '' : 'es'} on <b>${state.chain.name}</b>
+        ${deadline && !isNaN(deadline) ? `; unclaimed tokens come back to you after <b>${deadline.toISOString().slice(0, 16).replace('T', ' ')} UTC</b>` : ''}.
+        ${problems.length ? `<br><span style="color:var(--bad)">${problems.length} line${problems.length === 1 ? '' : 's'} need attention.</span>` : ''}`;
+    } else {
+      $('sumtext').className = 'muted';
+      $('sumtext').textContent = 'Paste the list — the summary appears here, in one sentence.';
+    }
+
+    const btn = $('go');
+    btn.disabled = state.busy || errs.length > 0;
+    btn.textContent = state.busy ? 'Working…' : (!state.addr ? 'Connect a wallet' : 'Fund the campaign');
+  }
+  for (const id of ['list', 'deadline']) $(id).addEventListener('input', update);
+
+  /* ── 创建 ────────────────────────────────────────────────────────── */
+  $('go').onclick = async () => {
+    const { rows, problems } = parsed();
+    if (problems.length || !rows.length) { toast(problems[0] || 'Nothing to publish', 'bad'); return; }
+    state.busy = true; update();
+    try {
+      if (!state.addr) { await wallet.connect(); await refreshWallet(); }
+      await wallet.ensureChain(state.chain);
+      const signer = await wallet.signer();
+      const store = contract(state.chain, 'airdrop', ADDR.airdrop, signer);
+
+      const { root } = buildTree(rows);
+      const total = rows.reduce((s, r) => s + r.amount, 0n);
+      const deadline = BigInt(Math.floor(new Date($('deadline').value).getTime() / 1000));
+
+      const allowed = await safeRead(() => erc20(state.chain, state.token).allowance(state.addr, ADDR.airdrop),
+        { chain: state.chain, timeout: 10_000, retries: 1, label: 'allowance' });
+      if (allowed < total) {
+        $('steps').textContent = 'Step 1 of 2 — approving the tokens…';
+        const an = txNotice(state.chain, 'Token approval');
+        const at = await erc20(state.chain, state.token, signer).approve(ADDR.airdrop, total, { gasLimit: 120_000n });
+        an.sent(at.hash);
+        await at.wait();
+        an.ok('Approval confirmed.');
+      }
+
+      $('steps').textContent = 'Step 2 of 2 — funding the campaign…';
+      const note = txNotice(state.chain, 'Campaign');
+      const tx = await store.createCampaign(state.token, root, total, deadline, { gasLimit: 700_000n });
+      note.sent(tx.hash);
+      const rc = await tx.wait();
+      let campaignId = null;
+      for (const log of rc.logs) {
+        try { const p = store.interface.parseLog(log); if (p?.name === 'CampaignCreated') { campaignId = Number(p.args.id); break; } } catch {}
+      }
+
+      // 那份领取文件：创建者必须自己发布出去，我们只在本地也留一份方便他再下载
+      const file = {
+        kind: 'oaken-airdrop', version: 1, chainId: state.chain.id, campaignId,
+        token: state.token, root,
+        entries: rows.map((r) => ({ account: r.account, amount: r.amount.toString() })),
+      };
+      try {
+        const key = `oaken.airdrop.${state.chain.id}.${campaignId}`;
+        localStorage.setItem(key, JSON.stringify(file));
+      } catch { /* 隐私模式写不进去就算了，下载那条路还在 */ }
+
+      const blobUrl = URL.createObjectURL(new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' }));
+      const name = `oaken-airdrop-${state.chain.id}-${campaignId}.json`;
+      $('done').classList.remove('hide');
+      $('donebody').innerHTML = `
+        <div style="display:grid;gap:10px">
+          <div>Campaign <b class="mono">#${campaignId ?? '?'}</b> is live on ${state.chain.name}.</div>
+          <div class="mono muted" style="font-size:12px;word-break:break-all">root ${esc(root)}</div>
+          <div class="mono muted" style="font-size:12px;word-break:break-all">tx ${tx.hash}</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+            <a class="btn btn-p" href="${blobUrl}" download="${name}">Download the claim file</a>
+            ${campaignId !== null ? `<a class="btn btn-s" href="/tools/airdrop/${state.chain.slug}/${campaignId}">Open the claim page →</a>` : ''}
+          </div>
+          <!-- Make this prominent: the claim file is the holder's only credential. -->
+          <div class="warnbox" style="margin-top:4px">
+            <b>Publish this file now.</b> Your holders cannot claim without it — post it in Discord, on your
+            site, anywhere they can reach it. This browser kept a copy too, but “this browser” is not a place
+            other people can reach.
+          </div>
+        </div>`;
+      cacheDrop();
+      note.ok('Campaign #' + (campaignId ?? '?') + ' funded on ' + state.chain.name + '.',
+        campaignId !== null ? [{ label: 'Open the claim page →', href: '/tools/airdrop/' + state.chain.slug + '/' + campaignId }] : []);
+      reveal();
+      loadCampaigns();
+    } catch (e) {
+      const msg = humanizeTxError(e, state.chain);
+      $('err').classList.remove('hide');
+      $('err').textContent = msg;
+      toast(String(msg).slice(0, 120), 'bad');
+    } finally {
+      state.busy = false;
+      $('steps').textContent = '';
+      update();
+    }
+  };
+
+  /* ── 列表 ────────────────────────────────────────────────────────── */
+  for (const b of document.querySelectorAll('#cstate button')) {
+    b.onclick = () => {
+      state.campState = b.dataset.st;
+      for (const x of document.querySelectorAll('#cstate button')) x.classList.toggle('on', x === b);
+      paintCampaigns();
+    };
+  }
+  for (const b of document.querySelectorAll('#cscope button')) {
+    b.onclick = async () => {
+      state.campScope = b.dataset.s;
+      for (const x of document.querySelectorAll('#cscope button')) x.classList.toggle('on', x === b);
+      if (state.campScope === 'mine' && !state.campAcct) state.campAcct = (await wallet.accounts())[0] || null;
+      paintCampaigns();
+    };
+  }
+  wallet.accounts().then(([a]) => { state.campAcct = a || null; if (state.campScope === 'mine') paintCampaigns(); });
+  onWallet('accounts', (a) => { state.campAcct = a || null; if (state.campScope === 'mine') paintCampaigns(); });
+
+  async function loadCampaigns() {
+    const tbody = document.querySelector('#tbl tbody');
+    const host = tbody.closest('.panel') || tbody;
+    /* 骨架屏 + "还在读"提示（3.5 秒后出现，带"立刻重试"）—— 用户不该对着骨架猜死活 */
+    tbody.innerHTML = skeletonRows(7, 3);
+    const stop = stillReadingAfter(host, 3500, { what: 'the campaigns', onRetry: () => { cacheDrop(); loadCampaigns(); } });
+    const live = await chains();
+
+    /**
+     * 每条链的读**并行**，每条各带 4 秒超时（+ 换端点重试一次），**外面再套 9 秒总闸**。
+     *
+     * 为什么（2026-10-15 实测）：公共 RPC"连上了但不回"时，每个读要走完
+     * 10 秒超时 + 10 秒重试，而原来是**逐链串行**——四条链 42 秒才给出可用状态，
+     * 用户看到的就是"Campaigns 卡在 Reading…"。并行 + 总闸之后最坏 ~9 秒。
+     */
+    const readChain = async (c) => {
+      const count = await safeRead(
+        () => cachedRead('airdrop.count.' + c.id, 45_000, async () => Number(await contract(c, 'airdrop', ADDR.airdrop).campaignCount())),
+        { chain: c, timeout: 4000, retries: 1, label: 'airdrop campaigns' },
+      );
+      if (!count) return { rows: [] };
+      const all = await safeRead(
+        () => cachedRead('airdrop.list.' + c.id, 45_000, () => contract(c, 'airdrop', ADDR.airdrop).allCampaigns()),
+        { chain: c, timeout: 4000, retries: 1, label: 'airdrop list' },
+      );
+      const rows = [];
+      for (let i = all.length - 1; i >= Math.max(0, all.length - 10); i--) rows.push({ c, id: i, camp: all[i] });
+      return { rows };
+    };
+
+    const results = await Promise.all(live.map(async (c) => {
+      const r = await Promise.race([
+        readChain(c).catch((e) => ({ failed: true, error: (e && e.message) || '' })),
+        raceTimeout(9000).then((s) => (s === TOO_SLOW ? { failed: true, slow: true } : s)),
+      ]);
+      return { c, ...(r || { failed: true }) };
+    }));
+    stop();
+
+    const rows = [];
+    const failed = [];
+    for (const r of results) { if (r.failed) failed.push(r.c); else for (const x of r.rows) rows.push(x); }
+    $('note').textContent = rows.length
+      ? 'Read from the contracts on every chain we are deployed to. “Claimed” is what has actually left the contract, not what the list says.'
+      : '';
+    // 每条读一次代币的符号/精度 —— 不读的话金额只能按 18 位显示，6 位的代币会差 10¹² 倍
+    const metas = await Promise.all(rows.map(({ c, camp }) => tokenMeta(camp.token, c).catch(() => ['TOKEN', 18])));
+    state.camps = rows; state.campMetas = metas;
+    state.campFailed = failed;
+    paintCampaigns();
+  }
+
+  /**
+   * "有链没读到"那一行 —— 画在表格尾部。**放在 paintCampaigns 里面**：
+   * 它是输出的一部分，单独 insert 会被下一次重画（切 All/My）擦掉。
+   */
+  function appendCampFail() {
+    const failed = state.campFailed || [];
+    if (!failed.length) return;
+    const tbody = document.querySelector('#tbl tbody');
+    tbody.insertAdjacentHTML('beforeend',
+      '<tr id="campfail"><td colspan="7" style="padding:14px">'
+      + '<div class="readfail"><b>Could not read the campaigns on ' + esc(failed.map((c) => c.name).join(', '))
+      + ' this time — please retry.</b> <button class="btn btn-s" type="button" id="campretry">Retry</button></div></td></tr>');
+    document.getElementById('campretry').onclick = async () => {
+      const b = document.getElementById('campretry');
+      b.disabled = true; b.textContent = 'Retrying…';
+      for (const c of failed) { try { await rotateRpc(c); } catch { /* 单端点链没什么可轮 */ } }
+      cacheDrop();
+      await loadCampaigns();
+    };
+  }
+
+  /**
+   * All | My campaigns（PinkSale 的 /airdrops/my 等价物）：判据就是行上的 `creator` 字段。
+   * 数据只加载一次，切换只重画 —— 不为了换个筛选再打一轮 RPC。
+   */
+  function paintCampaigns() {
+    const tbody = document.querySelector('#tbl tbody');
+    const hint = $('cscopehint');
+    let rows = state.camps, metas = state.campMetas;
+    if (state.campScope === 'mine') {
+      if (!state.campAcct) {
+        tbody.innerHTML = '<tr><td colspan="7" class="muted" style="padding:26px 14px">Connect a wallet to see the campaigns you created — or switch back to All.</td></tr>';
+        hint.textContent = '';
+        return;
+      }
+      const keep = [];
+      rows = rows.filter((r, i) => {
+        const hit = String(r.camp.creator).toLowerCase() === state.campAcct.toLowerCase();
+        if (hit) keep.push(metas[i]);
+        return hit;
+      });
+      metas = keep;
+      hint.innerHTML = rows.length ? 'Campaigns created by <span class="mono">' + shortAddr(state.campAcct) + '</span>.' : '';
+    } else hint.textContent = '';
+    /* 状态筛选：**日期按用户本机时钟现算**，和列表页"live/upcoming/ending"同一口径 */
+    if (state.campState) {
+      const keep = [];
+      rows = rows.filter((r, i) => {
+        const past = Number(r.camp.deadline) * 1000 < Date.now();
+        const hit = state.campState === 'swept' ? !!r.camp.swept
+          : state.campState === 'past' ? (past && !r.camp.swept)
+          : (!past && !r.camp.swept);
+        if (hit) keep.push(metas[i]);
+        return hit;
+      });
+      metas = keep;
+    }
+    if (!rows.length) {
+      const mine = state.campScope === 'mine';
+      const allFailed = !state.camps.length && state.campFailed.length;
+      const filtered = mine || state.campState || state.campFailed.length;
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:0">' + emptyState({
+        title: allFailed ? 'Could not read the campaigns.'
+          : filtered ? 'No campaigns match that view.' : 'No airdrop campaigns yet.',
+        body: allFailed ? 'Every chain we asked did not answer this time — retry below.'
+          : filtered ? 'Switch back to All · Any state to see everything.'
+          : 'Publish a list and your holders claim their own share.',
+        actions: filtered ? [] : [{ label: 'Create a campaign', href: '#', primary: true }],
+      }) + '</td></tr>';
+      appendCampFail();
+      /* 空状态里那颗"创建"按钮是锚点，不该跳走 —— 它把焦点送回表单 */
+      const a = tbody.querySelector('.empty-acts a');
+      if (a) a.onclick = (ev) => { ev.preventDefault(); $('list').focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+      return;
+    }
+    tbody.innerHTML = rows.map(({ c, id, camp }, i) => {
+      const [symbol, decimals] = metas[i];
+      const pct = Number(camp.total) > 0 ? Number(camp.claimed) * 100 / Number(camp.total) : 0;
+      return `<tr>
+        <td class="mono">#${id}</td>
+        <td>${esc(symbol)} <span class="mono muted" style="font-size:12px">${shortAddr(camp.token)}</span>
+          <div class="muted" style="font-size:12px;margin-top:4px">by ${shortAddr(camp.creator)}</div></td>
+        <td><span class="chip">${esc(c.name)}</span></td>
+        <td>${fmtAmount(camp.total, decimals, 2)} ${esc(symbol)}</td>
+        <td>${pct.toFixed(1)}%<div class="muted" style="font-size:12px">${camp.claimedRows} row${Number(camp.claimedRows) === 1 ? '' : 's'}</div></td>
+        <td>${camp.swept ? '<span class="pill">swept</span>' : `<span class="pill lock">${fmtDate(camp.deadline)}</span>`}
+          ${Number(camp.deadline) * 1000 < Date.now() && !camp.swept ? '<div class="muted" style="font-size:12px;margin-top:4px">claims still open · creator can sweep</div>' : ''}</td>
+        <td style="text-align:right"><a href="/tools/airdrop/${c.slug}/${id}">Open →</a></td>
+      </tr>`;
+    }).join('');
+    appendCampFail();
+  }
+</script>
+</body>
+</html>

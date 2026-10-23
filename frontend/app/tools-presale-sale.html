@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sale · OAKEN</title>
+<meta name="description" content="One sale: the price, the window, the caps, and what is left to do.">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below — '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead slim">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/balance.webp"><source src="/app/media/balance.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:44px">
+    <a class="muted" href="/tools/presale" style="font-size:13.5px">← Launched here</a>
+    <div id="head" style="margin-top:18px"><span class="muted skel">Reading the chain</span></div>
+    <div id="body"></div>
+  </section>
+</main>
+
+<script src="/app/vendor/ethers.umd.min.js" defer></script>
+<script type="module">
+  import { shell, wallet, chainBySlug, currentChain, erc20, fmtAmount, fmtDate, toast, explorerHref, reveal,
+    safeRead, showReadFail, txNotice, humanizeTxError , onChainSwitch} from '/app/oaken.js';
+  import { ADDR, contract } from '/app/tools.js';
+  import { esc, shortAddr, when } from '/app/explore.js';
+
+  shell({ active: 'tools' });
+
+    /* 2026-10-16：这一页的数据**不是按钱包那条链渲染的**（跨链读 / 由 URL 决定）——
+       钱包换链不改变这里的任何一块。登记一个空的处理器 = 换链时不整页重载（不白闪），
+       结果和以前重载完一模一样。没登记的页面仍走整页重载，见 oaken.js 的 onChainSwitch。 */
+    onChainSwitch(() => { /* 见上 */ });
+  const parts = location.pathname.split('/').filter(Boolean);   // ['tools','presale',slug,address]
+  const slug = parts[2] || '';
+  const address = parts[3] || '';
+  const state = { chain: null, sale: null, d: null, symbol: '', decimals: 18, addr: null, mine: 0n, claimed: false };
+
+  const kv = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
+
+  (async () => {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
+      document.getElementById('head').innerHTML = '<div class="eyebrow">Sale</div><h2 class="sec">That is not a sale address.</h2>';
+      return;
+    }
+    const chain = (await chainBySlug(slug)) || (await currentChain());
+    if (!chain) { document.getElementById('head').innerHTML = '<h2 class="sec">Could not load the chain list.</h2>'; return; }
+    state.chain = chain;
+    await load();
+    bootWallet();
+  })();
+
+  async function load() {
+    const c = state.chain;
+    const s = contract(c, 'presale', address);
+    let d;
+    try {
+      const [token, creator, startTime, endTime, soft, hard, minBuy, maxBuy, rate, router, lpbips] = await safeRead(() => Promise.all([
+        s.token(), s.creator(), s.startTime(), s.endTime(), s.softCap(), s.hardCap(),
+        s.minBuy(), s.maxBuy(), s.rate(), s.router(), s.liquidityBps(),
+      ]), { chain: c, timeout: 12_000, retries: 1, label: 'sale' });
+      const [raised, finalized, liquidityAdded, claimedTokens, status] = await safeRead(() => Promise.all([
+        s.raised(), s.finalized(), s.liquidityAdded(), s.claimedTokens(), s.status(),
+      ]), { chain: c, timeout: 12_000, retries: 1, label: 'sale' });
+      d = { token, creator, startTime, endTime, soft, hard, minBuy, maxBuy, rate, router, lpbips, raised, finalized, liquidityAdded, claimedTokens, status };
+    } catch (e) {
+      /**
+       * ⚠ 这一段以前**把两种失败说成一句**："Nothing at that address"。
+       * 一次 RPC 抖动就等于告诉创建者"你的盘子没了"。分开：读不到 → 统一那句 + 重试；
+       * 读到了但没有 token 字段 → 那才叫"这个地址不是我们的盘"。
+       */
+      document.getElementById('head').innerHTML = `
+        <div class="eyebrow">Sale</div><h2 class="sec">Could not read that sale on ${esc(c.name)}.</h2>`;
+      document.getElementById('body').innerHTML = '<div id="salefail" style="margin-top:16px;max-width:52ch"></div>';
+      showReadFail(document.getElementById('salefail'), {
+        what: 'that sale',
+        detail: (e && e.message) || '',
+        chain: c,
+        onRetry: () => location.reload(),
+      });
+      return;
+    }
+    if (!d.token || d.token === '0x0000000000000000000000000000000000000000') {
+      document.getElementById('head').innerHTML = `
+        <div class="eyebrow">Sale</div><h2 class="sec">Nothing at that address on ${esc(c.name)}.</h2>`;
+      document.getElementById('body').innerHTML = `<p class="muted" style="margin-top:14px">The RPC answered, and that address is not a sale this factory made. <a href="/tools/presale">See the ones that are →</a></p>`;
+      return;
+    }
+    state.d = d;
+    try {
+      const [symbol, decimals] = await Promise.all([erc20(c, d.token).symbol(), erc20(c, d.token).decimals()]);
+      state.symbol = symbol; state.decimals = Number(decimals);
+    } catch { state.symbol = 'TOKEN'; }
+    document.title = `${state.symbol} sale · OAKEN`;
+
+    if (state.addr) await loadMine();
+    paintHead();
+    paintBody();
+    reveal();
+  }
+
+  async function loadMine() {
+    const s = contract(state.chain, 'presale', address);
+    try {
+      const [contrib, claimed] = await Promise.all([s.contribution(state.addr), s.claimed(state.addr)]);
+      state.mine = BigInt(contrib); state.claimed = claimed;
+    } catch { /* 读不到就当没买过，不让它拦住整页 */ }
+  }
+
+  const unit = () => state.chain?.native || 'ETH';
+  /**
+   * The chain decides whether the window is open — not the visitor's device clock.
+   * `status()` is already read from the contract (upcoming / live / failed /
+   * "ended, awaiting finalize" / finalized); a laptop clock a few days off used to
+   * hide Finalize and Refund on a sale the chain had already closed.
+   */
+  const past = () => ['failed', 'ended, awaiting finalize', 'finalized'].includes(state.d.status);
+  const failed = () => state.d.status === 'failed';
+  const succeeded = () => past() && BigInt(state.d.raised) >= BigInt(state.d.soft);
+
+  function paintHead() {
+    // ⚠ 没有这盘预售时 state.d 是 null —— 而 bootWallet() 会无条件重画一次，
+    //   不挡住就是一句 "Cannot read properties of null"（页面文案是对的，控制台是红的）。
+    if (!state.d) return;
+    const d = state.d;
+    const pct = Number(d.hard) > 0 ? Number(d.raised) * 100 / Number(d.hard) : 0;
+    const softPct = Number(d.hard) > 0 ? Number(d.soft) * 100 / Number(d.hard) : 0;
+    const pill = d.status === 'live' ? '<span class="pill lock"><span class="dot"></span>live</span>'
+      : d.status === 'upcoming' ? '<span class="pill">opens ' + esc(when(d.startTime)) + '</span>'
+      : d.status === 'failed' ? '<span class="pill" style="color:var(--bad);border-color:rgba(224,120,95,.4)">soft cap missed</span>'
+      : d.status === 'finalized' ? '<span class="pill ok">finalized</span>'
+      : '<span class="pill">ended · awaiting finalize</span>';
+    document.getElementById('head').innerHTML = `
+      <div class="eyebrow">Sale · read live from ${esc(state.chain.name)}</div>
+      <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+        <span class="tile lg">${esc((state.symbol || '?').slice(0, 2).toUpperCase())}</span>
+        <div>
+          <h2 class="sec" style="margin:0">${esc(state.symbol)} sale</h2>
+          <div class="muted" style="margin-top:6px;font-size:14px">
+            ${fmtAmount(d.rate, state.decimals, 4)} ${esc(state.symbol)} per 1 ${esc(unit())}
+            · by <span class="mono">${shortAddr(d.creator)}</span></div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
+          <span class="chip">${esc(state.chain.name)}</span>${pill}
+        </div>
+      </div>
+      <div class="bar" style="margin-top:22px;position:relative">
+        <i class="${pct >= 100 ? 'ok' : ''}" style="width:${Math.min(100, pct).toFixed(1)}%"></i>
+      </div>
+      <div style="position:relative;height:0">
+        <span title="soft cap" style="position:absolute;left:${Math.min(100, softPct).toFixed(1)}%;top:-10px;width:2px;height:12px;background:var(--muted)"></span>
+      </div>
+      <div class="raise">
+        <span><b>${fmtAmount(d.raised, 18, 4)} ${esc(unit())}</b> raised (${pct.toFixed(1)}% of the hard cap)</span>
+        <span>soft ${fmtAmount(d.soft, 18, 4)} · hard ${fmtAmount(d.hard, 18, 4)} ${esc(unit())}</span>
+      </div>`;
+  }
+
+  function paintBody() {
+    // ⚠ 没有这盘预售时 state.d 是 null —— 而 bootWallet() 会无条件重画一次，
+    //   不挡住就是一句 "Cannot read properties of null"（页面文案是对的，控制台是红的）。
+    if (!state.d) return;
+    const d = state.d;
+    document.getElementById('body').innerHTML = `
+      <div class="dossier">
+        <div class="stack">
+          <div class="panel reveal" id="action"></div>
+          <div class="panel reveal">
+            <div class="head"><h3>What the contract will do</h3></div>
+            <div class="body">
+              <dl class="kv">
+                ${kv('Window', `${fmtDate(d.startTime)} → ${fmtDate(d.endTime)}${past() ? ' <span class="muted">(closed)</span>' : ''}`)}
+                ${kv('Per wallet', `${fmtAmount(d.minBuy, 18, 4)} – ${fmtAmount(d.maxBuy, 18, 4)} ${esc(unit())}`)}
+                ${kv('If it misses the soft cap', '<span class="muted">every contribution is refundable, by the buyer, forever after the window</span>')}
+                ${kv('If it makes it', d.router === '0x0000000000000000000000000000000000000000'
+                  ? `<span class="muted">the whole raise goes to <span class="mono">${shortAddr(d.creator)}</span> at finalize</span>`
+                  : `<span class="muted">${(Number(d.lpbips) / 100).toFixed(0)}% of the raise is paired with tokens at the sale price through <span class="mono">${shortAddr(d.router)}</span>; the LP tokens go to the creator, the rest of the raise too</span>`)}
+                ${kv('Tokens', `<span class="mono muted" style="font-size:12px">${esc(shortAddr(d.token))}</span>
+                   ${explorerHref('/token/' + d.token, state.chain) ? `<a class="mono" style="font-size:12px" target="_blank" rel="noopener"
+                     href="${explorerHref('/token/' + d.token, state.chain)}">explorer ↗</a>` : ''}`)}
+              </dl>
+            </div>
+          </div>
+        </div>
+        <div class="side">
+          <div class="panel reveal">
+            <div class="head"><h3>On chain</h3></div>
+            <div class="body">
+              <dl class="kv" style="grid-template-columns:110px 1fr">
+                ${kv('Sale', `<span class="mono" style="font-size:11.5px;word-break:break-all">${esc(address)}</span>`)}
+                ${kv('Factory', `<span class="mono" style="font-size:11.5px;word-break:break-all">${esc(ADDR.presaleFactory)}</span>`)}
+              </dl>
+              <p class="hint" style="margin-top:12px">Finalizing is permissionless: once the window closes and the soft cap is met, <b>anyone</b> can push the money to where the sale said it goes. The creator cannot delay it, and buyers can claim their tokens as soon as it is done.</p>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    paintAction();
+  }
+
+  function paintAction() {
+    // ⚠ 没有这盘预售时 state.d 是 null —— 而 bootWallet() 会无条件重画一次，
+    //   不挡住就是一句 "Cannot read properties of null"（页面文案是对的，控制台是红的）。
+    if (!state.d) return;
+    const d = state.d;
+    const box = document.getElementById('action');
+    const rows = [];
+    const unitSym = unit();
+
+    // ① 买
+    if (d.status === 'live' || d.status === 'upcoming') {
+      rows.push(`
+        <div class="head"><h3>Buy</h3><span class="muted" style="margin-left:auto;font-size:12.5px">at ${fmtAmount(d.rate, state.decimals, 4)} ${esc(state.symbol)} / ${esc(unitSym)}</span></div>
+        <div class="body">
+          <label class="f" for="buy">Amount (${esc(unitSym)})</label>
+          <input class="i" id="buy" placeholder="0.0" inputmode="decimal" autocomplete="off">
+          <div class="hint" id="buyhint"></div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap">
+            <button class="btn btn-p" id="dobuy" disabled>${d.status === 'upcoming' ? 'Not open yet' : 'Connect a wallet'}</button>
+            <span class="muted" id="buymine"></span>
+          </div>
+        </div>`);
+    }
+
+    // ② 领：finalize 之后
+    if (d.finalized && state.mine > 0n) {
+      const tokens = (state.mine * BigInt(d.rate)) / 10n ** 18n;
+      rows.push(`
+        <div class="head"><h3>Your tokens</h3></div>
+        <div class="body">
+          <div class="muted" style="font-size:14px">You contributed <b style="color:var(--parch)">${fmtAmount(state.mine, 18, 4)} ${esc(unitSym)}</b>, which buys <b style="color:var(--gold)">${fmtAmount(tokens, state.decimals, 4)} ${esc(state.symbol)}</b>.</div>
+          <button class="btn ${state.claimed ? 'btn-g' : 'btn-p'}" id="doclaim" style="margin-top:14px" ${state.claimed ? 'disabled' : ''}>
+            ${state.claimed ? 'Already claimed' : 'Claim the tokens'}</button>
+        </div>`);
+    }
+
+    // ③ 退款：没达标
+    if (failed() && state.mine > 0n) {
+      rows.push(`
+        <div class="head"><h3>Refund</h3></div>
+        <div class="body">
+          <div class="muted" style="font-size:14px">The sale closed at
+            <b style="color:var(--parch)">${fmtAmount(d.raised, 18, 4)} ${esc(unitSym)}</b>, under its soft cap of
+            ${fmtAmount(d.soft, 18, 4)}. Your ${fmtAmount(state.mine, 18, 4)} ${esc(unitSym)} is yours to take back — the creator cannot keep it.</div>
+          <button class="btn btn-p" id="dorefund" style="margin-top:14px">Get my contribution back</button>
+        </div>`);
+    }
+
+    // ④ finalize：过了窗口、达标、还没收尾
+    if (succeeded() && !d.finalized) {
+      rows.push(`
+        <div class="head"><h3>Finalize</h3></div>
+        <div class="body">
+          <div class="muted" style="font-size:14px">The window is closed and the soft cap was met, so this can be pushed over the line by anyone: the raise ${d.router === '0x0000000000000000000000000000000000000000'
+              ? `goes to the creator` : `is split — part into the pool, the rest to the creator`}, and buyers can then claim.</div>
+          <button class="btn btn-p" id="dofinalize" style="margin-top:14px">Finalize the sale</button>
+        </div>`);
+    }
+
+    // ⑤ 未售出的代币：只有创建者
+    const isCreator = state.addr && state.addr.toLowerCase() === d.creator.toLowerCase();
+    if (isCreator && (d.finalized || failed())) {
+      rows.push(`
+        <div class="head"><h3>Your unsold tokens</h3></div>
+        <div class="body">
+          <div class="muted" style="font-size:14px">${d.finalized
+            ? 'The tokens nobody bought can be withdrawn now — what buyers can still claim stays behind.'
+            : 'The sale did not go ahead, so all the tokens come back to you.'}</div>
+          <button class="btn btn-s" id="dounsold" style="margin-top:14px">Withdraw the unsold tokens</button>
+        </div>`);
+    }
+
+    if (!rows.length) {
+      rows.push(`<div class="head"><h3>${d.finalized ? 'This sale is done' : 'Nothing to do right now'}</h3></div>
+        <div class="body muted" style="font-size:14px">${d.finalized
+          ? 'The raise has moved and buyers can claim their tokens. The page stays up because the numbers on it are read from the chain and will keep being true.'
+          : past() ? 'The window is closed and this page is waiting on finalize.' : 'The sale has not opened yet.'}</div>`);
+    }
+
+    box.innerHTML = rows.join('');
+    wire();
+  }
+
+  function wire() {
+    const d = state.d;
+
+    /* 五个动作一个形状：连钱包 → 发交易 → 等上块 → 重画。
+       全部走**同一条全局交易通知**（Pending 带浏览器链接 → Success / Fail）。
+       ⚠ `act` 必须在 wire() 顶层：它原先写在 `if (buyInput)` 里面，而买入面板只在
+       live/upcoming 时存在 —— 窗口一关，Claim / Refund / Finalize / Withdraw 的
+       onclick 全都指向一个不在作用域里的 `act`（ReferenceError，按钮点了没反应）。 */
+    async function act(label, build) {
+      const note = txNotice(state.chain, label);
+      try {
+        await wallet.connect(state.chain);
+        await wallet.ensureChain(state.chain);
+        const s = contract(state.chain, 'presale', address, await wallet.signer());
+        const tx = await build(s);
+        note.sent(tx.hash);
+        await tx.wait();
+        note.ok(label + ' confirmed.');
+        await load(); paintAction(); paintHead();
+      } catch (e) {
+        note.fail(humanizeTxError(e, state.chain));
+      }
+    }
+
+    const buyInput = document.getElementById('buy');
+    const dobuy = document.getElementById('dobuy');
+    if (buyInput) {
+      const paint = () => {
+        const v = buyInput.value.trim();
+        let amount = 0n;
+        try { amount = v ? window.ethers.parseUnits(v, 18) : 0n; } catch { amount = 0n; }
+        const tokens = (amount * BigInt(d.rate)) / 10n ** 18n;
+        const remaining = BigInt(d.hard) - BigInt(d.raised);
+        const mineAfter = state.mine + amount;
+        const problems = [];
+        if (amount > 0n && amount < BigInt(d.minBuy)) problems.push(`minimum is ${fmtAmount(d.minBuy, 18, 4)}`);
+        if (mineAfter > BigInt(d.maxBuy)) problems.push(`that would take you past the ${fmtAmount(d.maxBuy, 18, 4)} per-wallet cap`);
+        if (amount > remaining) problems.push(`only ${fmtAmount(remaining, 18, 4)} ${unit()} left before the hard cap`);
+        document.getElementById('buyhint').innerHTML = amount > 0n
+          ? `Buys <b style="color:var(--parch)">${fmtAmount(tokens, state.decimals, 4)} ${esc(state.symbol)}</b>${problems.length ? ` · <span style="color:var(--bad)">${problems[0]}</span>` : ''}`
+          : `Between ${fmtAmount(d.minBuy, 18, 4)} and ${fmtAmount(d.maxBuy, 18, 4)} ${esc(unit())} per wallet.`;
+        document.getElementById('buymine').innerHTML = state.mine > 0n
+          ? `you have ${fmtAmount(state.mine, 18, 4)} ${esc(unit())} in` : '';
+        dobuy.disabled = !state.addr || amount === 0n || problems.length > 0 || d.status !== 'live';
+        dobuy.textContent = !state.addr ? 'Connect a wallet' : d.status !== 'live' ? 'Not open yet' : `Buy ${v || ''} ${unit()}`.trim();
+      };
+      buyInput.addEventListener('input', paint);
+      paint();
+
+      dobuy.onclick = () => {
+        const amount = window.ethers.parseUnits(buyInput.value.trim(), 18);
+        return act('Buy', (s) => s.buy({ value: amount, gasLimit: 400_000n }));
+      };
+    }
+
+    const claim = document.getElementById('doclaim');
+    if (claim) claim.onclick = () => act('Claim', (s) => s.claim({ gasLimit: 400000n }));
+
+    const refund = document.getElementById('dorefund');
+    if (refund) refund.onclick = () => act('Refund', (s) => s.refund({ gasLimit: 300000n }));
+
+    const fin = document.getElementById('dofinalize');
+    if (fin) fin.onclick = () => act('Finalize', (s) => s.finalize({ gasLimit: 1200000n }));
+
+    const un = document.getElementById('dounsold');
+    if (un) un.onclick = () => act('Withdraw unsold', (s) => s.withdrawUnsold({ gasLimit: 300000n }));
+  }
+
+  async function bootWallet() {
+    const [a] = await wallet.accounts();
+    state.addr = a || null;
+    if (state.addr) await loadMine();
+    paintHead();
+    paintBody();
+    // ⚠ 面板是这一趟**重画**出来的，`load()` 里那次 reveal() 扫的是上一批节点 ——
+    //   不补这一下，连上钱包之后整页停在 opacity:0（[[automation-scroll-misses-reveals]]）。
+    reveal();
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terms &amp; Risk · OAKEN</title>
+<meta name="description" content="OAKEN terms of use and risk disclosure: non-custodial software, no warranty, no audit claim, irreversible transactions, third-party launchpad risk and limitation of liability.">
+<meta property="og:title" content="Terms &amp; Risk — OAKEN">
+<meta property="og:description" content="Plain-English terms and risk disclosure for a non-custodial lock and launch service. No warranty, no audit claim, irreversible transactions.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://oaken.one/terms">
+<meta property="og:image" content="https://oaken.one/logo512.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/key.webp"><source src="/app/media/key.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Terms &amp; Risk</div>
+    <h1 class="reveal">Software, not a promise.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <div class="panel reveal">
+      <div class="head"><h3>Before you read further</h3></div>
+      <div class="body">
+        <p class="muted" style="font-size:14.5px">This page is a plain-English statement of the terms and the
+          risks. It is not legal advice, and it does not create a lawyer-client relationship. If you need legal
+          certainty, consult a qualified lawyer in your jurisdiction. By using the site or the contracts, you
+          accept the terms below.</p>
+        <p class="muted" style="font-size:14.5px;margin-top:12px">OAKEN is non-custodial software. We never hold
+          your keys, your tokens or your funds. Every transaction is signed by your wallet and executed by a
+          public smart contract.</p>
+      </div>
+    </div>
+
+    <div class="grid2" data-stagger style="margin-top:26px">
+      <div class="panel">
+        <div class="head"><h3>1 · What OAKEN is</h3></div>
+        <div class="body">
+          <p class="muted" style="font-size:14.5px">OAKEN is a set of public smart contracts and a website that
+            reads them. The lock, launch and tool contracts have no owner, no upgrade path and no admin key.
+            The Bonds contracts have a disclosed admin (a 2-of-3 Safe behind a 24h Timelock). The website is a
+            reader and an interface; it is not the vault and is not required for a lock to release.</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="head"><h3>2 · Eligibility and compliance</h3></div>
+        <div class="body">
+          <p class="muted" style="font-size:14.5px">You must be legally able to enter into these terms in your
+            jurisdiction and must not be subject to sanctions that prohibit your use of the service. You are
+            responsible for complying with the laws that apply to you, including tax, securities, sanctions and
+            anti-money-laundering laws. Do not use OAKEN where doing so would be unlawful.</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="head"><h3>3 · No custody, no fiduciary duty</h3></div>
+        <div class="body">
+          <p class="muted" style="font-size:14.5px">We do not custody assets and do not control your wallet.
+            We owe you no fiduciary, advisory or brokerage duty. Nothing on this site is investment, legal,
+            tax or financial advice. You are solely responsible for the transactions you sign.</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="head"><h3>4 · No warranty, no audit claim</h3></div>
+        <div class="body">
+          <p class="muted" style="font-size:14.5px">The software is provided “as is” and “as available”, without
+            warranties of any kind, express or implied, including fitness for a particular purpose and
+            non-infringement. <b>We claim no audit.</b> “Source verified” means the published source compiles to
+            the deployed bytecode; it is not a security review. Smart contracts can contain bugs; you use them
+            at your own risk.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band ambient">
+    <div class="wrap">
+      <div class="reveal"><div class="eyebrow">RISK DISCLOSURE</div>
+        <h2 class="sec">What can go wrong.</h2><div class="sec-rule"></div></div>
+      <div class="panel reveal" style="margin-top:26px"><div class="body">
+        <ul style="list-style:none;display:grid;gap:14px;color:var(--muted);font-size:14.5px">
+          <li><b style="color:var(--parch)">Smart-contract risk.</b> A bug, an unexpected token behaviour or a
+            chain-level failure can cause a transaction to revert or behave differently from the description.
+            The contracts are short and public, but they are not guaranteed to be free of defects.</li>
+          <li><b style="color:var(--parch)">Irreversibility.</b> Blockchains do not reverse transactions. A lock,
+            a launch, a transfer or a renounce is final. We cannot recover tokens sent to the wrong address,
+            locked with the wrong beneficiary, or locked into a schedule you later regret.</li>
+          <li><b style="color:var(--parch)">Token risk.</b> Fee-on-transfer, rebase, blacklist, pause and
+            max-transaction tokens can make a lock hold a different amount than expected, or block a transfer
+            entirely. Exclude the adapter and the vault from fees and limits before locking. Do not lock rebase
+            tokens here.</li>
+          <li><b style="color:var(--parch)">Market and liquidity risk.</b> A lock does not make a token valuable
+            or liquid. Prices can go to zero. A locked position can be worth less than when it was locked.</li>
+          <li><b style="color:var(--parch)">Third-party risk.</b> Pons, Flap, Genius, Clanker and four.meme are
+            independent services with their own contracts, backends and upgrade rights. Their rules, fees and
+            hooks can change. A third-party launch is not covered by OAKEN's “no owner” statement.</li>
+          <li><b style="color:var(--parch)">Bonds risk.</b> aOAKEN is a separate product with an admin (2-of-3
+            Safe + 24h Timelock). Redemptions depend on vault reserves and can be limited by them. There is no
+            external yield promise, no aOAKEN market on this site, and OAKEN emissions are not a dollar yield.</li>
+          <li><b style="color:var(--parch)">Off-chain metadata.</b> Token images for our own factory are stored
+            off-chain. If that host is unavailable, the image may disappear while the token remains on chain.</li>
+          <li><b style="color:var(--parch)">Regulatory risk.</b> The legal treatment of tokens, locks and sales
+            varies by jurisdiction and can change. You are responsible for your own compliance.</li>
+        </ul>
+      </div></div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="grid2" data-stagger>
+        <div class="panel">
+          <div class="head"><h3>5 · Third-party services and links</h3></div>
+          <div class="body">
+            <p class="muted" style="font-size:14.5px">The site links to block explorers, Sourcify, X, RPC
+              providers, WalletConnect relays and third-party launchpads. Those services are not under our
+              control and have their own terms and privacy practices. We are not responsible for their
+              availability, accuracy, security or conduct.</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="head"><h3>6 · Fees</h3></div>
+          <div class="body">
+            <p class="muted" style="font-size:14.5px">OAKEN charges no protocol fee on locks or on our own
+              factory: you pay the network gas. Third-party launchpads charge their own fees, shown before you
+              sign. Bonds charge a 0.10% redemption fee that goes to stakers. The website does not take custody
+              of any of these amounts.</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="head"><h3>7 · Prohibited use</h3></div>
+          <div class="body">
+            <p class="muted" style="font-size:14.5px">Do not use OAKEN to violate sanctions, launder money,
+              defraud anyone, or infringe the rights of others. Do not attempt to disrupt the site, the RPC
+              providers or other users. You are responsible for the tokens and sales you create.</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="head"><h3>8 · Limitation of liability</h3></div>
+          <div class="body">
+            <p class="muted" style="font-size:14.5px">To the maximum extent permitted by law, the operators of
+              OAKEN are not liable for any indirect, incidental, special, consequential or punitive damages, or
+              for any loss of tokens, profits, data or opportunity, arising from your use of the software or
+              the site. Your sole remedy is to stop using them.</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="head"><h3>9 · Changes</h3></div>
+          <div class="body">
+            <p class="muted" style="font-size:14.5px">We may update these terms as the software changes. The
+              version published on this page is the current one. Continued use after a change means you accept
+              the updated terms.</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="head"><h3>10 · Contact</h3></div>
+          <div class="body">
+            <p class="muted" style="font-size:14.5px">Questions about these terms: reach us on X at
+              <a href="https://x.com/oakenhood" target="_blank" rel="noopener">@oakenhood</a>. That is the only
+              official channel.</p>
+            <p style="margin-top:14px"><a class="btn btn-s" href="/privacy">Privacy →</a>
+              <a class="btn btn-s" href="/verify">How to verify →</a></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+  import { shell, reveal } from '/app/oaken.js';
+  shell();
+  reveal();
+</script>
+</body>
+</html>

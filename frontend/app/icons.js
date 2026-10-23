@@ -1,0 +1,47 @@
+// OAKEN 的图标 —— 一套**同一网格同一笔画**的线性图标（24×24、stroke 1.6、圆端）。
+//
+// 为什么要自己画：上一版是把源站那套七拼八凑的图标拿来用（粗细、圆角、留白各不一样），
+// owner 一眼就说"很难看"。这一套全部落在同一个 24 网格上，视觉重量一致：
+// 同样的描边宽度、同样的圆角、同样的光学留白。
+export const ICONS = {
+  home: '<path d="M3.5 10.6 12 3.6l8.5 7"/><path d="M5.8 9.8V20a.8.8 0 0 0 .8.8h10.8a.8.8 0 0 0 .8-.8V9.8"/><path d="M10 20.8v-5.4h4v5.4"/>',
+  lock: '<rect x="4.6" y="10.4" width="14.8" height="10" rx="1.8"/><path d="M8.2 10.4V7.6a3.8 3.8 0 0 1 7.6 0v2.8"/><circle cx="12" cy="15.4" r="1.5"/><path d="M12 16.9v2.2"/>',
+  unlock: '<rect x="4.6" y="10.4" width="14.8" height="10" rx="1.8"/><path d="M8.2 10.4V7.6a3.8 3.8 0 0 1 7.2-1.6"/>',
+  plus: '<circle cx="12" cy="12" r="8.4"/><path d="M12 8.2v7.6M8.2 12h7.6"/>',
+  board: '<rect x="3.6" y="4.4" width="16.8" height="15.2" rx="1.8"/><path d="M7.4 9h9M7.4 12.4h9M7.4 15.8h5.4"/>',
+  arrow: '<path d="M4.6 12h14.2M13.4 6.6 18.8 12l-5.4 5.4"/>',
+  external: '<path d="M14 4.6h5.4V10"/><path d="M19.4 4.6 11 13"/><path d="M18 14.2v4.4a.8.8 0 0 1-.8.8H5.4a.8.8 0 0 1-.8-.8V6.8a.8.8 0 0 1 .8-.8h4.4"/>',
+  wallet: '<path d="M3.8 7.6a2 2 0 0 1 2-2h10.4"/><rect x="3.8" y="7.6" width="16.4" height="12" rx="2"/><path d="M16 13.6h1.6"/>',
+  check: '<path d="M4.8 12.6 9.6 17.4 19.2 6.8"/>',
+  copy: '<rect x="8.6" y="8.6" width="11" height="11" rx="1.8"/><path d="M15.4 5.4a1.8 1.8 0 0 0-1.8-1.8H5.4a1.8 1.8 0 0 0-1.8 1.8v8.2a1.8 1.8 0 0 0 1.8 1.8"/>',
+  chevron: '<path d="M6.4 9.6 12 15.2l5.6-5.6"/>',
+  clock: '<circle cx="12" cy="12" r="8.4"/><path d="M12 7.4V12l3.2 2"/>',
+  shield: '<path d="M12 3.6 19 6v6c0 4.2-2.9 7.3-7 8.4-4.1-1.1-7-4.2-7-8.4V6l7-2.4Z"/><path d="M9 12.2l2.2 2.2 4-4.4"/>',
+  x: '<path fill="currentColor" stroke="none" d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-4.9-6.4L6.4 22H3.2l7.3-8.3L1.2 2h6.4l4.4 5.8L18.9 2Zm-1.1 18h1.7L7.2 3.8H5.4L17.8 20Z"/>',
+  alert: '<path d="M12 4.4 21 19.6H3L12 4.4Z"/><path d="M12 10v4M12 16.8v.2"/>',
+  spark: '<path d="M12 3.6v4M12 16.4v4M3.6 12h4M16.4 12h4M6.2 6.2l2.8 2.8M15 15l2.8 2.8M17.8 6.2 15 9M9 15l-2.8 2.8"/>',
+  rocket: '<path d="M12 3.2c2.8 1.6 4.4 4.6 4.4 8.2 0 1.6-.3 3.1-.8 4.4H8.4c-.5-1.3-.8-2.8-.8-4.4 0-3.6 1.6-6.6 4.4-8.2Z"/><circle cx="12" cy="10" r="1.8"/><path d="M7.6 12.6 5 15v2.6l2.6-.9M16.4 12.6 19 15v2.6l-2.6-.9"/><path d="M10.6 18.6h2.8M11.2 21h1.6"/>',
+  pulse: '<path d="M3.6 12.6h4.2l2.2-6 3.4 10.4 2-4.4h5"/>',
+  trophy: '<path d="M8 4.6h8v4.4a4 4 0 0 1-8 0V4.6Z"/><path d="M8 5.8H5.4v1.4a3 3 0 0 0 3 3M16 5.8h2.6v1.4a3 3 0 0 1-3 3"/><path d="M12 13v3.2M10 16.2h4v3.4h-4z"/><path d="M8.6 19.6h6.8"/>',
+  user: '<circle cx="12" cy="8.4" r="3.4"/><path d="M5.2 19.8a6.8 6.8 0 0 1 13.6 0"/>',
+  search: '<circle cx="10.8" cy="10.8" r="6"/><path d="M15.3 15.3 20 20"/>',
+  globe: '<circle cx="12" cy="12" r="8.4"/><path d="M3.6 12h16.8"/><path d="M12 3.6c2.2 2.3 3.4 5.2 3.4 8.4s-1.2 6.1-3.4 8.4c-2.2-2.3-3.4-5.2-3.4-8.4s1.2-6.1 3.4-8.4Z"/>',
+  /* 二维码：连接面板里 WalletConnect 那一行的图标（三缺一 + 点阵，一眼认得出是"扫"） */
+  qr: '<rect x="3.8" y="3.8" width="6.6" height="6.6" rx="1.2"/><rect x="13.6" y="3.8" width="6.6" height="6.6" rx="1.2"/><rect x="3.8" y="13.6" width="6.6" height="6.6" rx="1.2"/><path d="M13.6 13.6h2.6v2.6h-2.6z"/><path d="M17.6 17.6h2.6v2.6h-2.6z"/><path d="M13.6 19.6h1.6M19.6 13.6v1.6"/>',
+  /* Chain marks — same 24 grid and stroke as the rest. Simple silhouettes,
+     not official logos: recognisable at 13px next to a chain name. */
+  chainRobinhood: '<path d="M4.6 19.8 18.8 5.6"/><path d="M12.6 5.2h6.6v6.6"/><path d="M4.6 19.8l1.4-5.2 3.8 3.8-5.2 1.4Z"/>',
+  chainBnb: '<path d="M12 3 15.2 6.2 12 9.4 8.8 6.2 12 3Z"/><path d="M12 14.6 15.2 17.8 12 21 8.8 17.8 12 14.6Z"/><path d="M5.9 8.8 9.1 12 5.9 15.2 2.7 12 5.9 8.8Z"/><path d="M18.1 8.8 21.3 12 18.1 15.2 14.9 12 18.1 8.8Z"/>',
+  chainBase: '<circle cx="12" cy="12" r="8.4"/><path d="M5.6 13.3h12.8"/><path d="M8.4 16.2h7.2"/>',
+  chainPolygon: '<path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6L12 3.2Z"/><path d="M12 7.2 15.9 9.4v4.4L12 16l-3.9-2.2V9.4L12 7.2Z"/>',
+  chainSolana: '<path d="M7.2 4.8h11.6l-3.1 3.2H4.1L7.2 4.8Z"/><path d="M3.6 10.4h11.6l3.6 3.2H7.2l-3.6-3.2Z"/><path d="M7.2 16h11.6l-3.1 3.2H4.1L7.2 16Z"/>',
+  chainHardhat: '<path d="M4 17.6h16"/><path d="M6.4 17.6v-4.2a5.6 5.6 0 0 1 11.2 0v4.2"/><path d="M9.4 8.4V6.9a1.3 1.3 0 0 1 1.3-1.3h2.6a1.3 1.3 0 0 1 1.3 1.3v1.5"/>',
+};
+
+/** 返回一段可以塞进 innerHTML 的 <svg>。 */
+export function icon(name, size = 18) {
+  const body = ICONS[name];
+  if (!body) return '';
+  return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor"`
+    + ` stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+}

@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sale · OAKEN</title>
+<meta name="description" content="One token sale: target, schedule, rate, and where the proceeds are meant to go.">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below — '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead slim">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/chest.webp"><source src="/app/media/chest.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:44px">
+    <a class="muted" href="/launchpads" style="font-size:13.5px">← All sales</a>
+    <div id="head" style="margin-top:18px"><span class="muted skel">Reading the snapshot</span></div>
+    <div id="body"></div>
+  </section>
+</main>
+
+<script type="module">
+  import { shell, reveal , onChainSwitch} from '/app/oaken.js';
+  import { icon } from '/app/icons.js';   // ⚠ icon 在 icons.js 里，不在 oaken.js（import 错会整页不执行）
+  import {
+    allPools, poolByAddress, chainOf, CHAINS, HOME_CHAIN, details, kyc, esc, amount, usd, day, when,
+    hardCapOf, softCapOf, raisedOf, raisedUsd, pctOf, statusOf, statusPill, chainChip, monogram, shortAddr, prices,    poolEntry, pushRecent, isSaved, toggleSaved,
+  } from '/app/explore.js';
+
+  shell({ active: 'launchpad' });
+
+    /* 2026-10-16：这一页的数据**不是按钱包那条链渲染的**（跨链读 / 由 URL 决定）——
+       钱包换链不改变这里的任何一块。登记一个空的处理器 = 换链时不整页重载（不白闪），
+       结果和以前重载完一模一样。没登记的页面仍走整页重载，见 oaken.js 的 onChainSwitch。 */
+    onChainSwitch(() => { /* 见上 */ });
+  // `/launchpads/<chain-slug>/<address>` —— 模板一个，参数从 URL 读（和记录页同一个做法）
+  const parts = location.pathname.split('/').filter(Boolean);   // ['launchpads', slug, address]
+  const slug = parts[1] || '';
+  const wanted = parts[2] || '';
+  const chainId = Number(Object.keys(CHAINS).find((id) => CHAINS[id].slug === slug)) || 0;
+
+  const line = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
+  const out = (v) => (v === null || v === undefined || v === '' ? '<span class="muted">—</span>' : v);
+
+  /** 募资那一栏的每个数字都写清口径：硬顶/软顶可能有一个没有，没有就说没有。 */
+  function raisePanel(row, pricesMap) {
+    const dp = Number(row.currency?.decimals ?? 18);
+    const cur = row.currency?.symbol || chainOf(row.chainId).native;
+    const cap = hardCapOf(row.pool);
+    const soft = softCapOf(row.pool);
+    const raised = raisedOf(row.pool);
+    const pct = pctOf(row.pool);
+    const usdRaised = raisedUsd(row, pricesMap);
+    const rate = (() => {
+      try {
+        const r = BigInt(row.pool?.rate || '0');
+        if (r <= 0n) return null;
+        return amount(r, Number(row.token?.decimals ?? 18), 4);
+      } catch { return null }
+    })();
+    const min = row.pool?.min ? amount(row.pool.min, dp, 4) : null;
+    const max = row.pool?.max ? amount(row.pool.max, dp, 4) : null;
+    const lp = Number(row.pool?.liquidityPercentage);
+    const lockDays = Number(row.pool?.liquidityLockDuration);
+    return `<div class="panel reveal">
+      <div class="head"><h3>The raise</h3>${statusPill(row.pool)}</div>
+      <div class="body">
+        ${cap ? `<div class="bar"><i class="${pct !== null && pct >= 100 ? 'ok' : ''}" style="width:${Math.max(0, Math.min(100, pct ?? 0)).toFixed(1)}%"></i></div>` : ''}
+        <div class="raise">
+          <span><b>${esc(amount(raised, dp))} ${esc(cur)}</b> raised${usdRaised !== null ? ` · ${usd(usdRaised)}` : ''}</span>
+          <span>${cap ? `${esc(amount(cap, dp))} hard cap · ${pct !== null ? pct.toFixed(1) + '%' : ''}` : 'no hard cap published'}</span>
+        </div>
+        ${cap ? '' : `<p class="hint" style="margin-top:12px">This sale published no hard cap, so there is no fill
+          percentage on this page to show — a percentage needs a denominator, and the soft cap that was published is a
+          minimum to reach, not a ceiling to fill.</p>`}
+        <dl class="kv" style="margin-top:20px">
+          ${line('Hard cap', cap ? esc(amount(cap, dp)) + ' ' + esc(cur) : '<span class="muted">not published</span>')}
+          ${line('Soft cap', soft ? esc(amount(soft, dp)) + ' ' + esc(cur) + ' <span class="muted">(minimum to reach)</span>' : '<span class="muted">not published</span>')}
+          ${line('Rate', rate ? `1 ${esc(cur)} = ${esc(rate)} ${esc(row.token?.symbol || 'tokens')}` : '<span class="muted">not published</span>')}
+          ${line('Per wallet', (min || max) ? `${out(min)} – ${out(max)} ${esc(cur)}` : '<span class="muted">not published</span>')}
+        </dl>
+      </div>
+    </div>`;
+  }
+
+  function schedulePanel(row, now) {
+    const st = statusOf(row.pool, now);
+    return `<div class="panel reveal">
+      <div class="head"><h3>Schedule</h3></div>
+      <div class="body">
+        <dl class="kv">
+          ${line('Opens', `${day(row.pool?.startTime)} <span class="muted">· ${esc(when(row.pool?.startTime, now))}</span>`)}
+          ${line('Closes', `${day(row.pool?.endTime)} <span class="muted">· ${esc(when(row.pool?.endTime, now))}</span>`)}
+          ${row.pool?.claimTime ? line('Claim', day(row.pool.claimTime)) : ''}
+          ${line('Status', st === 'live' ? 'Open now' : st === 'upcoming' ? 'Not open yet' : 'Closed')}
+        </dl>
+      </div>
+    </div>`;
+  }
+
+  /** 这一笔募资的 LP 是我们产品能接住的东西 —— 页面里给一条真链接，不做假按钮。 */
+  function lpPanel(row) {
+    const pct = Number(row.pool?.liquidityPercentage);
+    const days = Number(row.pool?.liquidityLockDuration);
+    if (!Number.isFinite(pct) && !Number.isFinite(days)) return '';
+    return `<div class="panel reveal">
+      <div class="head"><h3>Liquidity</h3></div>
+      <div class="body">
+        <dl class="kv">
+          ${Number.isFinite(pct) ? line('Raise to liquidity', `${pct}%`) : ''}
+          ${Number.isFinite(days) && days > 0 ? line('LP lock', days >= 86400 * 300 ? `${Math.round(days / 86400)} days` : `${days} seconds`) : ''}
+        </dl>
+        <p class="hint" style="margin-top:14px">A percentage and a duration are a promise about the pool, not the pool itself —
+          what makes it stay is the LP token sitting in a lock. You can check any lock on this chain under
+          <a href="/locks">Locks</a>, or put one there yourself in <a href="/locks/create">Create</a>.</p>
+      </div>
+    </div>`;
+  }
+
+  function aboutPanel(row) {
+    const d = details(row.pool);
+    const body = String(d.h || '').trim();
+    return `<div class="panel reveal">
+      <div class="head"><h3>About</h3></div>
+      <div class="body">
+        ${body ? esc(body).replace(/\n/g, '<br>') : '<span class="muted">No description was published with this sale.</span>'}
+      </div>
+    </div>`;
+  }
+
+  /** 侧栏的地址与外链 —— 只放源站自己公布过的链接，不拼不猜。 */
+  function linksPanel(row) {
+    const d = details(row.pool);
+    const meta = chainOf(row.chainId);
+    const links = [
+      d.b ? [d.b, 'website'] : null,
+      d.d ? [d.d, 'X / Twitter'] : null,
+      d.f ? [d.f, 'Telegram'] : null,
+      d.c ? [d.c, 'Facebook'] : null,
+      d.i ? [d.i, 'Instagram'] : null,
+      d.s ? [d.s, 'Video'] : null,
+    ].filter(Boolean);
+    const k = kyc(row.pool);
+    const kycLinks = Object.values(k).filter((v) => typeof v === 'string' && /^https?:/.test(v));
+    return `<div class="panel reveal">
+      <div class="head"><h3>Addresses</h3></div>
+      <div class="body">
+        <dl class="kv" style="grid-template-columns:110px 1fr">
+          ${line('Sale', `<span class="mono" style="font-size:13px">${esc(row.pool?.address)}</span>`)}
+          ${line('Token', `<span class="mono" style="font-size:13px">${esc(row.token?.address)}</span>`)}
+          ${line('Chain', esc(meta.name))}
+        </dl>
+        ${meta.explorer ? `<p class="hint" style="margin-top:12px"><a href="${esc(meta.explorer)}/address/${esc(row.pool?.address)}" target="_blank" rel="noopener">Open the sale contract in the explorer ↗</a></p>` : ''}
+      </div>
+    </div>
+    <div class="panel reveal">
+      <div class="head"><h3>Published links</h3></div>
+      <div class="body">
+        ${links.length || kycLinks.length ? `<div class="links">
+          ${links.map(([href, label]) => `<a href="${esc(href)}" target="_blank" rel="noopener nofollow">${icon('external', 15)}${esc(label)}</a>`).join('')}
+          ${kycLinks.length ? `<a href="${esc(kycLinks[0])}" target="_blank" rel="noopener nofollow">${icon('shield', 15)}KYC / audit document</a>` : ''}
+        </div>` : '<span class="muted">The sale published no links we can point at.</span>'}
+      </div>
+    </div>`;
+  }
+
+  /** 贡献者名单只对**抓过**的那些池子存在 —— 没有就整块不出现，不放一个空表。 */
+  async function contributorsPanel(row) {
+    try {
+      const r = await fetch(`/api/v1/pool/contributors?chainId=${row.chainId}&poolAddress=${row.pool.address}`);
+      if (!r.ok) return '';
+      const rows = await r.json();
+      if (!Array.isArray(rows) || !rows.length) return '';
+      const dp = Number(row.currency?.decimals ?? 18);
+      const cur = row.currency?.symbol || '';
+      const shown = rows.slice(0, 12);
+      return `<div class="panel reveal">
+        <div class="head"><h3>Backers</h3><span class="muted" style="margin-left:auto;font-size:12.5px">${rows.length} recorded</span></div>
+        <div class="body" style="padding:6px 0">
+          <div class="feed">
+            ${shown.map((c) => `<div class="row">
+              <span class="t">${esc((c.date || '').slice(0, 10))}</span>
+              <span class="mono" style="font-size:13px">${esc(shortAddr(c.user, 6))}</span>
+              <span style="margin-left:auto">${esc(amount(c.amount, dp, 4))} ${esc(cur)}</span>
+            </div>`).join('')}
+          </div>
+          ${rows.length > shown.length ? `<div class="hint" style="padding:10px 18px">Showing the first ${shown.length} of ${rows.length}.</div>` : ''}
+        </div>
+      </div>`;
+    } catch { return ''; }
+  }
+
+  (async () => {
+    if (!chainId || !/^0x[0-9a-fA-F]{40}$/.test(wanted)) {
+      document.getElementById('head').innerHTML = `<h2 class="sec">That is not a sale address.</h2>`;
+      document.getElementById('body').innerHTML = `<p class="muted" style="margin-top:14px">A sale page is addressed
+        <span class="mono">/launchpads/&lt;chain&gt;/&lt;0x…&gt;</span> — <a href="/launchpads">the listing</a> links them for you.</p>`;
+      return;
+    }
+
+    try {
+      const [rows, pricesMap] = await Promise.all([allPools(), prices()]);
+      const row = poolByAddress(rows, chainId, wanted);
+      if (!row) {
+        document.getElementById('head').innerHTML = `
+          <div class="eyebrow">Not in this snapshot</div>
+          <h2 class="sec">No sale at that address.</h2>`;
+        document.getElementById('body').innerHTML = `
+          <p class="muted" style="margin-top:14px;max-width:60ch">The listing that ships with this build does not carry
+            <span class="mono">${esc(wanted)}</span> on ${esc(chainOf(chainId).name)}. It is a captured corpus, not a live
+            feed — a sale that opened after the capture will not be here.</p>
+          <p style="margin-top:16px"><a class="btn btn-s" href="/launchpads">← Back to the listing</a></p>`;
+        return;
+      }
+
+      const now = Math.floor(Date.now() / 1000);
+      const d = details(row.pool);
+      const meta = chainOf(row.chainId);
+      document.title = `${row.token?.name || row.token?.symbol || 'Sale'} · OAKEN`;
+
+      document.getElementById('head').innerHTML = `
+        <div class="eyebrow">${esc(meta.name)} sale</div>
+        <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+          <span class="tile lg">${esc(monogram(row.token?.symbol))}</span>
+          <div style="min-width:0">
+            <h2 class="sec" style="margin:0">${esc(row.token?.name || row.token?.symbol || 'Token sale')}</h2>
+            <div class="muted" style="margin-top:6px;font-size:14px">${esc(row.token?.symbol || '')} · ${esc(meta.name)}
+              ${row.chainId === HOME_CHAIN ? ' · <span style="color:var(--gold)">the chain we live on</span>' : ''}</div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
+            <button class="btn btn-s" id="save"></button>
+            ${chainChip(row.chainId)}${statusPill(row.pool, now)}
+          </div>
+        </div>`;
+
+      // 「收藏」存在这台浏览器里（localStorage），没有账号也不上报 —— /me 那页说得明白。
+      const entry = poolEntry(row);
+      pushRecent(entry);
+      const save = document.getElementById('save');
+      const paintSave = () => { save.innerHTML = isSaved(row.chainId, row.pool.address) ? `${icon('check', 15)}<span>Saved</span>` : '<span>Save</span>' };
+      paintSave();
+      save.onclick = () => { toggleSaved(entry); paintSave(); };
+
+      document.getElementById('body').innerHTML = `
+        <div class="dossier">
+          <div class="stack">
+            ${raisePanel(row, pricesMap)}
+            ${aboutPanel(row)}
+            <div id="backers"></div>
+          </div>
+          <div class="side">
+            ${schedulePanel(row, now)}
+            ${lpPanel(row)}
+            ${linksPanel(row)}
+            <div class="panel reveal">
+              <div class="head"><h3>Where these numbers come from</h3></div>
+              <div class="body muted" style="font-size:13.5px">
+                The sale's own published fields, captured from the public listing this build ships with —
+                target, rate, schedule and links are the sale's words, not ours.
+                Status and countdowns are recomputed against your clock on every load.
+              </div>
+            </div>
+          </div>
+        </div>`;
+
+      reveal();
+      contributorsPanel(row).then((html) => {
+        if (!html) return;
+        document.getElementById('backers').innerHTML = html;
+        reveal();
+      });
+    } catch (e) {
+      document.getElementById('body').innerHTML =
+        `<div class="panel" style="margin-top:20px"><div class="body"><b>The snapshot did not load.</b>
+         <p class="muted" style="margin-top:8px">${esc(e.message)} — the listing is served from the build; refresh once.</p></div></div>`;
+    }
+  })();
+</script>
+</body>
+</html>

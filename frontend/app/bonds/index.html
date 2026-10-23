@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Bonds · OAKEN</title>
+<meta name="description" content="OAKEN bonds — mint and redeem aOAKEN against USDG on Robinhood Chain.">
+<meta property="og:title" content="Bonds · OAKEN">
+<meta property="og:description" content="OAKEN bonds — mint and redeem aOAKEN against USDG on Robinhood Chain.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://oaken.one/bonds">
+<meta property="og:image" content="https://oaken.one/logo512.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/bonds/app.css?v=0e63b8ce"/>
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="/bonds/"><img class="brand-mark" src="/oaken/ic-oaken.svg" alt=""><span>OAKEN</span></a>
+  <span class="tag">OAKEN bonds</span>
+  <a class="back" href="/">&larr; OAKEN</a>
+  <span class="spacer"></span>
+  <span class="net" id="net"></span>
+  <button class="btn" id="connect">Connect wallet</button>
+</header>
+
+<main>
+  <p class="lede">
+    Mint and redeem OAKEN bonds against <b>USDG</b> at the current net asset value.
+    Settled on Robinhood Chain.
+  </p>
+
+  <div class="notice" id="notice" hidden></div>
+  <div class="notice" id="riskNotice">
+    <b>RISK — read this first.</b> <b>This is the Bonds product: unlike the ownerless Locks, it has an admin</b>
+    (a 2-of-3 Safe behind a 24h Timelock). aOAKEN is a USDG-collateralized bond at NAV 1.00. Redemptions are limited by the
+    vault's USDG reserves. Admin is a <b>2-of-3 Safe</b> (<span class="mono">0x5E8C…E92e</span>). NAV and parameter
+    changes are queued through the <b>24h Timelock</b>; the governance panel below shows the live admin and queue status.
+    Rewards are OAKEN emissions, a small treasury USDG bootstrap, and redemption fees — no external
+    yield is promised. Redemption is the only exit; there is no aOAKEN secondary market yet.
+  </div>
+
+  <nav class="pills" id="pills"></nav>
+
+  
+  <section id="visitor" hidden>
+    <p class="lede small" id="visitorLede"></p>
+    <section class="stats">
+      <div><span class="mono k">NAV</span><b id="vNav">—</b></div>
+      <div><span class="mono k">POOL STAKED</span><b id="vPool">—</b></div>
+      <div><span class="mono k">USDG STREAM</span><b id="vUsdg">—</b></div>
+      <div><span class="mono k">OAKEN BUDGET</span><b id="vAur">—</b></div>
+      <div><span class="mono k">TOTAL STAKED</span><b id="vAll">—</b></div>
+      <div><span class="mono k">VAULT RESERVES</span><b id="vReserves">—</b></div>
+      <div><span class="mono k">BOND SUPPLY</span><b id="vSupply">—</b></div>
+      <div><span class="mono k">RESERVE COVERAGE</span><b id="vCoverage">—</b></div>
+      
+      <div><span class="mono k">OAKEN BURNED</span><b id="vBurn">—</b></div>
+    </section>
+    <p class="fine" id="visitorFine"></p>
+  </section>
+
+  <section class="grid" id="panels" hidden>
+    <div class="card">
+      <h2 class="mono">MINT</h2>
+      <label class="mono lbl" for="mintIn">USDG IN</label>
+      <div class="row">
+        <input id="mintIn" inputmode="decimal" placeholder="0.00" autocomplete="off"/>
+        <button class="btn ghost" id="mintMax">MAX</button>
+      </div>
+      <p class="out">You receive <b id="mintOut">—</b> <span id="mintSym"></span></p>
+      <button class="btn wide" id="mintGo">Mint</button>
+      <p class="fine"><button class="linkbtn" id="mintTry" type="button">Try 1 USDG</button> first if you are new.</p>
+    </div>
+
+    <div class="card">
+      <h2 class="mono">REDEEM</h2>
+      <label class="mono lbl" for="redeemIn">BONDS IN</label>
+      <div class="row">
+        <input id="redeemIn" inputmode="decimal" placeholder="0.00" autocomplete="off"/>
+        <button class="btn ghost" id="redeemMax">MAX</button>
+      </div>
+      <p class="out">You receive <b id="redeemOut">—</b> USDG <span class="muted" id="redeemFee"></span></p>
+      <button class="btn wide" id="redeemGo">Redeem</button>
+    </div>
+    <p class="fine" style="grid-column:1/-1;margin:0">Network fee: paid in ETH on Robinhood Chain. This app sets a
+      fixed gas limit because the chain's estimator is unreliable; your wallet shows the final fee before you sign.</p>
+  </section>
+
+  <section class="stats" id="stats" hidden>
+    <div><span class="mono k">NAV</span><b id="sNav">—</b></div>
+    <div><span class="mono k">YOUR BONDS</span><b id="sBal">—</b></div>
+    <div><span class="mono k">YOUR USDG</span><b id="sUsdg">—</b></div>
+    <div><span class="mono k">VAULT RESERVES</span><b id="sReserves">—</b></div>
+    <div><span class="mono k">REDEEMABLE NOW</span><b id="sMax">—</b></div>
+    <div><span class="mono k">BOND SUPPLY</span><b id="sSupply">—</b></div>
+    <div><span class="mono k">COLLATERAL</span><b id="sColl">—</b></div>
+  </section>
+
+  <div class="coverage" id="coverageBox" hidden>
+    <div class="coverageTop"><span class="mono">RESERVE COVERAGE</span><b id="covPct">—</b></div>
+    <div class="coverageTrack"><i id="covBar"></i></div>
+    <p class="fine" id="covNote">Vault USDG reserves divided by the USDG value of all aOAKEN at the current NAV.</p>
+  </div>
+
+  <h2 class="sect mono" id="stakeHead" hidden>STAKE</h2>
+  <p class="lede small" id="stakeLede" hidden>
+    Stake a bond and share in <b>this bond's own redemption fees</b> plus a treasury-funded
+    <b></b> budget. Nothing is printed: every unit paid out was transferred in first.
+    Staked bonds <b>keep their full NAV exposure</b> — staking does not touch the NAV, and there is no lock-up.
+  </p>
+
+  <section class="grid" id="stakePanels" hidden>
+    <div class="card">
+      <h2 class="mono">STAKE</h2>
+      <label class="mono lbl" for="stakeIn">BONDS IN</label>
+      <div class="row">
+        <input id="stakeIn" inputmode="decimal" placeholder="0.00" autocomplete="off"/>
+        <button class="btn ghost" id="stakeMax">MAX</button>
+      </div>
+      <p class="out">You keep earning <b id="stakeApy">—</b></p>
+      <button class="btn wide" id="stakeGo">Stake</button>
+    </div>
+
+    <div class="card">
+      <h2 class="mono">UNSTAKE</h2>
+      <label class="mono lbl" for="unstakeIn">STAKED BONDS</label>
+      <div class="row">
+        <input id="unstakeIn" inputmode="decimal" placeholder="0.00" autocomplete="off"/>
+        <button class="btn ghost" id="unstakeMax">MAX</button>
+      </div>
+      <p class="out">Claimable <b id="claimOut">—</b></p>
+      <button class="btn wide" id="unstakeGo">Unstake</button>
+      <button class="btn wide ghost" id="claimGo">Claim rewards</button>
+      
+      <button class="btn wide ghost" id="exitGo">Exit — unstake all &amp; claim</button>
+      
+      <button class="btn wide ghost" id="claimAllGo" hidden>Claim all bonds</button>
+    </div>
+  </section>
+
+  <section class="stats" id="stakeStats" hidden>
+    <div><span class="mono k">POOL STAKED</span><b id="sPool">—</b></div>
+    <div><span class="mono k">YOUR STAKE</span><b id="sStaked">—</b></div>
+    <div><span class="mono k">CLAIMABLE</span><b id="sClaim">—</b></div>
+    <div><span class="mono k">PENDING USDG</span><b id="sPendingUsdg">—</b></div>
+    <div><span class="mono k">PENDING OAKEN</span><b id="sPendingOaken">—</b></div>
+    <div><span class="mono k">USDG STREAM</span><b id="sApyUsdg">—</b></div>
+    <div><span class="mono k">OAKEN STREAM</span><b id="sApyAur">—</b></div>
+  </section>
+  <p class="fine" id="rewardSource"><b>Reward source.</b> Redemption fees (10 bps) and OAKEN emissions funded from
+    the fixed supply. No external yield and no fixed rate; rewards are streamed by the staking contract and can be
+    claimed at any time. History below is read from the contract's stream events.</p>
+  <p class="fine" id="lockLine"><a class="btn ghost" id="lockBond" href="/locks/create">Lock aOAKEN in Oaken Lock &rarr;</a></p>
+
+  
+  <h2 class="sect mono" id="historyHead">HISTORY</h2>
+  <p class="lede small" id="historyLede">Read from chain events. The tables are a build-time snapshot; connect a wallet for live positions.</p>
+  <section class="grid" id="historyPanels">
+    <div class="card"><h2 class="mono">NAV ROUNDS</h2>
+      <svg class="spark" id="navSpark" viewBox="0 0 320 48" preserveAspectRatio="none" aria-hidden="true"><polyline id="navSparkLine" points=""></polyline></svg>
+      <table class="hist"><thead><tr><th>Round</th><th>NAV</th><th>Published</th></tr></thead><tbody id="navHist"></tbody></table></div>
+    <div class="card"><h2 class="mono">REWARD STREAMS</h2>
+      <table class="hist"><thead><tr><th>Stream</th><th>Amount</th><th>Ends</th><th>Tx</th></tr></thead><tbody id="rewardHist"></tbody></table></div>
+    <div class="card span2"><h2 class="mono">MINT / REDEEM</h2>
+      <table class="hist"><thead><tr><th>Action</th><th>USDG</th><th>aOAKEN</th><th>When</th><th>Tx</th></tr></thead><tbody id="flowHist"></tbody></table></div>
+  </section>
+
+
+  <h2 class="sect mono" id="tlHead">GOVERNANCE &amp; TIMELOCK</h2>
+  <p class="lede small" id="tlLede">Admin is a 2-of-3 Safe. NAV updates and parameter changes are queued through a
+    24h Timelock; anyone can execute once the delay has passed. Execution is permissionless — no one can move the
+    vault's USDG or a user's staked bond through this panel.</p>
+  <section class="stats" id="tlStats">
+    <div><span class="mono k">ADMIN (SAFE)</span><b><a id="tlSafe" href="#" target="_blank" rel="noopener">—</a></b></div>
+    <div><span class="mono k">TIMELOCK</span><b><a id="tlAddr" href="#" target="_blank" rel="noopener">—</a></b></div>
+    <div><span class="mono k">DELAY</span><b id="tlDelay">—</b></div>
+    <div><span class="mono k">STATUS</span><b id="tlStatus">—</b></div>
+  </section>
+  <section class="grid" id="tlPanels">
+    <div class="card span2">
+      <h2 class="mono">PENDING CHANGES</h2>
+      <div id="tlList">Connect a wallet to read the Timelock queue.</div>
+      <p class="fine" id="tlNote"></p>
+      <button class="btn ghost" id="tlRefresh" type="button">Refresh queue</button>
+    </div>
+    <div class="card span2">
+      <h2 class="mono">PERMISSIONS</h2>
+      <p class="fine"><b>Admin can:</b> publish NAV, set fees/caps/pause, and start reward streams — only through the
+        Timelock. <b>Admin cannot:</b> move vault USDG, force-redeem user bonds, or transfer a staked bond's ownership.
+        The Timelock delay is public and execution is open to anyone.</p>
+    </div>
+  </section>
+
+  <section class="stats" id="allStats" hidden>
+    <div><span class="mono k">TOTAL STAKED</span><b id="sAllPool">—</b></div>
+    <div><span class="mono k">YOUR STAKE — ALL 5</span><b id="sAllMine">—</b></div>
+    <div><span class="mono k">CLAIMABLE — ALL 5</span><b id="sAllClaim">—</b></div>
+  </section>
+
+  
+  <h2 class="sect mono" id="govHead" hidden>GOVERNANCE</h2>
+  <p class="lede small" id="govLede" hidden>
+    Hold <b>xOAK</b> to vote on the contracts behind this page. A proposal is
+    <b>a specific call</b> (target&nbsp;+&nbsp;calldata) &mdash; if it passes, anyone can execute it
+    through the 24-hour timelock. Voting power is <b>snapshotted at the proposal block</b>:
+    moving your tokens afterwards does not change a vote already cast.
+  </p>
+
+  <section class="stats" id="govStats" hidden>
+    <div><span class="mono k">YOUR xOAK</span><b id="gMine">—</b></div>
+    <div><span class="mono k">xOAK TOTAL</span><b id="gTotal">—</b></div>
+    <div><span class="mono k">TIMELOCK DELAY</span><b id="gDelay">—</b></div>
+    <div><span class="mono k">QUORUM</span><b id="gQuorum">—</b></div>
+  </section>
+
+  <section class="grid" id="govPanels" hidden>
+    <div class="card">
+      <h2 class="mono">VOTING POWER</h2>
+      <label class="mono lbl" for="xIn">OAKEN ⇄ xOAK</label>
+      <div class="row">
+        <input id="xIn" inputmode="decimal" placeholder="0.00" autocomplete="off"/>
+        <button class="btn ghost" id="xMax">MAX</button>
+      </div>
+      <p class="out">Deposit 1:1, <b>withdraw any time</b>. No lock-up, no fee.</p>
+      <button class="btn wide" id="xDepGo">Deposit OAKEN</button>
+      <button class="btn wide ghost" id="xWitGo">Withdraw xOAK</button>
+      
+      <button class="btn wide ghost" id="xMaxW">MAX — my xOAK</button>
+    </div>
+
+    <div class="card">
+      <h2 class="mono">NEW PROPOSAL</h2>
+      <label class="mono lbl" for="propPreset">PRESET</label>
+      <select id="propPreset" class="sel"></select>
+      <label class="mono lbl" for="propTarget">TARGET</label>
+      <input id="propTarget" placeholder="0x… contract" autocomplete="off" spellcheck="false"/>
+      <label class="mono lbl" for="propData">CALLDATA</label>
+      <input id="propData" placeholder="0x… (what gets called)" autocomplete="off" spellcheck="false"/>
+      <label class="mono lbl" for="propDesc">DESCRIPTION</label>
+      <input id="propDesc" placeholder="What this changes" autocomplete="off"/>
+      <button class="btn wide" id="propGo">Propose</button>
+    </div>
+  </section>
+
+  <section id="govList" hidden></section>
+
+  <p class="fine" id="stakeFine" hidden>
+    <b>Where the rewards come from.</b> Stream 0 is <b>USDG</b>: the 10&nbsp;bps redemption fee
+    this bond's vault charges, paid straight into the staking pool. Stream 1 is <b>OAKEN</b>:
+    a budget the treasury transfers in. Both are <b>finite and visible on-chain</b> — the pool can
+    only ever pay out what it holds. Rates above are annualised from the <i>currently funded</i>
+    budget and the <i>current</i> pool size; when a budget runs out the rate goes to zero, and
+    nothing here is a promise of return. <b>OAKEN is an incentive token, not a dollar yield.</b>
+  </p>
+  <p class="fine"><b>Lock it.</b> aOAKEN is an ERC-20. Use <a href="/locks/create">Oaken Lock</a>
+    to vest or lock it — paste the bond address from the Contracts block below.</p>
+  <p class="fine"><b>Reward sources.</b> 100,000 OAKEN emissions (funded 2026-10-17),
+    a 0.01 USDG treasury bootstrap, and the 0.10% redemption fee stream. Every funding transaction is in the
+    history table above. No external yield is promised.</p>
+  <p class="fine" id="stakePending" hidden></p>
+
+  <p class="fine">
+    <b>NAV.</b> The oracle currently publishes <b>1.00000000 USDG</b>. No coupon is being funded yet;
+    the vault holds only USDG, and redemptions are limited by its reserves. Nothing here promises a yield.
+  </p>
+  
+  <p class="fine">
+    <b>What backs it.</b> aOAK is minted against <b>USDG</b> at NAV 1.00. The vault holds only USDG;
+    the only USDG exit is <b>redeem</b>. No stock or sovereign-bond instrument is tokenized on this page.
+  </p>
+  
+  <p class="fine">
+    <b>Admin.</b> The vault, NAV oracle and staking pool are administered by a <b>2-of-3 Safe</b>
+    <span class="mono">0x5E8C4c241a29ff7E60c648f378A4AA70053Ee92e</span>, not a single key. The Safe can update
+    params, but cannot move a staked bond or a vault reserve. The NAV keeper is a separate hot key; NAV and parameter
+    changes are queued through the 24h Timelock, and anyone can execute them once the delay has passed.
+  </p>
+  <p class="fine" id="contracts">
+    <b>Contracts.</b>
+    Bond <a href="https://robinhoodchain.blockscout.com/address/0x948344c5ee2748d7E3FD1c49f472C1e88232e786" target="_blank" rel="noopener">0x9483…e786</a> ·
+    Vault <a href="https://robinhoodchain.blockscout.com/address/0x1C14c153E55E260970DDbd2B51C938d570fa9839" target="_blank" rel="noopener">0x1C14…9839</a> ·
+    Staking <a href="https://robinhoodchain.blockscout.com/address/0xd14a16f5CCb4D1cbEA3C646A875EC61a4DD5FE36" target="_blank" rel="noopener">0xd14a…FE36</a> ·
+    OAKEN <a href="https://robinhoodchain.blockscout.com/address/0xbe98D7c8EBB304F6bb7aef2ef04589ED56C8830a" target="_blank" rel="noopener">0xbe98…830a</a> ·
+    Admin Safe <a href="https://robinhoodchain.blockscout.com/address/0x5E8C4c241a29ff7E60c648f378A4AA70053Ee92e" target="_blank" rel="noopener">0x5E8C…E92e</a>
+  </p>
+  <p class="fine" id="status"></p>
+</main>
+
+<footer class="foot">
+  <span class="mono">OAKEN.ONE</span>
+  <a href="/">Oaken Lock</a>
+  <a href="/about">About</a>
+  <a href="/faq">FAQ</a>
+  <a href="/verify">Verify</a>
+  <a href="/docs">Docs</a>
+  <a href="/terms">Terms</a>
+  <a href="/privacy">Privacy</a>
+  <a href="https://x.com/oakenhood" target="_blank" rel="noopener">@oakenhood</a>
+</footer>
+
+<script type="module" src="/bonds/app.js?v=11c1970f"></script>
+</body>
+</html>

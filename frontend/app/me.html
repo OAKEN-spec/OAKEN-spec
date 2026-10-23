@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My OAKEN · OAKEN</title>
+<meta name="description" content="One wallet's locks, the sales it backed, and the ones it kept an eye on.">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/key.webp"><source src="/app/media/key.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">My OAKEN</div>
+    <h1 class="reveal">Everything this wallet is in.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <p class="muted" style="max-width:64ch">A read-only view: the locks held for you on the chains we are on,
+      the sales this address bought into, and the ones you saved in this browser. Nothing on this page asks you to sign
+      anything.</p>
+
+    <div id="gate" style="margin-top:30px"></div>
+
+    <div id="dash" class="hide">
+      <div class="stats reveal" style="margin-top:34px">
+        <div><div class="v" id="s-locks">—</div><div class="k">Locks held for you</div></div>
+        <div><div class="v" id="s-backed">—</div><div class="k">Sales backed</div></div>
+        <div><div class="v" id="s-saved">—</div><div class="k">Saved here</div></div>
+        <div><div class="v" id="s-seen">—</div><div class="k">Recently viewed</div></div>
+      </div>
+
+      <div class="stack" style="margin-top:26px">
+        <div class="panel reveal">
+          <div class="head"><h3>Locks held for you</h3><span class="muted" id="lock-note" style="margin-left:auto;font-size:12.5px"></span></div>
+          <div id="locks"><div class="body skel">Reading…</div></div>
+        </div>
+
+        <div class="panel reveal">
+          <div class="head"><h3>Tokens you launched</h3><span class="muted" id="launch-note" style="margin-left:auto;font-size:12.5px"></span></div>
+          <div id="launched"><div class="body skel">Reading…</div></div>
+        </div>
+
+        <div class="panel reveal">
+          <div class="head"><h3>Launched from this browser</h3><span class="muted" id="here-note" style="margin-left:auto;font-size:12.5px">kept in this browser</span></div>
+          <div id="launchedhere"><div class="body skel">Reading…</div></div>
+        </div>
+
+        <div class="panel reveal">
+          <div class="head"><h3>Sales you backed</h3><span class="muted" style="margin-left:auto;font-size:12.5px">from captured contributor lists</span></div>
+          <div id="backed"><div class="body skel">Reading…</div></div>
+        </div>
+
+        <div class="dossier" style="margin-top:0">
+          <div class="panel reveal">
+            <div class="head"><h3>Saved in this browser</h3></div>
+            <div id="saved"><div class="body skel">—</div></div>
+          </div>
+          <div class="side">
+            <div class="panel reveal">
+              <div class="head"><h3>Recently viewed</h3></div>
+              <div id="recent"><div class="body skel">—</div></div>
+            </div>
+            <div class="panel reveal">
+              <div class="head"><h3>About this page</h3></div>
+              <div class="body muted" style="font-size:13px">
+                Saved and recently viewed live in your browser's local storage — there is no account, they are not sent
+                anywhere, and they disappear when you clear site data. The two lists above come from sources that are not
+                about you: the locks and the launches are read <b>live from the chains</b> (the header says so, and says when it had to fall
+                back to our index instead), and the contributions come from the captured listing.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:28px;flex-wrap:wrap">
+        <a class="btn btn-p" href="/locks/create">Lock tokens</a>
+        <a class="btn btn-s" href="/launchpads">Browse sales</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+  // ⚠ 这一页**不加载 ethers**（500 KB 只为把 wei 变成小数不值得）——
+  //   所以金额走 explore.js 里自己展开的 `amount()`，不是 oaken.js 的 `fmtAmount()`
+  //   （后者要 window.ethers，没有就静默回「—」，看起来像"没有金额"）。
+  import { shell, wallet, ownLocks, locksForOwner, launchesByCreator, countdown, short, fmtDate, toast, reveal, chains, launchedHere, copyBtn , onChainSwitch} from '/app/oaken.js';
+  import { allPools, chainOf, esc, amount, day, getSaved, getRecent, poolHref, shortAddr } from '/app/explore.js';
+
+  shell({ active: 'me' });
+
+    /* 你的锁、你发射过的代币都是**跨链**读的（每条部署过的链各查一遍），
+       钱包换链不改变这里的任何一块 —— 空的处理器，省掉没意义的重载。 */
+    onChainSwitch(() => { /* 什么都不用做（见上） */ });
+  /**
+   * **按需**把 ethers 拉进来。
+   *
+   * 这一页原本刻意不加载它（500 KB 只为把 wei 变成小数不划算）。但"你的锁"要读链 ——
+   * 而线上没有索引器，快照是打包那一刻的：刚锁完的锁在快照里根本不存在。
+   * 折中是**等真的要看链上锁时再拉**：首屏不为它付费，连接了钱包的人多等一次下载。
+   */
+  let _ethers = null;
+  function loadEthers() {
+    if (window.ethers) return Promise.resolve(window.ethers);
+    if (_ethers) return _ethers;
+    _ethers = new Promise((res, rej) => {
+      const sc = document.createElement('script');
+      sc.src = '/app/vendor/ethers.umd.min.js';
+      sc.onload = () => res(window.ethers);
+      sc.onerror = () => rej(new Error('ethers failed to load'));
+      document.head.appendChild(sc);
+    });
+    return _ethers;
+  }
+
+  const el = (id) => document.getElementById(id);
+  const rowsHtml = (rows) => `<div class="feed">${rows.join('')}</div>`;
+  const emptyRow = (text) => `<div class="body"><span class="muted">${text}</span></div>`;
+
+  function gate() {
+    el('gate').innerHTML = `<div class="panel"><div class="body" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+      <div style="flex:1 1 320px">
+        <h3 style="margin-bottom:6px">Connect a wallet to fill this page in.</h3>
+        <p class="muted" style="font-size:14px">It is a read: the address is used to look up locks and contributions.
+          No transaction is ever built here.</p>
+      </div>
+      <button class="btn btn-p" id="gate-connect">Connect</button>
+    </div></div>`;
+    el('dash').classList.add('hide');
+    el('gate-connect').onclick = async () => {
+      try { await wallet.connect(); } catch (e) { toast(String(e.message || e), 'bad'); return }
+      await boot();
+    };
+  }
+
+  async function boot() {
+    const [addr] = await wallet.accounts();
+    if (!addr) return gate();
+    el('gate').innerHTML = '';
+    el('dash').classList.remove('hide');
+    // ⚠ 面板是从 `display:none` 里放出来的 —— 隐藏时 IntersectionObserver 不会触发，
+    //   不补这一下，连上钱包之后整页还是停在 opacity:0。
+    reveal();
+    const me = addr.toLowerCase();
+
+    /**
+     * ① 你的锁 —— **从链上现读**。
+     *
+     * 这一页原先读我们自己的索引快照。而线上**没有索引器**（快照是打包那一刻的），
+     * 刚锁完的锁在这儿看不见，空态还写着"索引器下一趟就捡到"—— 那是句假话。
+     * 链读不到（ethers 没下来 / RPC 不通）才退回索引，并且在标题旁**说明这是退回的**。
+     */
+    (async () => {
+      const live = await chains();
+      const rows = [];
+      let source = '';
+      try {
+        await loadEthers();
+        /* 四条链**并行**读：原来是串行 for-await，2.3 秒里一半是链与链之间排队。 */
+        const groups = await Promise.all(live.map(async (c) => {
+          const list = await locksForOwner(c, addr);
+          return list.map((l) => ({
+            id: l.id, chain: c, symbol: l.symbol || short(l.token), decimals: l.decimals,
+            remaining: BigInt(l.amount) - BigInt(l.claimed || 0),
+            unlock: l.unlock, steps: l.steps,
+            claimed: BigInt(l.claimed || 0), amount: BigInt(l.amount),
+          }));
+        }));
+        for (const g of groups) rows.push(...g);
+        rows.sort((a, b) => Number(b.id) - Number(a.id));
+        /* ⚠ 链表为空时不能写 "read live from 0 chains"（假数据，且和空状态叠在一起像"你没有锁"）。
+           链表拿不到 → 后面那条 catch 分支会如实说"这次读不到链"。 */
+        if (!live.length) throw new Error('the chain list did not load');
+        source = 'read live from ' + live.length + ' chain' + (live.length === 1 ? '' : 's');
+      } catch (e) {
+        let indexed = 0;
+        const docsPer = await Promise.all(live.map((c) => ownLocks({ limit: 200, chain: c }).catch(() => [])));
+        live.forEach((c, ci) => {
+          const docs = docsPer[ci];
+          indexed += docs.length;
+          for (const d of docs) {
+            if (String(d.owner || '').toLowerCase() !== me) continue;
+            // ⚠ 别写成 String(Math.round(x * 10 ** dp))：1e21 会变成 "1e+21"，BigInt() 直接抛。
+            //   直接把 double 交给 BigInt（它是整数值）。
+            const wei = d.formatted_current_locked_amount != null && d.decimals != null
+              ? BigInt(Math.round(d.formatted_current_locked_amount * 10 ** d.decimals)) : 0n;
+            rows.push({ id: d.lockId, chain: c, symbol: d.symbol || short(d.address), decimals: d.decimals,
+              remaining: wei, unlock: d.unlock, steps: d.steps, claimed: 0n, amount: wei });
+          }
+        });
+        source = indexed
+          ? 'from ' + indexed + ' indexed — the chain was unreachable from this browser, so this may lag'
+          : 'the chain was unreachable from this browser';
+      }
+      el('s-locks').textContent = String(rows.length);
+      el('lock-note').textContent = source;
+      el('locks').innerHTML = rows.length ? rowsHtml(rows.map((r) => {
+        const c = r.unlock ? countdown(r.unlock) : null;
+        const state = !c ? ''
+          : c.done ? '<span class="pill ok">unlocked</span>' : `<span class="pill lock">${esc(c.text)}</span>`;
+        const part = r.claimed > 0n && r.claimed < r.amount ? ' · <span class="muted">partly claimed</span>' : '';
+        return `<div class="row">
+          <span class="t mono">#${esc(r.id)}</span>
+          <span style="flex:1 1 auto;min-width:0">${esc(r.symbol)}${r.token ? ' ' + copyBtn(r.token, 'copy CA') : ''}
+            <span class="muted" style="font-size:12.5px"> · ${esc(amount(r.remaining, r.decimals))}${r.steps ? ' · ' + esc(r.steps) + ' steps' : ''}${part}</span></span>
+          <span class="chip">${esc(r.chain.name)}</span>
+          <span class="muted" style="font-size:12.5px">${r.unlock ? esc(fmtDate(r.unlock)) : ''}</span>
+          <span>${state}</span>
+          <a href="/locks/${esc(r.chain.slug)}/record/${esc(r.id)}">View →</a>
+        </div>`;
+      })) : emptyRow('No locks are held for this address on any chain we are on. If you just created one, reload — this list is read from the chain, not from a cache.');
+    })();
+
+    /**
+     * ①b 你**发射过**的代币 —— 扫发射合约的 `Launched` 日志。
+     *
+     * 为什么单独一块：**只发不锁**的代币在别的任何地方都没有痕迹（"你的锁"读的是适配器
+     * 那张表，锁才在表里）。用户关掉成功面板就再也找不回那个地址了。
+     * 这是**区间扫描**不是索引：扫不动就如实说看的是哪一段，不把"没扫到"说成"没有"。
+     */
+    (async () => {
+      try {
+        await loadEthers();
+        const live = await chains();      // ⚠ 这一页的 `live` 在①那块自己的作用域里，这里要自己取
+        const all = [];
+        let complete = true, truncated = false, scanned = 0;
+        /* 四条链的日志扫描也**并行**（每条链自己还有 8 片上限）。 */
+        const scannedPer = await Promise.all(live.map((c) => launchesByCreator(c, addr)));
+        live.forEach((c, ci) => {
+          const r = scannedPer[ci];
+          all.push(...r.launches);
+          if (!r.complete) complete = false;
+          if (r.truncated) truncated = true;
+          scanned = Math.max(scanned, r.scannedBlocks);
+        });
+        all.sort((a, b) => b.block - a.block);
+        // 扫得全不全**要说出来**：截断了就说只看了最近多少块，不把"没扫到"说成"没有"
+        el('launch-note').textContent = all.length
+          ? 'read live from the chain' + (truncated ? ' · most recent ' + Math.round(scanned / 1000) + 'k blocks only' : (complete ? '' : ' · some ranges could not be read'))
+          : (truncated ? 'nothing in the most recent ' + Math.round(scanned / 1000) + 'k blocks' : (complete ? '' : 'some ranges could not be read'));
+        el('launched').innerHTML = all.length ? rowsHtml(all.map((x) => {
+          const c = chainOf(x.chainId);
+          const lockedPct = x.supply > 0n ? Number((x.locked * 10000n) / x.supply) / 100 : 0;
+          return `<div class="row">
+            <span class="t">${esc(x.symbol || short(x.token))}</span>
+            <span style="flex:1 1 auto;min-width:0">${esc(x.name || '')} ${copyBtn(x.token, 'copy CA')}
+              <span class="muted" style="font-size:12.5px"> · ${esc(amount(x.supply, 18))} supply${
+                x.locked > 0n ? ' · <b>' + lockedPct.toFixed(2) + '% locked</b> until ' + esc(day(x.unlockDate)) : ' · no lock'}</span></span>
+            <span class="chip">${esc(c.name)}</span>
+            <span><a href="/locks/${esc(c.slug)}/${esc(x.token)}">Token →</a>${
+              x.locked > 0n ? ' <a href="/locks/' + esc(c.slug) + '/record/' + esc(x.lockId) + '">Lock →</a>' : ''}</span>
+          </div>`;
+        })) : emptyRow('Nothing has been launched from this address yet. <a href="/launch">Launch a token →</a>');
+      } catch (e) {
+        el('launched').innerHTML = emptyRow('Could not read the launch history from this browser — the chain was unreachable.');
+      }
+    })();
+
+    /**
+     * ①c 从**这个浏览器**发射过的币 —— 自动包含**第三方路线**（Pons/Flap/four.meme/Genius/Clanker）。
+     *
+     * 链上没有任何属于我们的登记：第三方工厂只记它们自己的，我们线上又没有库。
+     * 所以这一块**如实**存在浏览器的 localStorage 里（和"收藏/最近浏览"同一套），
+     * 面板标题和 note 都写明白来源 —— 不冒充链上记录。
+     */
+    (async () => {
+      const here = launchedHere();
+      if (!here.length) {
+        el('here-note').textContent = '';
+        el('launchedhere').innerHTML = emptyRow('Nothing has been launched from this browser yet. <a href="/launch">Launch a token →</a>');
+        return;
+      }
+      const live = await chains();
+      const byId = new Map(live.map((c) => [c.id, c]));
+      el('launchedhere').innerHTML = rowsHtml(here.map((x) => {
+        const c = byId.get(Number(x.chainId));
+        const slug = c ? c.slug : 'robinhood';
+        const exUrl = c && c.explorer ? String(c.explorer).replace(/\/+$/, '') + '/token/' + x.token : null;
+        return `<div class="row">
+          <span class="t">${esc(x.symbol || short(x.token))}</span>
+          <span style="flex:1 1 auto;min-width:0">${esc(x.name || '')} ${copyBtn(x.token, 'copy CA')}
+            <span class="muted" style="font-size:12.5px"> · ${esc(x.route || 'launch')} · <span class="mono">${esc(short(x.token))}</span> · ${new Date(x.at).toISOString().slice(0, 16).replace('T', ' ')} UTC</span></span>
+          <span class="chip">${esc(c ? c.name : 'chain ' + x.chainId)}</span>
+          <span><a href="/locks/${esc(slug)}/${esc(x.token)}">Token →</a>${exUrl ? ' <a target="_blank" rel="noopener" href="' + esc(exUrl) + '">Explorer ↗</a>' : ''}</span>
+        </div>`;
+      }));
+    })();
+
+    // ② 认购过的池子：语料里有贡献者名单的那些池子（反查端点是这一轮加的）
+    const poolsPromise = allPools().catch(() => []);
+    (async () => {
+      const r = await fetch(`/api/v1/contributor/pools?address=${me}`).then((x) => (x.ok ? x.json() : { docs: [] })).catch(() => ({ docs: [] }));
+      const pools = await poolsPromise;
+      const rows = r.docs || [];
+      el('s-backed').textContent = rows.length ? String(rows.length) : '0';
+      if (!rows.length) {
+        el('backed').innerHTML = emptyRow('No captured contribution list carries this address. Only a handful of sales had their contributor lists captured — absence here is not evidence of absence.');
+        return;
+      }
+      el('backed').innerHTML = rowsHtml(rows.map((c) => {
+        const pool = pools.find((p) => p.chainId === c.chainId && String(p.pool?.address || '').toLowerCase() === String(c.poolAddress || '').toLowerCase());
+        const meta = chainOf(c.chainId);
+        const dp = Number(pool?.currency?.decimals ?? meta.dp);
+        const cur = pool?.currency?.symbol || meta.native;
+        const name = pool ? (pool.token?.name || pool.token?.symbol) : `${shortAddr(c.poolAddress)} (not in the listing)`;
+        const link = pool ? `<a href="${poolHref(pool)}">${esc(name)}</a>` : `<span>${esc(name)}</span>`;
+        return `<div class="row">
+          <span class="t">${esc((c.date || '').slice(0, 10))}</span>
+          <span style="flex:1 1 auto;min-width:0">${link}
+            <span class="muted" style="font-size:12.5px"> · ${esc(meta.name)}</span></span>
+          <span><b>${esc(amount(c.amount, dp, 4))} ${esc(cur)}</b></span>
+        </div>`;
+      }));
+    })();
+
+    // ③ 收藏 / 最近浏览：localStorage，不联网
+    const saved = getSaved();
+    const recent = getRecent();
+    el('s-saved').textContent = String(saved.length);
+    el('s-seen').textContent = String(recent.length);
+    const localRow = (x) => `<div class="row" style="padding-left:18px;padding-right:18px">
+      <span class="t">${esc(day(x.at / 1000))}</span>
+      <a href="/launchpads/${esc(chainOf(x.chainId).slug)}/${esc(x.address)}">${esc(x.name || x.symbol || shortAddr(x.address))}</a>
+      <span class="muted" style="margin-left:auto;font-size:12.5px">${esc(chainOf(x.chainId).name)}</span>
+    </div>`;
+    el('saved').innerHTML = saved.length ? rowsHtml(saved.map(localRow)) : emptyRow('Nothing saved yet — press “Save” on any sale page.');
+    el('recent').innerHTML = recent.length ? rowsHtml(recent.map(localRow)) : emptyRow('Pages you open will show up here.');
+  }
+
+  // 换账号/断开时跟着变：oaken.js 的顶栏按钮已经在听 accountsChanged，这里再听一次是
+  // 因为**这个页面**的内容整个都取决于地址（不像别的页面只是按钮上的几个字）。
+  if (window.ethereum && window.ethereum.on) {
+    window.ethereum.on('accountsChanged', () => boot());
+  }
+  boot();
+</script>
+</body>
+</html>

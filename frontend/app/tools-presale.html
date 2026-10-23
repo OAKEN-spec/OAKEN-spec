@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Presale · OAKEN</title>
+<meta name="description" content="Run a sale: a fixed price, a window, a soft cap that decides whether it happens at all.">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+<style>
+  .flow { display: grid; grid-template-columns: 1.1fr .9fr; gap: 26px; align-items: start; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; flex-wrap: wrap; }
+  .seg button { background: transparent; border: 0; color: var(--muted); font: 600 13.5px/1 "Segoe UI", system-ui, sans-serif;
+                padding: 11px 16px; cursor: pointer; }
+  .seg button.on { background: rgba(217,163,67,.12); color: var(--gold); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .summary { background: var(--panel); border: 1px solid var(--line-gold); border-radius: var(--r); padding: 20px 22px; }
+  .summary b { color: var(--gold); }
+  @media (max-width: 940px) { .flow { grid-template-columns: 1fr; } .row2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/balance.webp"><source src="/app/media/balance.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Launchpad</div>
+    <h1 class="reveal">Launch a sale that cannot lie about its terms.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <p class="muted" style="margin-top:12px;max-width:64ch">You fund the sale with the tokens up front, so a buyer is
+      never looking at a promise to deliver later. Price, window and caps are fixed at creation and cannot be changed by
+      anyone — including you. Miss the soft cap and every contribution goes back automatically.</p>
+
+    <div class="flow" style="margin-top:30px">
+      <div class="panel">
+        <div class="head"><h3>New sale</h3></div>
+        <div class="body">
+          <label class="f">Chain</label>
+          <div class="seg" id="chainseg"><button type="button" class="on">Loading…</button></div>
+          <div class="hint" id="chainhint"></div>
+
+          <label class="f" for="token">Token being sold</label>
+          <input class="i" id="token" placeholder="0x… ERC-20" autocomplete="off">
+          <div class="hint" id="tokenmeta"></div>
+
+          <label class="f" for="rate">Price — tokens per 1 <span id="unit">ETH</span></label>
+          <input class="i" id="rate" placeholder="10000" inputmode="decimal" autocomplete="off">
+          <div class="hint" id="ratehint">Everyone buys at this price for the whole sale. No curve, no bonus for being early.</div>
+
+          <div class="row2">
+            <div>
+              <label class="f" for="soft">Soft cap (<span class="unit">ETH</span>)</label>
+              <input class="i" id="soft" placeholder="5" inputmode="decimal" autocomplete="off">
+            </div>
+            <div>
+              <label class="f" for="hard">Hard cap (<span class="unit">ETH</span>)</label>
+              <input class="i" id="hard" placeholder="20" inputmode="decimal" autocomplete="off">
+            </div>
+          </div>
+          <div class="hint">Under the soft cap the sale is cancelled and everyone is refunded. At the hard cap buying stops.</div>
+
+          <div class="row2">
+            <div>
+              <label class="f" for="min">Min per wallet (<span class="unit">ETH</span>)</label>
+              <input class="i" id="min" placeholder="0.01" inputmode="decimal" autocomplete="off">
+            </div>
+            <div>
+              <label class="f" for="max">Max per wallet (<span class="unit">ETH</span>)</label>
+              <input class="i" id="max" placeholder="10" inputmode="decimal" autocomplete="off">
+            </div>
+          </div>
+
+          <div class="row2">
+            <div>
+              <label class="f" for="start">Opens (your local time)</label>
+              <input class="i" id="start" type="datetime-local">
+            </div>
+            <div>
+              <label class="f" for="end">Closes</label>
+              <input class="i" id="end" type="datetime-local">
+            </div>
+          </div>
+
+          <label class="f" for="router">Liquidity router (optional)</label>
+          <input class="i" id="router" placeholder="0x… a Uniswap-V2-style router, or leave empty" autocomplete="off">
+          <div class="hint" id="routerhint">Leave empty and the whole raise goes to your address when the sale finalizes —
+            you add and lock the liquidity yourself (<a href="/locks/create">Oaken Lock</a> takes it from there).</div>
+
+          <div class="row2" id="lprow" style="display:none">
+            <div>
+              <label class="f" for="lpbps">Share of the raise to liquidity (%)</label>
+              <input class="i" id="lpbps" placeholder="60" inputmode="decimal" autocomplete="off">
+            </div>
+            <div>
+              <label class="f">At what price</label>
+              <input class="i" disabled value="the sale price" style="opacity:.6">
+            </div>
+          </div>
+
+          <div class="err hide" id="err"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="summary">
+          <div class="eyebrow" style="margin-bottom:12px">Before you sign</div>
+          <div id="sumtext" class="muted">Fill the form — the summary appears here, in one sentence.</div>
+        </div>
+        <div style="display:grid;gap:10px;margin-top:16px">
+          <button class="btn btn-p" id="go" style="width:100%" disabled>Connect a wallet</button>
+          <div class="hint" id="steps"></div>
+        </div>
+        <div class="panel hide" id="done" style="margin-top:16px">
+          <div class="head"><h3>Sale live</h3></div>
+          <div class="body" id="donebody"></div>
+        </div>
+        <div class="panel" style="margin-top:16px">
+          <div class="head"><h3>The one promise the contract enforces</h3></div>
+          <div class="body muted" style="font-size:13.5px">
+            A sale cannot be created unless <b style="color:var(--parch)">you fund at least hard cap × price</b> tokens.
+            That is the whole safety property: a fully subscribed sale can always pay every claim, because the tokens
+            were in the contract before the first buyer arrived.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="band" style="padding-top:44px">
+      <div class="eyebrow">Launched here</div>
+      <h2 class="sec">Sales running on this contract.</h2>
+      <div class="panel" style="margin-top:20px">
+        <table class="list" id="tbl">
+          <thead><tr><th>Sale</th><th>Chain</th><th>Raised</th><th>Target</th><th>Window</th><th>Status</th><th></th></tr></thead>
+          <tbody><tr><td colspan="7" class="muted" style="padding:26px 14px">Reading…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="hint" id="note" style="margin-top:14px"></div>
+    </section>
+  </section>
+
+    <div class="panel" style="margin-top:16px"><div class="head"><h3>If it fails — self-check</h3></div>
+      <div class="body muted" style="font-size:13.5px">
+        <ul style="list-style:none;display:grid;gap:10px">
+          <li><b style="color:var(--parch)">Fund the whole hard cap first.</b> The sale contract must hold enough tokens for the hard cap before it opens; the factory refuses a sale it cannot back.</li>
+          <li><b style="color:var(--parch)">The window is chain time.</b> A start time already in the past reverts. The form checks it against the chain, not your computer clock.</li>
+          <li><b style="color:var(--parch)">Miss the soft cap → refunds.</b> Every buyer can take their contribution back; the creator cannot keep it. The raise is not released to the creator until the sale succeeds.</li>
+          <li><b style="color:var(--parch)">Finalize is permissionless.</b> After the window and a met soft cap, anyone can push it over the line; buyers can claim as soon as it is final.</li>
+        </ul>
+      </div>
+    </div>
+</main>
+
+<script src="/app/vendor/ethers.umd.min.js" defer></script>
+<script type="module">
+  import { shell, wallet, chains, currentChain, erc20, tokenMeta, fmtAmount, fmtDate, toast, explorerHref, reveal, short,
+    safeRead, cachedRead, cacheDrop, rotateRpc, skeletonRows, emptyState, showReadFail, txNotice, humanizeTxError, provider, onWallet,
+    raceTimeout, TOO_SLOW, stillReadingAfter, showChainSegFailed , mountDatePicker, onChainSwitch, chainIcon} from '/app/oaken.js';
+  import { ADDR, contract } from '/app/tools.js';
+  import { esc, shortAddr, when } from '/app/explore.js';
+
+  shell({ active: 'tools' });
+  // 英文 / 美式的时间选择器（原生 datetime-local 跟浏览器语言走，改不动）
+  mountDatePicker(document.getElementById('start'));
+  mountDatePicker(document.getElementById('end'));
+
+  const $ = (id) => document.getElementById(id);
+  /** 本地链没有 explorer —— 硬拼出来的 `/tx/0x…` 是同源 404（链接检查器会报出来）。 */
+  const exLink = (path, label, cls = 'btn btn-s') => {
+    const h = explorerHref(path, state.chain);
+    return h ? `<a class="${cls}" target="_blank" rel="noopener" href="${h}">${label}</a>` : '';
+  };
+  const state = { chain: null, token: null, symbol: '', decimals: 18, balance: null, addr: null, busy: false };
+
+  /* ── 链 ──────────────────────────────────────────────────────────── */
+  async function bootChains() {
+    const live = await chains();
+    if (!live.length) { showChainSegFailed('chainseg', 'chainhint', bootChains); return; }
+    state.chain = await currentChain();
+    const seg = $('chainseg');
+    seg.innerHTML = live.map((c) => `<button type="button" data-id="${c.id}" class="${c.id === state.chain.id ? 'on' : ''}"><span class="chain-ico">${chainIcon(c.id, 13)}</span>${c.name}</button>`).join('');
+    paintChainWords();
+    seg.onclick = async (ev) => {
+      const b = ev.target.closest('button'); if (!b) return;
+      const c = live.find((x) => x.id === Number(b.dataset.id));
+      if (!c || c.id === state.chain.id) return;
+      state.chain = c;
+      for (const x of seg.querySelectorAll('button')) x.classList.toggle('on', x === b);
+      paintChainWords();
+      if (state.addr) { try { await wallet.ensureChain(c); } catch (e) { toast(String(e.message || e), 'bad'); } }
+      if (state.token) loadToken();
+      update(); loadSales();
+    };
+    /* 2026-10-16：钱包自己换链（或用户在顶栏切的）→ **走同一个入口**点一下链选择器，
+       这一页就按新链重画 —— 不再整页 location.reload() 白闪那一下。 */
+    onChainSwitch((id) => { const b = seg.querySelector('button[data-id="' + id + '"]'); if (b) b.click(); });
+    loadSales();
+    update();
+  }
+  bootChains();
+
+  function paintChainWords() {
+    const unit = state.chain?.native || 'ETH';
+    $('chainhint').innerHTML = `The sale runs on <b>${esc(state.chain?.name ?? '—')}</b> and raises <b>${esc(unit)}</b>.`;
+    $('unit').textContent = unit;
+    for (const el of document.querySelectorAll('.unit')) el.textContent = unit;
+  }
+
+  /* ── 代币 ────────────────────────────────────────────────────────── */
+  let tokenTimer = null;
+  $('token').addEventListener('input', () => { clearTimeout(tokenTimer); tokenTimer = setTimeout(loadToken, 420); });
+  async function loadToken() {
+    const value = $('token').value.trim();
+    state.token = null; state.balance = null;
+    $('tokenmeta').textContent = '';
+    if (!/^0x[0-9a-fA-F]{40}$/.test(value) || !state.chain) { update(); return; }
+    $('tokenmeta').textContent = 'Reading the token…';
+    try {
+      const R = { chain: state.chain, timeout: 10_000, retries: 1, label: 'token' };
+      const code = await safeRead(() => provider(state.chain).getCode(value), R);
+      if (!code || code === '0x') throw new Error('no code at this address');
+      const [symbol, decimals] = await safeRead(() => tokenMeta(value, state.chain), R);
+      state.token = value; state.symbol = symbol; state.decimals = decimals;
+      let bal = null;
+      if (state.addr) bal = await safeRead(() => erc20(state.chain, value).balanceOf(state.addr), R);
+      state.balance = bal;
+      $('tokenmeta').innerHTML = `<span class="pill ok">${esc(symbol)}</span><span>${decimals} decimals</span>`
+        + (bal !== null ? `<span>your balance: <b style="color:var(--parch)">${fmtAmount(bal, decimals)}</b></span>` : '');
+    } catch (e) {
+      if (/no code at this address/.test(String(e && e.message))) {
+        $('tokenmeta').innerHTML = '<span class="pill" style="color:var(--bad);border-color:rgba(224,120,95,.4)">not an ERC-20 at this address</span>';
+      } else {
+        showReadFail($('tokenmeta'), { what: 'that token', detail: (e && e.message) || '', chain: state.chain, onRetry: () => loadToken() });
+      }
+    }
+    update();
+  }
+
+  $('router').addEventListener('input', () => {
+    $('lprow').style.display = /^0x[0-9a-fA-F]{40}$/.test($('router').value.trim()) ? '' : 'none';
+    update();
+  });
+
+  /* ── 钱包 ────────────────────────────────────────────────────────── */
+  /**
+   * ⚠ 参数是**事件送来的地址**（`onWallet('accounts', ...)` 的载荷）。
+   *
+   * 事件的回调里**不能再 `wallet.accounts()` 回查一次** —— 真钱包在授权那一刻、
+   * 假钱包在每次 `eth_accounts` 之后都会补发 `accountsChanged`，回查就是自己喂自己：
+   * 一圈圈跑下去（2026-10-15 实测：每秒 400 次 update()，gas 预估永远排不上队，
+   * 而控制台一条错都没有）。事件给了地址用地址；没有载荷（首次调用）才去问。
+   */
+  async function refreshWallet(addrFromEvent, fromEvent = false) {
+    const a = fromEvent ? (addrFromEvent || null) : ((await wallet.accounts())[0] || null);
+    state.addr = a;
+    if (state.token) loadToken();
+    update();
+  }
+  onWallet('accounts', (a) => refreshWallet(a, true));
+  refreshWallet();
+
+  /* ── 读表单 ──────────────────────────────────────────────────────── */
+  function read() {
+    const num = (v) => { try { return v ? window.ethers.parseUnits(v, 18) : null; } catch { return undefined; } };
+    const rate = (() => { try { return $('rate').value.trim() ? window.ethers.parseUnits($('rate').value.trim(), state.decimals) : null; } catch { return undefined; } })();
+    const start = $('start').value ? new Date($('start').value) : null;
+    const end = $('end').value ? new Date($('end').value) : null;
+    const router = $('router').value.trim();
+    const lpbps = Math.round(Number($('lpbps').value || 0) * 100);
+    return {
+      soft: num($('soft').value.trim()), hard: num($('hard').value.trim()),
+      min: num($('min').value.trim()), max: num($('max').value.trim()),
+      rate, start, end, router, lpbps,
+    };
+  }
+
+  /** 合约那条闸：`tokensForSale >= hardCap × rate / 1e18`。这里算出"至少要准备多少"。 */
+  function requiredTokens(f) {
+    if (!f.hard || f.rate === null || f.rate === undefined) return null;
+    return (f.hard * f.rate) / 10n ** 18n;
+  }
+
+  function update() {
+    const f = read();
+    const required = requiredTokens(f);
+    const unit = state.chain?.native || 'ETH';
+    const errs = [];
+    if (!state.chain) errs.push('Pick a chain first.');
+    if (!state.token) errs.push('Enter the token address.');
+    if (f.rate === undefined) errs.push('The price is not a number.');
+    else if (!f.rate) errs.push('Set a price.');
+    if (f.soft === undefined || f.hard === undefined) errs.push('Caps are not numbers.');
+    else if (!f.soft || !f.hard) errs.push('Set both caps.');
+    else if (f.hard < f.soft) errs.push('The hard cap must be at least the soft cap.');
+    if (f.min === undefined || f.max === undefined) errs.push('Limits are not numbers.');
+    else if (!f.min || !f.max || f.max < f.min) errs.push('Max per wallet must be at least the minimum.');
+    if (!f.start || isNaN(f.start) || !f.end || isNaN(f.end)) errs.push('Pick the window.');
+    else if (f.end <= f.start) errs.push('The sale must close after it opens.');
+    if (f.router && !/^0x[0-9a-fA-F]{40}$/.test(f.router)) errs.push('The router address is not an address.');
+    if (f.lpbps > 10000) errs.push('The liquidity share cannot exceed 100%.');
+    if (required && state.balance !== null && state.balance < required) {
+      errs.push(`You need at least ${fmtAmount(required, state.decimals)} ${state.symbol} to fund this sale.`);
+    }
+
+    $('err').classList.toggle('hide', errs.length === 0);
+    { const errEl = $('err'); errEl.innerHTML = '';
+      for (const x of errs.slice(0, 3)) { const d = document.createElement('div'); d.textContent = x; errEl.appendChild(d); }
+      if (errs.length > 3) { const d = document.createElement('div'); d.textContent = `…and ${errs.length - 3} more`; errEl.appendChild(d); } }
+
+    if (required && f.soft) {
+      $('sumtext').className = '';
+      $('sumtext').innerHTML = `You are selling <b>${esc(state.symbol || 'tokens')}</b> at
+        <b>${esc($('rate').value.trim())} per ${esc(unit)}</b>: buyers pay into the sale until
+        <b>${fmtAmount(f.hard, 18)} ${esc(unit)}</b>, and it only happens if it reaches
+        <b>${fmtAmount(f.soft, 18)} ${esc(unit)}</b>. You must fund it with at least
+        <b>${fmtAmount(required, state.decimals)} ${esc(state.symbol || 'tokens')}</b>`
+        + (f.router ? `, and <b>${(f.lpbps / 100).toFixed(0)}%</b> of the raise goes into a pool at the sale price.` : ' — the whole raise comes to you at finalize.');
+    } else {
+      $('sumtext').className = 'muted';
+      $('sumtext').textContent = 'Fill the form — the summary appears here, in one sentence.';
+    }
+
+    const btn = $('go');
+    btn.disabled = state.busy || errs.length > 0;
+    btn.textContent = state.busy ? 'Working…' : (!state.addr ? 'Connect a wallet' : `Approve & launch (${required ? fmtAmount(required, state.decimals) : '—'} tokens)`);
+  }
+  for (const id of ['soft', 'hard', 'min', 'max', 'rate', 'start', 'end', 'lpbps']) $(id).addEventListener('input', update);
+
+  /* ── 创建 ────────────────────────────────────────────────────────── */
+  $('go').onclick = async () => {
+    const f = read();
+    const required = requiredTokens(f);
+    update();
+    if ($('go').disabled || !required) return;
+    state.busy = true; update();
+    let note = null;
+    try {
+      if (!state.addr) { await wallet.connect(); await refreshWallet(); }
+      await wallet.ensureChain(state.chain);
+      const signer = await wallet.signer();
+      const factory = contract(state.chain, 'presaleFactory', ADDR.presaleFactory, signer);
+
+      const allowed = await safeRead(() => erc20(state.chain, state.token).allowance(state.addr, ADDR.presaleFactory),
+        { chain: state.chain, timeout: 10_000, retries: 1, label: 'allowance' });
+      if (allowed < required) {
+        $('steps').textContent = 'Step 1 of 2 — approving the tokens…';
+        const an = txNotice(state.chain, 'Token approval');
+        const at = await erc20(state.chain, state.token, signer).approve(ADDR.presaleFactory, required, { gasLimit: 120_000n });
+        an.sent(at.hash);
+        await at.wait();
+        an.ok('Approval confirmed.');
+      }
+
+      $('steps').textContent = 'Step 2 of 2 — creating and funding the sale…';
+      const params = {
+        token: state.token,
+        startTime: BigInt(Math.floor(f.start.getTime() / 1000)),
+        endTime: BigInt(Math.floor(f.end.getTime() / 1000)),
+        softCap: f.soft, hardCap: f.hard, minBuy: f.min, maxBuy: f.max,
+        rate: f.rate,
+        router: f.router || '0x0000000000000000000000000000000000000000',
+        liquidityBps: f.router ? Math.min(10000, f.lpbps) : 0,
+        tokensForSale: required,
+      };
+      note = txNotice(state.chain, 'Sale');
+      const tx = await factory.createSale(params, { gasLimit: 6_000_000n });
+      note.sent(tx.hash);
+      const rc = await tx.wait();
+      let sale = null;
+      for (const log of rc.logs) {
+        try { const p = factory.interface.parseLog(log); if (p?.name === 'SaleCreated') { sale = p.args.sale; break; } } catch {}
+      }
+      $('done').classList.remove('hide');
+      $('donebody').innerHTML = `
+        <div style="display:grid;gap:10px">
+          <div>The sale is live${sale ? ` at <span class="mono" style="font-size:13px">${esc(sale)}</span>` : ''}.</div>
+          <div class="mono muted" style="font-size:12px;word-break:break-all">tx ${tx.hash}</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+            ${sale ? `<a class="btn btn-p" href="/tools/presale/${state.chain.slug}/${sale}">Open the sale page →</a>` : ''}
+            ${sale ? exLink('/address/' + sale, 'Explorer ↗') : ''}
+          </div>
+          <div class="hint">Anyone with the link can buy — there is no whitelist. Keep the sale page handy: finalizing
+            it (moving the raise or adding the pool) is a separate, permissionless step once the window closes.</div>
+        </div>`;
+      cacheDrop();   // 工厂的清单变了 —— 让"已开的盘"那张表立刻能看到刚开的这一盘
+      note.ok('Sale created' + (sale ? ' at ' + shortAddr(sale) : '') + ' on ' + state.chain.name + '.',
+        sale ? [{ label: 'Open the sale page →', href: '/tools/presale/' + state.chain.slug + '/' + sale }] : []);
+      reveal();
+      loadSales();
+    } catch (e) {
+      const msg = humanizeTxError(e, state.chain);
+      $('err').classList.remove('hide');
+      $('err').textContent = msg;
+      if (note) note.fail(msg); else toast(String(msg).slice(0, 140), 'bad');
+    } finally {
+      state.busy = false;
+      $('steps').textContent = '';
+      update();
+    }
+  };
+
+  /* ── 已开的盘 ──────────────────────────────────────────────────────
+   * ⚠ 和空投那一张表同一个病灶：没有加载态、没有超时、没有重试 —— 一条 RPC 卡住就永远
+   * "Reading…"。现在：骨架屏、每链超时 + 换端点重试、读不到如实说 + 重试按钮、成功值 45 秒缓存。 */
+  async function loadSales() {
+    const tbody = document.querySelector('#tbl tbody');
+    const host = tbody.closest('.panel') || tbody;
+    tbody.innerHTML = skeletonRows(7, 3);
+    const stop = stillReadingAfter(host, 3500, { what: 'the sales', onRetry: () => { cacheDrop(); loadSales(); } });
+    const live = await chains();
+
+    /**
+     * 每条链**并行**、每条 4 秒超时（+ 换端点重试一次）、外面套 9 秒总闸。
+     * 原来逐链串行 + 10 秒超时 + 重试 = 实测 42 秒才给出可用状态（用户看到"卡在 Reading…"）。
+     */
+    const readChain = async (c) => {
+      const count = await safeRead(
+        () => cachedRead('presale.count.' + c.id, 45_000, async () => Number(await contract(c, 'presaleFactory', ADDR.presaleFactory).saleCount())),
+        { chain: c, timeout: 4000, retries: 1, label: 'presale count' },
+      );
+      if (!count) return { rows: [] };
+      const all = await safeRead(
+        () => cachedRead('presale.list.' + c.id, 45_000, () => contract(c, 'presaleFactory', ADDR.presaleFactory).allSales()),
+        { chain: c, timeout: 4000, retries: 1, label: 'presale list' },
+      );
+      const rows = [];
+      for (let i = all.length - 1; i >= Math.max(0, all.length - 8); i--) rows.push({ c, addr: all[i] });
+      return { rows };
+    };
+
+    const results = await Promise.all(live.map(async (c) => {
+      const r = await Promise.race([
+        readChain(c).catch((e) => ({ failed: true, error: (e && e.message) || '' })),
+        raceTimeout(9000).then((s) => (s === TOO_SLOW ? { failed: true, slow: true } : s)),
+      ]);
+      return { c, ...(r || { failed: true }) };
+    }));
+    stop();
+
+    const rows = [];
+    const failed = [];
+    for (const r of results) { if (r.failed) failed.push(r.c); else for (const x of r.rows) rows.push(x); }
+    $('note').textContent = rows.length
+      ? 'Read from the factory and the sales themselves, on every chain we are deployed to. A sale whose chain did not answer is missing from this table rather than shown as empty.'
+      : '';
+    if (!rows.length && !failed.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:0">' + emptyState({
+        title: 'No sales yet.',
+        body: 'A presale takes one transaction: pick the caps, pick the price, fund it with the tokens.',
+        actions: [{ label: 'Create a sale', href: '#', primary: true }],
+      }) + '</td></tr>';
+      const a = tbody.querySelector('.empty-acts a');
+      if (a) a.onclick = (ev) => { ev.preventDefault(); $('soft').focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+      return;
+    }
+    if (!rows.length && failed.length) {
+      /* 一条都没读到 ≠ 没有销售（那是最伤的一种假数据）—— 说清是"这次没读到"并给重试 */
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:0">' + emptyState({
+        title: 'Could not read the sales.',
+        body: 'Every chain we asked did not answer this time. Nothing is shown rather than showing an empty list.',
+      }) + '</td></tr>';
+      appendSalesFail(failed);
+      return;
+    }
+    const details = await Promise.all(rows.map(async ({ c, addr }) => {
+      try {
+        const s = contract(c, 'presale', addr);
+        const [token, raised, soft, hard, startTime, endTime, status] = await Promise.all([
+          s.token(), s.raised(), s.softCap(), s.hardCap(), s.startTime(), s.endTime(), s.status(),
+        ]);
+        let symbol = '—';
+        try { symbol = await erc20(c, token).symbol(); } catch {}
+        return { token, symbol, raised, soft, hard, startTime, endTime, status };
+      } catch { return null; }
+    }));
+    tbody.innerHTML = rows.map(({ c, addr }, i) => {
+      const d = details[i];
+      if (!d) return `<tr><td colspan="7" class="muted" style="padding:18px 14px">${esc(shortAddr(addr))} — could not be read on ${esc(c.name)}.</td></tr>`;
+      const pct = Number(d.hard) > 0 ? Number(d.raised) * 100 / Number(d.hard) : 0;
+      const unit = c.native;
+      const pill = d.status === 'live' ? '<span class="pill lock"><span class="dot"></span>live</span>'
+        : d.status === 'upcoming' ? '<span class="pill">upcoming</span>'
+        : d.status === 'failed' ? '<span class="pill" style="color:var(--bad);border-color:rgba(224,120,95,.4)">failed — refunds open</span>'
+        : d.status === 'finalized' ? '<span class="pill ok">finalized</span>'
+        : '<span class="pill">ended</span>';
+      return `<tr>
+        <td>${esc(d.symbol)} <span class="mono muted" style="font-size:12px">${shortAddr(addr)}</span></td>
+        <td><span class="chip">${esc(c.name)}</span></td>
+        <td>${fmtAmount(d.raised, 18, 4)} ${esc(unit)}
+          <div class="bar" style="margin-top:6px;max-width:140px"><i class="${pct >= 100 ? 'ok' : ''}" style="width:${Math.min(100, pct).toFixed(1)}%"></i></div></td>
+        <td>${fmtAmount(d.soft, 18, 4)} / ${fmtAmount(d.hard, 18, 4)} ${esc(unit)}
+          <div class="muted" style="font-size:12px">soft / hard</div></td>
+        <td class="muted" style="font-size:12.5px">${fmtDate(d.startTime)}<br>→ ${fmtDate(d.endTime)}</td>
+        <td>${pill}</td>
+        <td style="text-align:right"><a href="/tools/presale/${c.slug}/${addr}">Open →</a></td>
+      </tr>`;
+    }).join('');
+    appendSalesFail(failed);
+  }
+
+  /** "有链没读到"那一行 + 重试（在表格尾部；重试先轮换 RPC、清缓存，再重来一遍）。 */
+  function appendSalesFail(failed) {
+    if (!failed.length) return;
+    const tbody = document.querySelector('#tbl tbody');
+    tbody.insertAdjacentHTML('beforeend',
+      '<tr><td colspan="7" style="padding:14px">'
+      + '<div class="readfail"><b>Could not read the sales on ' + esc(failed.map((c) => c.name).join(', '))
+      + ' this time — please retry.</b> <button class="btn btn-s" type="button" id="salesretry">Retry</button></div></td></tr>');
+    document.getElementById('salesretry').onclick = async () => {
+      const b = document.getElementById('salesretry');
+      b.disabled = true; b.textContent = 'Retrying…';
+      for (const c of failed) { try { await rotateRpc(c); } catch { /* 单端点链没什么可轮 */ } }
+      cacheDrop();
+      await loadSales();
+    };
+  }
+</script>
+</body>
+</html>

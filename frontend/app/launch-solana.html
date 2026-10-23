@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launch on Solana · OAKEN</title>
+<meta name="description" content="Launch a fixed-supply SPL token on Solana through OAKEN Factory, or create it on pump.fun. Your wallet signs; no OAKEN fee.">
+<meta property="og:title" content="Launch on Solana · OAKEN">
+<meta property="og:description" content="Two routes on Solana: OAKEN Factory (fixed supply, no mint authority) and pump.fun.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://oaken.one/launch/solana">
+<meta property="og:image" content="https://oaken.one/logo512.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below.';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'+err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+<style>
+  body.sol-page #gas-chip, body.sol-page #connect { display: none !important; }
+  .flow { display: grid; grid-template-columns: 1.15fr .85fr; gap: 26px; align-items: start; }
+  .panel + .panel { margin-top: 16px; }
+  .panel .body { display: grid; gap: 13px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .hint { color: var(--muted); font-size: 12.5px; line-height: 1.55; }
+  .warnline { color: #e0a85f; }
+  .badline { color: var(--bad, #e0785f); }
+  .okline { color: var(--ok, #6fbf73); }
+  .lab { display: flex; align-items: baseline; gap: 10px; }
+  input.i, select.i, textarea.i { width: 100%; box-sizing: border-box; }
+  textarea.i { min-height: 78px; resize: vertical; font: inherit; }
+  .filebtn { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: var(--r);
+             padding: 10px 14px; cursor: pointer; color: var(--parch); font-size: 13px; background: var(--panel); }
+  .filebtn:hover { border-color: var(--line-gold); }
+  .preview { display: flex; gap: 12px; align-items: center; border: 1px solid var(--line); border-radius: var(--r);
+             padding: 10px; background: var(--panel); }
+  .preview img { width: 56px; height: 56px; object-fit: cover; border-radius: 4px; background: #1b1814; }
+  .preview .meta { min-width: 0; }
+  .preview b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .preview span { color: var(--muted); font-size: 12px; }
+  .routes { display: grid; gap: 10px; }
+  .route { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
+           border: 1px solid var(--line); border-radius: var(--r); padding: 13px 15px; background: var(--panel); }
+  .route.on { border-color: var(--line-gold); background: rgba(217,163,67,.05); }
+  .route b { font-size: 14px; }
+  .route .sub { color: var(--muted); font-size: 12.5px; margin-top: 3px; display: block; line-height: 1.5; }
+  .route button { white-space: nowrap; }
+  .walletrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .walletrow .addr { font: 12px/1.4 ui-monospace, Consolas, monospace; color: var(--parch); }
+  .walletbtns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .track { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .track li { display: grid; grid-template-columns: 14px 1fr; gap: 10px; align-items: baseline;
+              border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; background: var(--panel); }
+  .track li .dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(240,228,208,.22); }
+  .track li[data-state="run"] .dot { background: var(--gold); animation: pulse 1.2s ease-in-out infinite; }
+  .track li[data-state="done"] .dot { background: var(--ok, #6fbf73); }
+  .track li[data-state="fail"] { border-color: rgba(224,120,95,.5); }
+  .track li[data-state="fail"] .dot { background: var(--bad, #e0785f); }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+  .result { display: grid; gap: 10px; }
+  .result .mono { word-break: break-all; font-size: 12.5px; }
+  .btnrow { display: flex; gap: 10px; flex-wrap: wrap; }
+  .summary { background: var(--panel); border: 1px solid var(--line-gold); border-radius: var(--r); padding: 20px 22px; }
+  .summary b { color: var(--gold); }
+  .kv2 { display: grid; gap: 9px; margin-top: 12px; }
+  .kv2 div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; border-bottom: 1px dashed var(--line); padding-bottom: 8px; }
+  .kv2 span:first-child { color: var(--muted); }
+  .kv2 span:last-child { text-align: right; }
+  .riskbox { border: 1px solid rgba(224,120,95,.35); background: rgba(224,120,95,.05); border-radius: var(--r);
+             padding: 12px 14px; font-size: 12.5px; line-height: 1.6; color: var(--parch); }
+  .riskbox b { color: #e0a85f; }
+  .install a { color: var(--gold); }
+  @media (max-width: 940px) { .flow { grid-template-columns: 1fr; } .row2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body class="sol-page">
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/vaultdoor.webp"><source src="/app/media/vaultdoor-live.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Solana · launch</div>
+    <h1 class="reveal">Two doors onto Solana.</h1>
+    <p class="lede reveal">OAKEN Factory writes a fixed-supply SPL token with no mint authority and no owner.
+      pump.fun puts it on its bonding curve. Your wallet signs both; OAKEN takes no fee.</p>
+  </div>
+</section>
+
+<main class="wrap">
+  <p class="hint" style="margin:0 0 18px">Looking for an EVM launch instead? <a href="/launch" style="color:var(--gold)">Open the EVM launchpad →</a></p>
+
+  <div class="flow">
+    <div>
+      <div class="panel">
+        <div class="head"><h3>1 · Solana wallet</h3><span class="steps-mini" id="netmini">mainnet-beta</span></div>
+        <div class="body">
+          <div id="walletbox">
+            <div class="hint" id="walletstate">Looking for a Solana wallet…</div>
+            <div class="walletbtns" id="walletbtns" style="margin-top:10px"></div>
+            <div class="install hint" id="walletinstall" style="display:none;margin-top:10px">
+              No Solana wallet found in this browser. Install
+              <a href="https://phantom.app/" target="_blank" rel="noopener">Phantom</a> or
+              <a href="https://solflare.com/" target="_blank" rel="noopener">Solflare</a>, then reload this page.
+              OAKEN never asks for a seed phrase.
+            </div>
+          </div>
+          <div class="walletrow" id="walletrow" style="display:none">
+            <span class="addr" id="walletaddr"></span>
+            <span class="hint" id="walletbal"></span>
+            <button class="btn btn-s" type="button" id="walletdisconnect">Disconnect</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="head"><h3>2 · Choose a route</h3></div>
+        <div class="body">
+          <div class="routes" id="routes">
+            <div class="route on" data-route="own">
+              <div>
+                <b>OAKEN Factory</b>
+                <span class="sub">Fixed-supply SPL token + Metaplex metadata. Mint authority is revoked, so no one can ever mint more. No owner, no pause, no OAKEN fee. There is no market until you create one.</span>
+              </div>
+              <button type="button" class="btn btn-s" data-pick="own">Selected</button>
+            </div>
+            <div class="route" data-route="pump">
+              <div>
+                <b>pump.fun</b>
+                <span class="sub">Create the coin on pump.fun's bonding curve. pump.fun's program and rules run the market, graduation and fees; the creator share is paid by pump.fun, not by us.</span>
+              </div>
+              <button type="button" class="btn btn-s" data-pick="pump">Use this</button>
+            </div>
+          </div>
+          <div class="hint" id="routehint">OAKEN Factory creates the token directly; pump.fun is a third-party launch service.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="head"><h3>3 · Token</h3></div>
+        <div class="body">
+          <div class="row2">
+            <div>
+              <label class="f" for="name">Name</label>
+              <input class="i" id="name" placeholder="Ex: Oaken Coin" maxlength="32" autocomplete="off">
+            </div>
+            <div>
+              <label class="f" for="symbol">Symbol</label>
+              <input class="i" id="symbol" placeholder="OAK" maxlength="10" autocomplete="off">
+            </div>
+          </div>
+
+          <div id="ownsrow" class="row2">
+            <div>
+              <label class="f" for="supply">Supply</label>
+              <input class="i" id="supply" value="1000000000" inputmode="decimal" autocomplete="off">
+              <div class="hint">Minted once, then the mint authority is revoked.</div>
+            </div>
+            <div>
+              <label class="f" for="decimals">Decimals</label>
+              <select class="i" id="decimals">
+                <option value="6" selected>6 (recommended)</option>
+                <option value="9">9</option>
+              </select>
+              <div class="hint">6 is what pump.fun and most Solana tools use.</div>
+            </div>
+          </div>
+
+          <div id="pumpbuyrow">
+            <label class="f" for="p0buy">Developer buy (SOL, required)</label>
+            <input class="i" id="p0buy" placeholder="e.g. 0.01" inputmode="decimal" autocomplete="off">
+            <div class="hint">pump.fun: spend this much SOL on the new curve in the <b>same transaction</b> that
+              creates the coin. Required — enter an amount above 0. This is pump.fun's bonding curve, not a market
+              OAKEN runs.</div>
+          </div>
+
+          <div>
+            <label class="f" for="desc">Description</label>
+            <textarea class="i" id="desc" maxlength="1000" placeholder="What is this coin? Keep it short and true."></textarea>
+          </div>
+
+          <div>
+            <label class="f">Image</label>
+            <div class="lab">
+              <label class="filebtn" for="imgfile">Choose an image</label>
+              <input id="imgfile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
+              <span class="hint" id="imgstate">No file chosen</span>
+            </div>
+            <input class="i" id="imgurl" placeholder="…or paste an https:// image URL" autocomplete="off" style="margin-top:8px">
+            <div class="hint">We crop to 512×512 and host it on our own image service. The token stays on-chain even if the image host is not around.</div>
+          </div>
+
+          <div class="preview" id="preview" style="display:none">
+            <img id="previewimg" alt="">
+            <div class="meta"><b id="previewname">—</b><span id="previewsym">—</span></div>
+          </div>
+
+          <div class="row2">
+            <div>
+              <label class="f" for="web">Website (optional)</label>
+              <input class="i" id="web" placeholder="https://…" autocomplete="off">
+            </div>
+            <div>
+              <label class="f" for="x">X / Twitter (optional)</label>
+              <input class="i" id="x" placeholder="https://x.com/…" autocomplete="off">
+            </div>
+          </div>
+          <div>
+            <label class="f" for="tg">Telegram (optional)</label>
+            <input class="i" id="tg" placeholder="https://t.me/…" autocomplete="off">
+          </div>
+
+          <div class="riskbox" id="routeRisk">
+            <b>OAKEN Factory is not a market.</b> It only creates the token. There is no developer buy here — a token
+            with no liquidity cannot be bought
+            or sold — you will need a pool or a launchpad for that. The metadata image is stored off-chain.
+          </div>
+
+          <div class="err hide" id="err"></div>
+          <button class="btn btn-p wide" type="button" id="go">Connect a Solana wallet</button>
+          <div class="hint" id="gohint">Nothing is sent until you press the button and approve it in your wallet.</div>
+        </div>
+      </div>
+
+      <div class="panel" id="trackpanel" style="display:none">
+        <div class="head"><h3>Progress</h3></div>
+        <div class="body"><ul class="track" id="track"></ul></div>
+      </div>
+
+      <div class="panel" id="done" style="display:none">
+        <div class="head"><h3>Launched.</h3></div>
+        <div class="body"><div class="result" id="donebody"></div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="summary">
+        <div class="eyebrow" style="margin-bottom:12px">Before you sign</div>
+        <div id="sumtext" class="muted">Connect a wallet and fill the form — the summary appears here.</div>
+        <div class="kv2" id="sumkv"></div>
+      </div>
+
+      <div class="panel" style="margin-top:16px">
+        <div class="head"><h3>What it costs</h3></div>
+        <div class="body">
+          <div class="hint" id="costline">Reading the chain…</div>
+          <div class="hint">Solana charges rent for the accounts a launch creates (paid once, refundable only by closing them).
+            The wallet shows the exact amount before you approve. OAKEN charges no launch fee on either route.</div>
+          <div class="hint" id="balanceLine">—</div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px">
+        <div class="head"><h3>After launch</h3></div>
+        <div class="body">
+          <div class="hint">Lock tokens on Solana from the Solana locks page. It names the program it will use —
+            <b>Jupiter Lock</b> while OAKEN's own lock program is still undeployed — before it asks for a signature.</div>
+          <a class="btn btn-s" href="/locks/solana">Open Solana locks →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="/app/vendor/oaken-buffer.iife.min.js"></script>
+<script src="/app/vendor/solana-web3.iife.min.js"></script>
+<script type="module">
+  import { shell, toast, fmtAmount, publishLaunch } from '/app/oaken.js';
+  import * as SOL from '/app/solana.js';
+
+  shell({ active: 'launch' });
+  document.documentElement.dataset.oakenBoot = '1';
+
+  const $ = (id) => document.getElementById(id);
+  const state = {
+    route: 'own', addr: null, file: null, fileUrl: '', busy: false, solUsd: null,
+    lastLaunch: null, programLive: false,
+  };
+
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function short(a) { return a ? a.slice(0, 4) + '…' + a.slice(-4) : '—'; }
+  function usd(v) { return state.solUsd ? ` (~$${(v * state.solUsd).toFixed(2)})` : ''; }
+
+  function err(msg) {
+    const el = $('err');
+    el.classList.remove('hide');
+    el.textContent = msg;
+  }
+  function clearErr() { $('err').classList.add('hide'); $('err').textContent = ''; }
+
+  function paintWallet() {
+    const list = SOL.wallets();
+    $('walletinstall').style.display = list.length ? 'none' : '';
+    $('walletbtns').innerHTML = list.map((w) =>
+      `<button class="btn btn-s" type="button" data-w="${esc(w.key)}">${esc(w.name)}</button>`).join('');
+    for (const b of $('walletbtns').querySelectorAll('[data-w]')) {
+      b.onclick = async () => {
+        clearErr();
+        b.disabled = true;
+        try {
+          await SOL.connect(b.dataset.w);
+          await afterConnect();
+        } catch (e) {
+          err(SOL.humanize(e));
+        } finally { b.disabled = false; }
+      };
+    }
+    const connected = Boolean(state.addr);
+    $('walletstate').style.display = connected ? 'none' : '';
+    $('walletbtns').style.display = connected ? 'none' : '';
+    $('walletrow').style.display = connected ? '' : 'none';
+    if (connected) {
+      $('walletaddr').textContent = state.addr;
+      loadBalance();
+    }
+    update();
+  }
+
+  async function loadBalance() {
+    if (!state.addr) return;
+    try {
+      const lam = await SOL.balance();
+      const sol = SOL.lamportsToSol(lam);
+      $('walletbal').textContent = `${sol.toFixed(4)} SOL${usd(sol)}`;
+      $('balanceLine').textContent = `Wallet balance: ${sol.toFixed(4)} SOL${usd(sol)}.`;
+    } catch {
+      $('walletbal').textContent = 'balance —';
+      $('balanceLine').textContent = 'Wallet balance could not be read right now.';
+    }
+  }
+
+  async function afterConnect() {
+    state.addr = SOL.address();
+    paintWallet();
+    await loadCosts();
+  }
+
+  async function loadCosts() {
+    try {
+      if (!state.solUsd) state.solUsd = await SOL.solPriceUsd();
+      const lam = await (async () => {
+        try { return await SOL.balance(); } catch { return null; }
+      })();
+      const rent = 0.0014616;   // 82-byte SPL mint, exact value is read again by the wallet
+      const ata = 0.00203928;
+      const meta = 0.015;       // approximate Metaplex metadata rent, depends on name/uri length
+      const own = rent + ata + meta + 0.00001;
+      $('costline').innerHTML = state.route === 'own'
+        ? `OAKEN Factory: about <b>${own.toFixed(4)} SOL${usd(own)}</b> for mint + token account + metadata rent and network fees.
+           The exact amount is shown by your wallet before signing.`
+        : `pump.fun: the wallet shows the exact rent and network fee before signing; pump.fun's own creation rules apply.
+           OAKEN adds nothing.`;
+      if (lam !== null) {
+        const have = SOL.lamportsToSol(lam);
+        $('balanceLine').textContent = `Wallet balance: ${have.toFixed(4)} SOL${usd(have)}.`;
+        if (have < 0.005) $('gohint').innerHTML = '<span class="warnline">This wallet looks low on SOL. Creating accounts needs a little SOL for rent and fees.</span>';
+      }
+    } catch { /* the page already says balances are unavailable */ }
+  }
+
+  function readForm() {
+    return {
+      name: $('name').value.trim(),
+      symbol: $('symbol').value.trim().toUpperCase(),
+      supply: $('supply').value.trim(),
+      decimals: Number($('decimals').value),
+      description: $('desc').value.trim(),
+      imageUrl: $('imgurl').value.trim(),
+      website: $('web').value.trim(),
+      twitter: $('x').value.trim(),
+      telegram: $('tg').value.trim(),
+      buySol: $('p0buy').value.trim(),
+    };
+  }
+
+  function validate() {
+    const f = readForm();
+    const out = [];
+    if (!state.addr) out.push('Connect a Solana wallet.');
+    if (!f.name) out.push('Enter a name.');
+    if (f.name.length > 32) out.push('Name is too long.');
+    if (!f.symbol) out.push('Enter a symbol.');
+    if (f.symbol.length > 10) out.push('Symbol is too long.');
+    if (state.route === 'own') {
+      const n = Number(f.supply);
+      if (!(n > 0) || !Number.isFinite(n)) out.push('Supply must be a positive number.');
+    } else if (!f.buySol) {
+      out.push('Enter the developer buy amount — it is required on pump.fun.');
+    } else {
+      try {
+        if (SOL.solToLamports(f.buySol) <= 0n) out.push('The developer buy must be above 0 SOL.');
+      } catch (e) { out.push('Buy amount: ' + String(e.message || e)); }
+    }
+    if (f.imageUrl && !/^https?:\/\//i.test(f.imageUrl)) out.push('The image URL must start with https:// or http://.');
+    for (const [v, label] of [[f.website, 'Website'], [f.twitter, 'X'], [f.telegram, 'Telegram']]) {
+      if (v && !/^https?:\/\//i.test(v)) out.push(`${label} must start with https://`);
+    }
+    return out;
+  }
+
+  function update() {
+    const f = readForm();
+    const risks = {
+      own: '<b>OAKEN Factory is not a market.</b> It only creates the token. There is no developer buy here — a token with no liquidity cannot be bought or sold. You will need a pool or a launchpad for that. The metadata image is stored off-chain.',
+      pump: '<b>pump.fun runs this one.</b> Its program, bonding curve, graduation and fee rules apply. pump.fun can change its program and fees; OAKEN cannot see or move the token after creation.',
+    };
+    $('routeRisk').innerHTML = risks[state.route];
+    for (const r of $('routes').querySelectorAll('.route')) {
+      const on = r.dataset.route === state.route;
+      r.classList.toggle('on', on);
+      const b = r.querySelector('button');
+      b.textContent = on ? 'Selected' : 'Use this';
+    }
+    $('ownsrow').style.display = state.route === 'own' ? '' : 'none';
+    $('pumpbuyrow').style.display = state.route === 'pump' ? '' : 'none';
+    $('routehint').textContent = state.route === 'own'
+      ? 'OAKEN Factory creates the token directly; pump.fun is a third-party launch service.'
+      : 'pump.fun creates and runs the market; OAKEN only encodes the create transaction.';
+
+    const n = f.name || '—';
+    const s = f.symbol || '—';
+    $('preview').style.display = (state.fileUrl || f.imageUrl) ? '' : 'none';
+    $('previewimg').src = state.fileUrl || f.imageUrl || '';
+    $('previewname').textContent = n;
+    $('previewsym').textContent = s + (state.route === 'own' ? ` · ${f.supply || '—'} supply · ${f.decimals} decimals` : ' · pump.fun');
+
+    $('sumtext').innerHTML = f.name && f.symbol
+      ? `Launch <b>${esc(f.name)} (${esc(s)})</b> on Solana through <b>${state.route === 'own' ? 'OAKEN Factory' : 'pump.fun'}</b>.`
+      : 'Connect a wallet and fill the form — the summary appears here.';
+    const kv = [];
+    kv.push(['Network', 'Solana mainnet-beta']);
+    kv.push(['Route', state.route === 'own' ? 'OAKEN Factory' : 'pump.fun']);
+    if (state.route === 'own') {
+      kv.push(['Supply', f.supply ? Number(f.supply).toLocaleString('en-US') : '—']);
+      kv.push(['Mint authority', 'revoked after metadata']);
+    } else {
+      kv.push(['Developer buy', f.buySol ? f.buySol + ' SOL' : 'Required']);
+    }
+    kv.push(['OAKEN fee', '0']);
+    kv.push(['Wallet', state.addr ? short(state.addr) : 'not connected']);
+    $('sumkv').innerHTML = kv.map(([k, v]) => `<div><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join('');
+
+    const errs = validate();
+    $('go').textContent = !state.addr ? 'Connect a Solana wallet' : (state.busy ? 'Working…' : (state.route === 'own' ? 'Launch on Solana' : 'Launch on pump.fun'));
+    $('go').disabled = state.busy || (state.addr && errs.length > 0);
+  }
+
+  /* wallet events */
+  SOL.onSolWallet('accounts', (a) => { state.addr = a; paintWallet(); });
+  SOL.onSolWallet('disconnect', () => { state.addr = null; paintWallet(); });
+
+  $('walletdisconnect').onclick = async () => {
+    await SOL.disconnect();
+    state.addr = null;
+    paintWallet();
+  };
+
+  for (const b of $('routes').querySelectorAll('[data-pick]')) {
+    b.onclick = () => {
+      state.route = b.dataset.pick;
+      state.lastLaunch = null;
+      $('done').style.display = 'none';
+      $('trackpanel').style.display = 'none';
+      update();
+      loadCosts();
+    };
+  }
+
+  $('imgfile').onchange = () => {
+    const f = $('imgfile').files && $('imgfile').files[0];
+    state.file = f || null;
+    $('imgstate').textContent = f ? f.name : 'No file chosen';
+    if (state.fileUrl && state.fileUrl.startsWith('blob:')) URL.revokeObjectURL(state.fileUrl);
+    state.fileUrl = f ? URL.createObjectURL(f) : '';
+    update();
+  };
+  for (const id of ['name', 'symbol', 'supply', 'decimals', 'p0buy', 'desc', 'imgurl', 'web', 'x', 'tg']) {
+    $(id).addEventListener('input', update);
+    $(id).addEventListener('change', update);
+  }
+
+  function trackStep(key, label) {
+    let el = document.getElementById('tr-' + key);
+    if (!el) {
+      el = document.createElement('li');
+      el.id = 'tr-' + key;
+      el.innerHTML = `<span class="dot"></span><span>${esc(label)}</span>`;
+      $('track').appendChild(el);
+    }
+    return el;
+  }
+  const STEP_LABEL = { upload: 'Upload image and metadata', create: 'Create the token', metadata: 'Write metadata and revoke mint authority' };
+  function setStep(key, stateName, text) {
+    const el = trackStep(key, STEP_LABEL[key] || key);
+    el.dataset.state = stateName;
+    el.querySelector('span:last-child').textContent = text || STEP_LABEL[key] || key;
+  }
+
+  $('go').onclick = async () => {
+    clearErr();
+    if (!state.addr) {
+      const list = SOL.wallets();
+      if (!list.length) { err('No Solana wallet found. Install Phantom or Solflare, then reload.'); return; }
+      try { await SOL.connect(list[0].key); await afterConnect(); } catch (e) { err(SOL.humanize(e)); }
+      return;
+    }
+    const errs = validate();
+    if (errs.length) { err(errs.slice(0, 3).join(' ')); return; }
+    const f = readForm();
+    state.busy = true;
+    update();
+    $('trackpanel').style.display = '';
+    $('track').innerHTML = '';
+    $('done').style.display = 'none';
+    const onStep = (step, sig) => {
+      try {
+        if (step === 'upload') setStep('upload', 'run', 'Uploading image and metadata…');
+        if (step === 'building') setStep('create', 'run', 'Building the transaction…');
+        if (step === 'signing') setStep('create', 'run', 'Waiting for your wallet…');
+        if (step === 'sending') setStep('create', 'run', 'Sending the transaction…');
+        if (step === 'create') setStep('create', 'run', 'Creating the token…');
+        if (step === 'metadata') setStep('metadata', 'run', 'Writing metadata and revoking mint authority…');
+        if (step === 'done') {
+          setStep('create', 'done', 'Token created');
+          if (state.route === 'own') setStep('metadata', 'done', 'Metadata written; mint authority revoked');
+        }
+        if (step === 'sent' && sig) {
+          const el = trackStep('create', '');
+          el.dataset.state = 'run';
+          el.querySelector('span:last-child').innerHTML = 'Sent — waiting for the block… <a href="' + SOL.SOLSCAN_TX(sig) + '" target="_blank" rel="noopener">view</a>';
+        }
+      } catch { /* tracking must never break the launch */ }
+    };
+    try {
+      const buyLamports = state.route === 'pump' && f.buySol ? SOL.solToLamports(f.buySol) : 0n;
+      const res = state.route === 'own'
+        ? await SOL.launchOwn({ ...f, imageFile: state.file, onStep })
+        : await SOL.launchPump({ ...f, imageFile: state.file, buyLamports, onStep });
+      state.lastLaunch = res;
+      try { setStep('upload', 'done', 'Image and metadata uploaded'); } catch { /* noop */ }
+      if (res.metadataError) {
+        setStep('metadata', 'fail', 'Token is live, but metadata failed: ' + res.metadataError);
+      }
+      showDone(res);
+      try {
+        publishLaunch({
+          chainId: 0, token: res.mint, name: res.name, symbol: res.symbol,
+          route: res.route === 'own' ? 'OAKEN Solana factory' : 'pump.fun',
+          creator: SOL.address(), txHash: res.signature,
+        });
+      } catch { /* 全站发射记录失败不影响发射本身 */ }
+      loadBalance();
+      loadCosts();
+    } catch (e) {
+      const msg = SOL.humanize(e);
+      err(msg);
+      const running = [...$('track').querySelectorAll('li[data-state="run"]')];
+      running.forEach((el, i) => {
+        const last = i === running.length - 1;
+        el.dataset.state = last ? 'fail' : 'done';
+        el.querySelector('span:last-child').textContent = last ? msg : 'Done';
+      });
+      toast(msg.slice(0, 140), 'bad');
+    } finally {
+      state.busy = false;
+      update();
+    }
+  };
+
+  function showDone(res) {
+    const isOwn = res.route === 'own';
+    const links = [
+      `<a class="btn btn-s" href="${SOL.SOLSCAN_TOKEN(res.mint)}" target="_blank" rel="noopener">View on Solscan ↗</a>`,
+      isOwn ? '' : `<a class="btn btn-s" href="https://pump.fun/coin/${res.mint}" target="_blank" rel="noopener">Open on pump.fun ↗</a>`,
+      `<a class="btn btn-s" href="/launch/solana">Launch another</a>`,
+    ].filter(Boolean).join('');
+    $('donebody').innerHTML = `
+      <div><b>${esc(res.name || '')}</b> <span class="muted">(${esc(res.symbol || '')})</span> is on Solana.</div>
+      <div class="mono">mint ${esc(res.mint)} <button class="copybtn" type="button" data-copy="${esc(res.mint)}">copy</button></div>
+      ${isOwn ? `<div class="hint">Supply ${Number(res.supply || 0).toLocaleString('en-US')} base units · ${res.decimals} decimals · mint authority revoked${res.metadataSignature ? '' : ' — metadata not confirmed'}</div>` : '<div class="hint">pump.fun owns the market from here.</div>'}
+      ${res.metadataError ? `<div class="warnline">The token exists, but the metadata transaction did not land: ${esc(res.metadataError)}. Nothing is lost; the mint and supply are already on-chain.</div>` : ''}
+      <div class="btnrow">${links}</div>
+      <div class="hint">Locking is a separate page — nothing was locked in this launch. The lock page names the program it will use before you sign.</div>
+      ${(state.jupLive || state.programLive) ? '<a class="btn btn-p" href="/locks/solana">Lock on Solana →</a>' : ''}`;
+    $('done').style.display = '';
+    try { toast('Launched on Solana', 'ok'); } catch { /* noop */ }
+  }
+
+  (async () => {
+    try {
+      state.solUsd = await SOL.solPriceUsd();
+      await SOL.ready();
+      [state.programLive, state.jupLive] = await Promise.all([SOL.programLive(), SOL.jupLive()]);
+      const restored = await SOL.restore();
+      state.addr = restored || SOL.address();
+      paintWallet();
+      await loadCosts();
+    } catch (e) {
+      err(SOL.humanize(e));
+      paintWallet();
+    }
+    update();
+  })();
+</script>
+</body>
+</html>

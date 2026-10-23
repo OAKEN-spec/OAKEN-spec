@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FAQ · OAKEN</title>
+<meta name="description" content="Straight answers about OAKEN: why there is no audit, how to verify a lock yourself, Locks versus Bonds, third-party launchpad risk, fees, failed transactions and metadata.">
+<meta property="og:title" content="FAQ — the questions the form does not answer">
+<meta property="og:description" content="No audit claim. How to verify. Locks versus Bonds. Third-party launchpad risk. Fees, failures and metadata.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://oaken.one/faq">
+<meta property="og:image" content="https://oaken.one/logo512.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/key.webp"><source src="/app/media/key.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">FAQ</div>
+    <h1 class="reveal">The questions the form does not answer.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:34px">
+    <div class="reveal" style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="pill" href="#trust">Trust &amp; verification</a>
+      <a class="pill" href="#locks">Locks</a>
+      <a class="pill" href="#bonds">Bonds</a>
+      <a class="pill" href="#launch">Launch &amp; third parties</a>
+      <a class="pill" href="#tools">Tools</a>
+      <a class="pill" href="#failures">Failures &amp; wallets</a>
+      <a class="pill" href="#metadata">Metadata &amp; privacy</a>
+    </div>
+  </section>
+
+  <section class="band" id="trust">
+    <div class="wrap">
+      <div class="reveal"><div class="eyebrow">TRUST &amp; VERIFICATION</div>
+        <h2 class="sec">Start with what we do not claim.</h2><div class="sec-rule"></div></div>
+      <div class="grid2" data-stagger style="margin-top:26px">
+        <div class="card"><h3>Is OAKEN audited?</h3>
+          <p>No, and we do not claim it. There is no audit badge on this site. Verification means the published
+            source compiles to the deployed bytecode; it does not mean someone reviewed every failure mode.
+            The contracts are deliberately short and have no owner — read them, or have someone you trust read them.</p></div>
+        <div class="card"><h3>How do I verify a contract?</h3>
+          <p>Paste its address into <a href="https://sourcify.dev" target="_blank" rel="noopener">Sourcify</a> or
+            the chain's explorer. All eight contracts are exact matches on all four chains. The
+            <a href="/verify">Verify page</a> has the addresses, the status table and copy-paste eth_call recipes.</p></div>
+        <div class="card"><h3>Who owns OAKEN?</h3>
+          <p>The lock contracts have no owner, no admin and no upgrade path. The Bonds contracts have an admin —
+            a 2-of-3 Safe behind a 24h Timelock — and that boundary is stated on every Bonds page. The website is
+            a reader; it is not the vault.</p></div>
+        <div class="card"><h3>What if this website disappears?</h3>
+          <p>Locks still release. The schedule is stored in the contracts on four chains, and anyone can pay the
+            gas to send a due lock to its beneficiary. You do not need this site, our servers or our permission.</p></div>
+        <div class="card"><h3>Do you charge a protocol fee?</h3>
+          <p>No protocol fee on locks or on our own factory: you pay gas only. Third-party launchpads charge their
+            own fees, shown before you sign, and those go to them. Bonds have a 0.10% redemption fee that goes to
+            stakers, not to a company treasury.</p></div>
+        <div class="card"><h3>Is the same address really on every chain?</h3>
+          <p>Yes. The deployments use a deterministic salt, so the address is derived from the bytecode. The vault,
+            adapter, position lock, token factory, MultiSender, airdrop, presale factory and launcher share one
+            address across Robinhood Chain, BNB Chain, Base and Polygon.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band ambient" id="locks">
+    <div class="wrap">
+      <div class="reveal"><div class="eyebrow">LOCKS</div>
+        <h2 class="sec">How the vault behaves.</h2><div class="sec-rule"></div></div>
+      <div class="grid2" data-stagger style="margin-top:26px">
+        <div class="card"><h3>Can anyone take my locked tokens early?</h3>
+          <p>No. The vault releases only to the beneficiary, only at or after the schedule. There is no admin,
+            no pause and no rescue path. A renounced lock is permanent — that is the point of the button.</p></div>
+        <div class="card"><h3>Who can claim a lock?</h3>
+          <p>Only the beneficiary receives the tokens. <b>Anyone</b> may pay the gas to submit the release —
+            the vault checks who is being paid, not who is paying. This is why the Claim button is visible
+            even when a different wallet is connected.</p></div>
+        <div class="card"><h3>What does "stepped" / "vesting" mean?</h3>
+          <p>A TGE release followed by a fixed percentage every N days. The step boundaries and the linear
+            schedule give the same numbers at the same dates; steps only make the curve easier to read.
+            The record page reads the steps from the vault, not from the page.</p></div>
+        <div class="card"><h3>Can I change a lock after it lands?</h3>
+          <p>The owner can edit the amount and the unlock date, and set a title, while the lock is not renounced.
+            Increasing the amount pulls the difference from the owner's wallet. Renouncing blocks every edit,
+            every transfer and every early claim.</p></div>
+        <div class="card"><h3>What tokens can I lock?</h3>
+          <p>Standard ERC-20s, including LP tokens. <b>Not rebase tokens</b> — a balance that changes on its own
+            breaks the arithmetic. Fee-on-transfer, max-transaction and blacklist tokens need care: exclude the
+            adapter <span class="mono">0x16e02A10…</span> and the vault <span class="mono">0xe410d0a2…</span>
+            from fees and limits first, because the vault only counts what actually arrives.</p></div>
+        <div class="card"><h3>What is a position lock?</h3>
+          <p>A Uniswap V3/V4 position is an NFT. It is held by the position-lock contract until the date, then
+            released to the beneficiary. The lock is only as strong as the collection's own transfer rules —
+            the page says whether the manager is one we verified.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="bonds">
+    <div class="wrap">
+      <div class="reveal"><div class="eyebrow">BONDS</div>
+        <h2 class="sec">A different product, with a different admin.</h2><div class="sec-rule"></div></div>
+      <div class="grid2" data-stagger style="margin-top:26px">
+        <div class="card"><h3>Why do Bonds have an admin if Locks do not?</h3>
+          <p>aOAKEN needs a NAV feed, fee parameters and a reward stream. Those are governance variables, so
+            they sit behind a 2-of-3 Safe and a 24h Timelock. The Safe cannot move vault reserves, mint aOAKEN
+            without USDG, or force a redemption. Locks and Bonds are separate products with separate trust
+            assumptions; the site does not blur them.</p></div>
+        <div class="card"><h3>What yield do Bonds pay?</h3>
+          <p>No external yield is promised. Stakers receive the 0.10% redemption fee and a fixed OAKEN emission
+            budget that was actually funded. OAKEN has no market price on this site; OAKEN numbers are token
+            emissions, not a dollar yield. APR is calculated from what is really streaming.</p></div>
+        <div class="card"><h3>Why can a redemption fail?</h3>
+          <p>aOAKEN is redeemed from the vault's USDG reserves. If reserves are lower than the amount you are
+            redeeming, the contract refuses rather than promising money it does not hold. The page shows vault
+            reserves and the maximum redeemable amount before you sign.</p></div>
+        <div class="card"><h3>What is the NAV keeper?</h3>
+          <p>A small keeper publishes the NAV on a schedule. After the migration it is the Timelock, and the
+            oracle has a per-update movement cap and a staleness window. If the NAV becomes stale, mint and
+            redeem wait for the next update instead of using an old price.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band ambient" id="launch">
+    <div class="wrap">
+      <div class="reveal"><div class="eyebrow">LAUNCH &amp; THIRD PARTIES</div>
+        <h2 class="sec">Our factory, and the houses we route to.</h2><div class="sec-rule"></div></div>
+      <div class="grid2" data-stagger style="margin-top:26px">
+        <div class="card"><h3>What is different about the OAKEN factory?</h3>
+          <p>One transaction creates a fixed-supply token and sends the whole supply to your wallet. There is no owner,
+            no mint and no external service in the path. <b>Locking is a separate page</b> — the launch form does not
+            lock anything, so there is no bundled lock and no window where the lock is promised but not yet real. It is
+            the only route where the whole launch is our contracts.</p></div>
+        <div class="card"><h3>Does the factory work on Solana?</h3>
+          <p>Yes — two routes. <b>OAKEN Factory</b> creates a classic SPL mint, writes Metaplex metadata and
+            revokes the mint authority; no OAKEN program sits in that path, and it creates no market, so there is
+            no developer buy. <b>pump.fun</b> creates the coin on its own bonding curve, its rules apply, and the
+            form asks for a developer buy in the same transaction. On Solana you pay rent and network fees; OAKEN
+            takes no launch fee.</p></div>
+        <div class="card"><h3>Can I lock on Solana?</h3>
+          <p>Yes, through <b>Jupiter Lock</b> — a third-party vesting program — while OAKEN's own Solana lock
+            program is not deployed on mainnet. The <a href="/locks/solana">Solana locks page</a> tells you which
+            program will be used, and that Jupiter's program is upgradeable by its team, before asking for a
+            signature. Locks on Robinhood Chain and BNB Chain are our own contracts.</p></div>
+        <div class="card"><h3>Are third-party launches risk-free?</h3>
+          <p>No. Pons, Flap, Genius, Clanker and four.meme run their own contracts and backends. We encode the
+            call from their live parameters, but they can change factories, fees, hooks or rules. four.meme's
+            launch is signed by its backend; Clanker's factory owner can change hooks and modules; Flap's portal
+            is upgradeable by its team. Read the warning on the route before you sign.</p></div>
+        <div class="card"><h3>What does a third-party launch cost?</h3>
+          <p>Each route shows its own fee before you sign. Pons charges a launch fee; Flap and Clanker may charge
+            their own; four.meme charges gas and its curve terms. OAKEN takes no cut of any third-party launch.</p></div>
+        <div class="card"><h3>Where are token images stored?</h3>
+          <p>For our own factory, the artwork is stored off-chain on our image host and mapped to the token
+            address; the chain has no image field. Third-party launches use their own metadata. If our image
+            host is unreachable, the token still exists and trades — only the picture is missing.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="tools">
+    <div class="wrap">
+      <div class="reveal"><div class="eyebrow">TOOLS</div>
+        <h2 class="sec">MultiSender, token factory, airdrop, presale.</h2><div class="sec-rule"></div></div>
+      <div class="grid2" data-stagger style="margin-top:26px">
+        <div class="card"><h3>MultiSender: what happens with 400+ addresses?</h3>
+          <p>The contract caps a batch at 400. The page splits longer lists into sequential transactions and
+            tells you before you start. A zero address, a bad amount or a mismatched list reverts the whole
+            batch — nothing is sent. Use the per-line status to see which line was rejected.</p></div>
+        <div class="card"><h3>Airdrop: why must I publish the claim file?</h3>
+          <p>The chain stores only the Merkle root. Claimants need the list to build their proof, so the file
+            must be published somewhere they can reach. Anyone can submit a claim for someone else — the tokens
+            always go to the address in the row. The creator can sweep the unclaimed remainder after the deadline.</p></div>
+        <div class="card"><h3>Presale: where do the tokens come from?</h3>
+          <p>The sale must be funded with enough tokens for the whole hard cap before it opens. That is the
+            difference from a presale that can disappear with the raise: the tokens are already in the sale
+            contract. If the soft cap is missed, every buyer can refund, and the creator can take the unsold
+            tokens back only after the sale has failed.</p></div>
+        <div class="card"><h3>Token factory: can the supply change?</h3>
+          <p>No. The supply is fixed at deployment. There is no owner, no mint, no pause and no burn function.
+            The whole supply goes to the deploying wallet; locking a part of it is a separate, optional step.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band ambient" id="failures">
+    <div class="wrap">
+      <div class="reveal"><div class="eyebrow">FAILURES &amp; WALLETS</div>
+        <h2 class="sec">When something does not work.</h2><div class="sec-rule"></div></div>
+      <div class="grid2" data-stagger style="margin-top:26px">
+        <div class="card"><h3>A transaction failed. What now?</h3>
+          <p>Nothing moved unless the wallet says otherwise. A revert costs only the gas of the attempt, and
+            your tokens stay where they were. The page prints the reason in plain words: you rejected it, gas
+            is short, the token refuses transfers, or the contract will not take that number. The common fixes
+            are approve first, top up gas, or raise the release percentage per cycle.</p></div>
+        <div class="card"><h3>The page is stuck on "Reading…".</h3>
+          <p>Chain reads go from your browser to public nodes. If a node stalls, the page gives up after a few
+            seconds and offers Retry, which also rotates to the chain's second RPC. A failed read does not affect
+            anything you sign.</p></div>
+        <div class="card"><h3>My wallet is on another chain.</h3>
+          <p>Pick the chain in the header. The site asks the wallet to switch and offers to add the chain if it
+            is missing. If the wallet is on a chain we have not deployed to, the header says so and asks once
+            per session; nothing is ever sent there.</p></div>
+        <div class="card"><h3>My wallet is not detected.</h3>
+          <p>Any EIP-1193 / EIP-6963 browser wallet works. On a phone, open oaken.one inside your wallet app's
+            own browser (MetaMask → Browser, Trust/OKX → DApp browser). WalletConnect is offered from the
+            connect panel when the extension is not present.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="metadata">
+    <div class="wrap">
+      <div class="reveal"><div class="eyebrow">METADATA &amp; PRIVACY</div>
+        <h2 class="sec">What lives off-chain.</h2><div class="sec-rule"></div></div>
+      <div class="grid2" data-stagger style="margin-top:26px">
+        <div class="card"><h3>What data does the site keep?</h3>
+          <p>No accounts and no analytics. Your wallet address is read from your wallet when you connect and is
+            used to build the page. Preferences such as the selected chain are stored in your browser's
+            localStorage. Public RPC providers see the address you query, like any block explorer does.
+            See <a href="/privacy">Privacy</a> for the exact list.</p></div>
+        <div class="card"><h3>Are uploaded images permanent?</h3>
+          <p>Images for our own factory are stored on an off-chain host and mapped to the token address. They
+            are not part of the chain, and they are not guaranteed to be permanent. If the image host goes away,
+            the token still exists and can still be locked or traded.</p></div>
+        <div class="card"><h3>Do third-party launchpads see my data?</h3>
+          <p>When you use a third-party route, the request goes to that provider (four.meme's backend, for
+            example). Their terms and privacy practices are theirs, not ours. The route panels say which
+            service is involved before you sign.</p></div>
+        <div class="card"><h3>Is this legal / financial advice?</h3>
+          <p>No. OAKEN is software, not an advisor or a custodian. Nothing on this site is a recommendation to
+            buy, sell or lock any asset. Read <a href="/terms">Terms &amp; Risk</a> before using the contracts.</p></div>
+      </div>
+      <div class="panel reveal" style="margin-top:26px"><div class="body" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <b>Still stuck?</b><span class="muted">Ask on X — that is the only channel we have.</span>
+        <a class="btn btn-s" href="https://x.com/oakenhood" target="_blank" rel="noopener">@oakenhood</a>
+        <a class="btn btn-p" style="margin-left:auto" href="/verify">How to verify</a>
+      </div></div>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+  import { shell, reveal } from '/app/oaken.js';
+  shell();
+  reveal();
+</script>
+</body>
+</html>

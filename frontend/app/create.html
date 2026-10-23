@@ -1,0 +1,1046 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Create a lock · OAKEN</title>
+<meta name="description" content="Lock ERC-20 tokens or LP with a schedule written once. No owner, no upgrade, no protocol fee — gas only.">
+<meta property="og:title" content="Create a lock · OAKEN">
+<meta property="og:description" content="Lock ERC-20 tokens or LP with a schedule written once. No owner, no upgrade, no protocol fee — gas only.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://oaken.one/locks/create">
+<meta property="og:image" content="https://oaken.one/logo512.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+<style>
+  .flow { display: grid; grid-template-columns: 1.2fr .8fr; gap: 26px; align-items: start; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; flex-wrap: wrap; }
+  .seg button { background: transparent; border: 0; color: var(--muted); font: 600 13.5px/1 "Segoe UI", system-ui, sans-serif;
+                padding: 11px 16px; cursor: pointer; }
+  .seg button.on { background: rgba(217,163,67,.12); color: var(--gold); }
+  .summary { background: var(--panel); border: 1px solid var(--line-gold); border-radius: var(--r); padding: 20px 22px; }
+  .summary b { color: var(--gold); }
+  .tok { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 13.5px; color: var(--muted); flex-wrap: wrap; }
+  .chest-art { border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; margin-bottom: 16px; }
+  .chest-art img { width: 100%; height: auto; display: block; }
+  .lab { display: flex; align-items: baseline; gap: 10px; }
+  .lab .f { margin-bottom: 0; }
+  .linklike { background: none; border: 0; color: var(--gold); cursor: pointer; padding: 0;
+              font: 600 12px/1 "Segoe UI", system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+  .linklike:hover { text-decoration: underline; }
+  .warnline { color: #e0a85f; }
+  /* 五步的步骤头：圆圈编号 + 标题 + 右边的"已完成/状态" */
+  .stephead { display: flex; align-items: center; gap: 9px; margin: 24px 0 10px; }
+  .stephead .num { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line-gold);
+                   color: var(--gold); display: grid; place-items: center;
+                   font: 700 12px/1 "Segoe UI", system-ui, sans-serif; flex: none; }
+  .stephead b { font-size: 13.5px; letter-spacing: .02em; }
+  .stephead .ok { margin-left: auto; color: var(--ok, #6fbf73); font-size: 12px; text-align: right; }
+  .stephead.done .num { background: rgba(111,191,115,.16); border-color: rgba(111,191,115,.55); color: var(--ok, #6fbf73); }
+  .stephead .ok .mono { font-size: 12px; }
+  input.i:disabled, .panel .body input:disabled { opacity: .45; cursor: not-allowed; }
+  /* 字段级错误：出错的输入框自己变红，用户不用在下面的列表里找"是哪一格" */
+  input.i[data-bad], .panel .body input[data-bad] { border-color: rgba(224,120,95,.65); background: rgba(224,120,95,.05); }
+  input.i[data-bad]:focus { border-color: rgba(224,120,95,.9); }
+  /* 勾选项：勾了才展开下面那组字段（学 PinkSale 的 use another owner? / use vesting?） */
+  .chk { display: flex; align-items: center; gap: 8px; margin: 16px 0 8px; cursor: pointer;
+         font-size: 13.5px; color: var(--parch); }
+  .chk input { width: 15px; height: 15px; accent-color: var(--gold); cursor: pointer; }
+  /* 费用/限额代币的警告：PinkSale 那个黄框的等价物 */
+  .warnbox { border: 1px solid rgba(217,163,67,.55); background: rgba(217,163,67,.07);
+             border-radius: var(--r); padding: 12px 14px; margin-top: 18px; font-size: 13px;
+             color: var(--parch); line-height: 1.55; }
+  .warnbox b { color: var(--gold); }
+  .copybtn { background: none; border: 0; color: var(--gold); cursor: pointer; padding: 0 2px;
+             font: 600 12px/1 "Segoe UI", system-ui, sans-serif; }
+  .copybtn:hover { text-decoration: underline; }
+  /* 步骤追踪器：每一步自己说自己到了哪儿（等钱包 / 已发出 / 已确认 / 失败）。
+     一屏之内就能看出"现在卡在哪一步"，不用去猜那个 Working… 是什么意思。 */
+  .track { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 8px; }
+  .track li { display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; align-items: baseline;
+              border: 1px solid var(--line); border-radius: var(--r); padding: 11px 13px; background: var(--panel); }
+  .track li .dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(240,228,208,.22); display: inline-block; }
+  .track li b { color: var(--parch); font-size: 13.5px; }
+  .track li em { display: block; font-style: normal; color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+  .track li a { color: var(--gold); font-size: 12px; }
+  .track li[data-state="wallet"] { border-color: rgba(217,163,67,.45); }
+  .track li[data-state="wallet"] .dot { background: var(--gold); animation: pulse 1.2s ease-in-out infinite; }
+  .track li[data-state="sent"] { border-color: rgba(217,163,67,.45); }
+  .track li[data-state="sent"] .dot { background: var(--ringdeep, #A06A1F); animation: pulse 1.2s ease-in-out infinite; }
+  .track li[data-state="done"] .dot { background: var(--ok, #6fbf73); }
+  .track li[data-state="done"] em { color: var(--ok, #6fbf73); }
+  .track li[data-state="fail"] { border-color: rgba(224,120,95,.5); }
+  .track li[data-state="fail"] .dot { background: var(--bad, #e0785f); }
+  .track li[data-state="fail"] em { color: var(--bad, #e0785f); }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+  @media (max-width: 940px) { .flow { grid-template-columns: 1fr; } .chest-art { display: none; } }
+</style>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/vaultdoor.webp"><source src="/app/media/vaultdoor-live.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">New lock</div>
+    <h1 class="reveal">Put it where it cannot be moved.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <p class="muted" style="max-width:64ch">Five steps: connect the wallet, paste the token
+      address, pick how much to lock (<b>Lock all</b> fills in your whole balance), approve it — one approval
+      covers every later lock of that token — then lock. The schedule is fixed the moment it lands; nobody,
+      including us, can move it afterwards.</p>
+
+    <div class="flow" style="margin-top:30px">
+      <div class="panel">
+        <div class="head"><h3>Details</h3><span class="steps-mini" style="margin-left:auto" id="modehint"></span></div>
+        <div class="body">
+          <div class="progress-steps" id="progresssteps" aria-hidden="true"><i class="ps"></i><i class="ps"></i><i class="ps"></i><i class="ps"></i><i class="ps"></i></div>
+          <label class="f">Chain</label>
+          <div class="seg" id="chainseg"><button type="button" class="on">Loading…</button></div>
+          <div class="hint" id="chainhint">The lock lands on the chain your wallet is on. Pick another one here and we
+            will ask the wallet to switch before signing. Solana opens its own lock page — it uses a Solana wallet.</div>
+
+          <div class="stephead" id="st1"><span class="num">1</span><b>Connect your wallet</b><span class="ok" id="st1ok"></span></div>
+          <button class="btn btn-p" id="st1btn" style="width:100%">Connect a wallet</button>
+          <div class="hint">On a phone, open oaken.one inside your wallet app's browser (MetaMask → Browser).
+            On desktop, the connect panel offers the installed wallets and WalletConnect.</div>
+
+          <div class="stephead" id="st2"><span class="num">2</span><b>Token address</b><span class="ok" id="st2ok"></span></div>
+          <label class="f" for="token">Token address (CA)</label>
+          <input class="i" id="token" placeholder="0x… ERC-20 (a project token, or an LP token)" autocomplete="off">
+          <div class="tok" id="tokmeta"></div>
+
+          <div class="stephead" id="st3"><span class="num">3</span><b>How much to lock</b><span class="ok" id="st3ok"></span></div>
+          <div class="lab"><label class="f" for="amount">Amount to lock</label></div>
+          <div class="row2" style="grid-template-columns:1fr auto;align-items:center">
+            <input class="i" id="amount" placeholder="0.0" inputmode="decimal" autocomplete="off">
+            <button type="button" class="btn btn-s" id="max" disabled style="white-space:nowrap">Lock all</button>
+          </div>
+          <div class="hint" id="bal"></div>
+          <label class="chk" for="usevest"><input type="checkbox" id="usevest"> use vesting?</label>
+          <div class="hint" id="modehint2">Off = everything unlocks at once on one date. On = a TGE release,
+            then a slice every N days.</div>
+
+          <div id="p-once">
+            <label class="f" for="date">Unlock date (your local time)</label>
+            <input class="i" id="date" type="datetime-local">
+            <div class="hint">Everything unlocks at once, at this moment. Must be in the future.</div>
+          </div>
+
+          <div id="p-vest" class="hide">
+            <div class="row2">
+              <div><label class="f" for="tge">TGE Date (your local time)</label>
+                <input class="i" id="tge" type="datetime-local"></div>
+              <div><label class="f" for="tgepct">TGE Percent</label>
+                <input class="i" id="tgepct" placeholder="Ex: 10" inputmode="decimal"></div>
+            </div>
+            <div class="row2">
+              <div><label class="f" for="cyc">Cycle (days)</label>
+                <input class="i" id="cyc" placeholder="Ex: 30" inputmode="decimal"></div>
+              <div><label class="f" for="cycpct">Cycle Release Percent</label>
+                <input class="i" id="cycpct" placeholder="Ex: 5" inputmode="decimal"></div>
+            </div>
+            <div class="hint" id="vesthint">The schedule is written as steps: a tranche must be at least 0.01%.
+              Whole days only — the chain stores the interval in seconds and the pages read it back in days.</div>
+            <div class="hint" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+              <span class="muted">Presets:</span>
+              <button type="button" class="btn btn-s" data-vest="10,30,5" style="padding:5px 10px;font-size:12px">10% TGE + 5% / 30d</button>
+              <button type="button" class="btn btn-s" data-vest="20,30,4" style="padding:5px 10px;font-size:12px">20% TGE + 4% / 30d</button>
+              <button type="button" class="btn btn-s" data-vest="0,90,25" style="padding:5px 10px;font-size:12px">25% / quarter (1y)</button>
+            </div>
+          </div>
+
+
+
+          <label class="chk" for="useowner"><input type="checkbox" id="useowner"> use another owner?</label>
+          <div id="ownerwrap" class="hide">
+            <label class="f" for="benef">Owner</label>
+            <input class="i" id="benef" placeholder="0x… — the address that receives the tokens when unlocked" autocomplete="off">
+            <div class="hint" id="benefhint">Whoever this is will be able to claim, transfer and rename the lock —
+              it will not be yours.</div>
+          </div>
+
+          <label class="f" for="label">Title (optional)</label>
+          <input class="i" id="label" placeholder="Ex: Team vesting" maxlength="64" autocomplete="off">
+          <div class="hint" id="titlehint">Shown on the lock's record page.</div>
+
+
+
+
+          <div class="warnbox">
+            <b>Fee or limit tokens?</b> Exclude our lock contracts —
+            adapter <span class="mono">0x16e02A106fE6E978fB98F76756B3a06b4995a7A6</span>
+            <button class="copybtn" type="button" data-copy="0x16e02A106fE6E978fB98F76756B3a06b4995a7A6">copy</button>,
+            vault <span class="mono">0xe410d0a21C1376992874a9bEEeE0d623A50D4a34</span>
+            <button class="copybtn" type="button" data-copy="0xe410d0a21C1376992874a9bEEeE0d623A50D4a34">copy</button>
+            — from fees, rewards and max-transaction limits <b>before</b> locking, or the transfer can be taxed or
+            blocked and the lock will hold less than you asked. The same addresses exist on every chain we deploy to.
+            <b>We don't support rebase tokens.</b>
+          </div>
+
+          <div class="err hide" id="err"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="chest-art"><img src="/app/img/chest.webp" alt="" width="1200" height="1200"></div>
+        <div class="summary" id="summary">
+          <div class="eyebrow" style="margin-bottom:12px">Before you sign</div>
+          <div id="sumtext" class="muted">Fill the form — the summary appears here, in one sentence.</div>
+          <div class="hint" id="sumline2" style="margin-top:12px"></div>
+        </div>
+
+        <div class="panel" style="margin-top:16px">
+          <div class="head"><h3>What it costs</h3></div>
+          <div class="body">
+            <dl class="kv">
+              <dt>OAKEN fee</dt><dd>0 — no fee, ever</dd>
+              <dt>Confirmations</dt><dd id="ntx">—</dd>
+              <dt>Network fee</dt><dd id="fee">—</dd>
+              <dt>Your gas balance</dt><dd id="native">—</dd>
+            </dl>
+            <div class="hint" id="costhint">Connect a wallet to see the fee and your gas balance.</div>
+          </div>
+        </div>
+
+        <div style="display:grid;gap:10px;margin-top:16px">
+          <ol class="track" id="track" style="display:none">
+            <li data-step="approve" data-state="idle"><span class="dot"></span>
+              <div><b>4 · Approve</b><em id="t-approve">Not needed yet</em></div>
+              <a id="tx-approve" target="_blank" rel="noopener" style="display:none">tx ↗</a></li>
+            <li data-step="lock" data-state="idle"><span class="dot"></span>
+              <div><b>5 · Lock</b><em id="t-lock">Waiting for the form</em></div>
+              <a id="tx-lock" target="_blank" rel="noopener" style="display:none">tx ↗</a></li>
+          </ol>
+          <button class="btn btn-p" id="actionbtn" style="width:100%" disabled>4 · Approve</button>
+          <div class="hint" id="steps"></div>
+        </div>
+
+        <div class="panel hide" id="done" style="margin-top:16px">
+          <div class="head"><h3>Locked</h3></div>
+          <div class="body" id="donebody"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<!-- defer：不让 514 KB 的 ethers 挡住首屏；顺序仍在我们自己的模块之前（模块默认 deferred） -->
+<script src="/app/vendor/ethers.umd.min.js" defer></script>
+<script type="module">
+  import { shell, wallet, erc20, adapter, ADAPTER, tokenMeta, fmtAmount, toast, explorerHref, short,
+    chains, currentChain, provider, nativeBalance, isV2Pair, lockCreatedFromReceipt, storedTitle,
+    humanizeTxError, safeRead, showReadFail, txNotice, onWallet, showChainSegFailed , mountDatePicker,
+    onChainSwitch, setSiteChain, sealMoment, chainNow, chainIcon } from '/app/oaken.js';
+  shell({ active: 'create' });
+  // 英文 / 美式的时间选择器（原生 datetime-local 跟浏览器语言走，改不动）
+  mountDatePicker(document.getElementById('date'));
+  mountDatePicker(document.getElementById('tge'));
+
+  const $ = (id) => document.getElementById(id);
+  const state = {
+    mode: 'once', token: '', decimals: 18, symbol: '', balance: 0n, addr: null, busy: false, chain: null,
+    lp: false, needApprove: true, fee: null, gas: null,
+    activeStep: null, trackMode: 'hidden',   // hidden | preview | running | done
+    nowSec: null,                            // 链上的 now（日期校验用它，不用访客电脑时钟）
+  };
+
+  /**
+   * 链：**默认跟着钱包走**（"自动识别"），也可以在这里手选。
+   * 手选之后如果钱包已经连着，会先请钱包切过去 —— 不切就没有意义：交易是钱包发的。
+   */
+  async function bootChains() {
+    const live = await chains();
+    if (!live.length) { showChainSegFailed('chainseg', 'chainhint', bootChains); return; }
+    state.chain = await currentChain();
+    chainNow(state.chain).then((t) => { state.nowSec = t; update(); }).catch(() => { /* 读不到就退回设备时钟 */ });
+    const seg = $('chainseg');
+    let walletChainId = null;
+    const paint = () => {
+      /* Solana 是独立页（Solana 钱包、Jupiter Lock），放在最左边；点它只跳转，不参与 EVM 链选择。 */
+      seg.innerHTML = '<button type="button" data-sol="1" title="Solana locks"><span class="chain-ico">' + chainIcon('solana', 13) + '</span>Solana</button>'
+        + live.map((c) => '<button type="button" data-id="' + c.id + '" class="' + (c.id === state.chain.id ? 'on' : '') + '"><span class="chain-ico">' + chainIcon(c.id, 13) + '</span>' + c.name + '</button>').join('');
+      const walletOn = live.find((c) => c.id === walletChainId);
+      $('chainhint').innerHTML =
+        walletOn && walletOn.id !== state.chain.id
+          ? 'Your wallet is on <b>' + walletOn.name + '</b> — it will be asked to switch to <b>' + state.chain.name + '</b> before signing.'
+          : (walletChainId !== null && !walletOn)
+            /* 钱包在一条我们没部署的链上：说清"那儿没有我们的合约"，
+               否则用户会以为是页面坏了 —— 而往没代码的地址发交易是**成功且无声**的。 */
+            ? 'Your wallet is on chain id <b>' + walletChainId + '</b>, which we have not deployed to — there is no lock contract there. '
+              + 'Pick one below and the wallet will be asked to switch to <b>' + state.chain.name + '</b>.'
+            : 'Only chains we have deployed to are listed. The lock lands on <b>' + state.chain.name + '</b>. Solana opens its own lock page.';
+    };
+    walletChainId = await wallet.chainId();
+    paint();
+    /* ⚠ 这里必须自己叫一次 `refreshCosts()`（2026-10-15 补）：模块初始化的 `refreshWallet()`
+       可能跑在 `state.chain` 落定**之前**，那一跑会在 `if (!state.chain) return;` 上直接返回 ——
+       于是**没连钱包时费用面板永远停在 "—"**（连"大概要花多少"都看不到）。 */
+    refreshCosts();
+    /**
+     * 把这一页切到某条链并重画。**两个入口共用这一条路**：
+     *   · 用户在链选择器上点（要顺手把钱包也切过去）；
+     *   · 钱包自己换过去了 / 用户在顶栏链清单里选了（已经切完了，别再问钱包一次）。
+     * 2026-10-16：第二条以前是整页 `location.reload()`，现在是这一页自己重画（不白闪）。
+     */
+    const applyChain = async (c, { askWallet = true } = {}) => {
+      if (!c || c.id === state.chain.id) return;
+      state.chain = c;
+      state.nowSec = null;
+      chainNow(c).then((t) => { state.nowSec = t; update(); }).catch(() => { /* 读不到就退回设备时钟 */ });
+      walletChainId = c.id;
+      setSiteChain(c.id);                  // 断开钱包之后站点也停在这条链
+      paint();
+      if (askWallet && state.addr) { try { await wallet.ensureChain(c); } catch (e) { toast(String(e.message || e), 'bad'); } }
+      if (state.token) loadToken();
+      refreshCosts();
+      update();
+    };
+    seg.onclick = (ev) => {
+      const b = ev.target.closest('button');
+      if (!b) return;
+      if (b.dataset.sol) { location.href = '/locks/solana'; return; }
+      applyChain(live.find((x) => x.id === Number(b.dataset.id)));
+    };
+    /* 钱包换链 → 这一页自己重画（没注册这一步的页面会整页重载，见 oaken.js 的 onChainSwitch） */
+    onChainSwitch((id) => { const c = live.find((x) => x.id === id); if (c) applyChain(c, { askWallet: false }); });
+  }
+  bootChains();
+
+  /* ── 分档开关（学 PinkSale 的「use vesting?」：勾了才展开）────────────── */
+  $('usevest').onchange = () => {
+    state.mode = $('usevest').checked ? 'vesting' : 'once';
+    $('p-once').classList.toggle('hide', state.mode !== 'once');
+    $('p-vest').classList.toggle('hide', state.mode !== 'vesting');
+    $('modehint').innerHTML = state.mode === 'once' ? '<b>01</b> one date' : '<b>01</b> stepped';
+    refreshCosts();
+    update();
+  };
+  /* Vesting presets: fill the three percentages (and a TGE date if empty) in one click.
+     The numbers still go through the normal validation; nothing is signed here. */
+  for (const b of document.querySelectorAll('[data-vest]')) {
+    b.onclick = () => {
+      const [tge, days, pct] = b.dataset.vest.split(',');
+      for (const [id, v] of [['tgepct', tge], ['cyc', days], ['cycpct', pct]]) {
+        const el = $(id);
+        if (!el) continue;
+        el.value = v;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      if ($('tge') && !$('tge').value) {
+        const base = (state.nowSec ? state.nowSec * 1000 : Date.now()) + 30 * 86400000;
+        const d = new Date(base), pad = (n) => String(n).padStart(2, '0');
+        $('tge').value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        $('tge').dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      update();
+    };
+  }
+  /* 「use another owner?」：勾了才出 Owner 输入框 —— 默认锁给自己 */
+  $('useowner').onchange = () => {
+    $('ownerwrap').classList.toggle('hide', !$('useowner').checked);
+    update();
+  };
+  /* 警告框里的复制按钮：剪贴板 API 在页面没焦点时会 reject（记录页踩过），给两层兜底 */
+  for (const b of document.querySelectorAll('.copybtn')) {
+    b.onclick = async () => {
+      const v = b.dataset.copy || '';
+      const done = () => { b.textContent = 'copied ✓'; setTimeout(() => { b.textContent = 'copy'; }, 1400); };
+      try { await navigator.clipboard.writeText(v); done(); }
+      catch {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = v; document.body.appendChild(ta); ta.select();
+          document.execCommand('copy'); ta.remove(); done();
+        } catch { b.textContent = 'press Ctrl+C'; }
+      }
+    };
+  }
+
+  /* ── 钱包 ───────────────────────────────────────────────────────────── */
+  /**
+   * ⚠ 参数是**事件送来的地址**（`onWallet('accounts', ...)` 的载荷）。
+   *
+   * 事件的回调里**不能再 `wallet.accounts()` 回查一次** —— 真钱包在授权那一刻、
+   * 假钱包在每次 `eth_accounts` 之后都会补发 `accountsChanged`，回查就是自己喂自己：
+   * 一圈圈跑下去（2026-10-15 实测：每秒 400 次 update()，gas 预估永远排不上队，
+   * 而控制台一条错都没有）。事件给了地址用地址；没有载荷（首次调用）才去问。
+   */
+  async function refreshWallet(addrFromEvent, fromEvent = false) {
+    const a = fromEvent ? (addrFromEvent || null) : ((await wallet.accounts())[0] || null);
+    state.addr = a;
+    if (state.token) loadToken();
+    refreshCosts();
+    update();
+  }
+  onWallet('accounts', (a) => refreshWallet(a, true));
+  refreshWallet();
+
+  /** 第 1 步的按钮：连上之后它自己藏起来（表格 2/3 步会跟着解禁）。 */
+  $('st1btn').onclick = async () => {
+    $('st1btn').disabled = true;
+    try { await wallet.connect(); await refreshWallet(); }
+    catch (e) { toast(String((e && e.message) || e).slice(0, 140), 'bad'); $('st1btn').disabled = false; }
+  };
+
+  /* ── 读代币 ─────────────────────────────────────────────────────────── */
+  let tokenTimer = null;
+  $('token').addEventListener('input', () => {
+    clearTimeout(tokenTimer);
+    tokenTimer = setTimeout(loadToken, 450);
+  });
+  async function loadToken() {
+    const value = $('token').value.trim();
+    /**
+     * ⚠ **值没变、而且已经读好了，就别再读一遍**（2026-10-15 真链 E2E 抓到的时序）：
+     * 授权/锁定那笔交易会让钱包补发 `accountsChanged` → `refreshWallet` → `loadToken`，
+     * 而它开头会把 `state.token` **清空**、四个串行读要好几秒 —— 用户正好在这几秒里
+     * 点"锁定"，拿到的就是空地址（表现是一句莫名其妙的 ENS 报错）。
+     * 地址没变就跳过，等于把这个空档整个抹掉。
+     */
+    if (value === state.token && !state.tokenReading && state.symbol) { refreshCosts(); update(); return; }
+    $('tokmeta').textContent = '';
+    state.token = ''; state.lp = false; state.balance = 0n;
+    $('max').style.display = 'none';
+    if (!/^0x[0-9a-fA-F]{40}$/.test(value)) { state.tokenReading = false; refreshCosts(); update(); return; }
+    $('tokmeta').textContent = 'Reading the token…';
+    /* 读在飞的这段时间里**别让人点锁定**（见 validate 里那条错误） */
+    state.tokenReading = true;
+    update();
+    try {
+      /**
+       * 先看这个地址在**当前这条链**上有没有代码 —— `tokenMeta()` 读失败时会兜底成
+       * "TOKEN / 18"，那会让"粘错了链"看起来像读到了真币（下一步才以更费解的方式失败）。
+       * 没代码就走 catch，如实说这个地址在这条链上没有 ERC-20。
+       *
+       * ⚠ 这一段的每一次读都走 `safeRead`（10 秒超时 + 换端点重试一次）——
+       * 一条公共 RPC 卡住时，表单不能永远停在 "Reading the token…"。
+       */
+      const R = { chain: state.chain, timeout: 10_000, retries: 1, label: 'token' };
+      const code = await safeRead(() => provider(state.chain).getCode(value), R);
+      if (!code || code === '0x') throw new Error('no code at this address');
+      const [symbol, decimals] = await safeRead(() => tokenMeta(value, state.chain), R);
+      const name = await safeRead(() => erc20(state.chain, value).name().catch(() => null), R);
+      state.token = value; state.symbol = symbol; state.decimals = decimals;
+      let bal = 0n;
+      if (state.addr) bal = await safeRead(() => erc20(state.chain, value).balanceOf(state.addr), R);
+      state.balance = bal;
+      /**
+       * LP 标记**探测来的，不是让用户勾的**：Uniswap V2 交易对答得出 token0/token1，
+       * 普通 ERC-20 没有这两个函数。探针失败就当普通代币 —— 少标一个 LP 好过标错。
+       * V3 的仓位是 ERC-721，这个界面够不着（那条线是 PositionLock）。
+       */
+      state.lp = await isV2Pair(state.chain, value);
+      /* 卡片照 PinkSale 的做法：名字 + 符号 + 精度 + 你的余额；LP 的话标出是哪对池子 */
+      let pairLabel = '';
+      if (state.lp) {
+        try {
+          const pair = new window.ethers.Contract(value, [
+            'function token0() view returns (address)', 'function token1() view returns (address)',
+          ], provider(state.chain));
+          const [t0, t1] = await Promise.all([pair.token0(), pair.token1()]);
+          const [s0, s1] = await Promise.all([
+            erc20(state.chain, t0).symbol().catch(() => '?'),
+            erc20(state.chain, t1).symbol().catch(() => '?'),
+          ]);
+          pairLabel = s0 + '/' + s1;
+        } catch { pairLabel = ''; }
+      }
+      $('tokmeta').innerHTML = '<span class="pill ok">' + symbol + '</span>'
+        + (name ? '<span>' + name + '</span>' : '')
+        + '<span>' + decimals + ' decimals</span>'
+        + (state.lp ? '<span class="pill">LP · ' + (pairLabel || 'V2 pair') + '</span>' : '')
+        + (state.addr ? '<span>your balance: <b style="color:var(--parch)">' + fmtAmount(bal, decimals) + '</b></span>' : '');
+      $('bal').textContent = state.addr ? 'Balance ' + fmtAmount(bal, decimals) + ' ' + symbol + '.'
+        : 'Connect a wallet to see your balance — reading the token works without one.';
+      $('max').style.display = state.addr ? '' : 'none';
+    } catch (e) {
+      /**
+       * 两种失败**必须分开说**（这是清单第 1 条的要害）：
+       *   · "这个地址在这条链上没有 ERC-20" —— 用户改地址或改链就能解决；
+       *   · "这次没读到链" —— 用户的地址是对的，重试就能解决。
+       * 混成一句话的话，RPC 抖一下就会让人以为自己的代币地址是错的。
+       */
+      if (/no code at this address/.test(String(e && e.message))) {
+        $('tokmeta').innerHTML = '<span class="pill" style="color:var(--bad);border-color:rgba(224,120,95,.4)">no ERC-20 at this address on '
+          + state.chain.name + '</span> — check the chain and the address.';
+      } else {
+        showReadFail($('tokmeta'), { what: 'that token', detail: (e && e.message) || '', chain: state.chain, onRetry: () => loadToken() });
+      }
+      $('bal').textContent = '';
+    } finally {
+      state.tokenReading = false;
+    }
+    refreshCosts();
+    update();
+  }
+
+  /* 「use max」：整数运算填满余额，不走浮点（18 位小数上用 Number 比大小会失准）。 */
+  $('max').onclick = () => {
+    if (!state.balance) return;
+    $('amount').value = window.ethers.formatUnits(state.balance, state.decimals);
+    refreshCosts(); update();
+  };
+
+  /* ── gas 与确认次数（签名前要说清的两件事）──────────────────────────── */
+  let costTimer = null;
+  function scheduleCosts() { clearTimeout(costTimer); costTimer = setTimeout(refreshCosts, 700); }
+  async function refreshCosts() {
+    if (!state.chain) return;
+    const sym = state.chain.native || 'ETH';
+    if (!state.addr) {
+      /**
+       * 没连钱包也**能估费用**（2026-10-15 按清单补）：上界 = 我们的 gas limit × 当前 gas 价，
+       * 这里两个数都不需要钱包。只有"你的余额够不够"需要地址 —— 那一格才写 `—`。
+       * 原来三格全 `—` + 一句 "Connect a wallet"，用户连"大概要花多少"都看不到。
+       */
+      $('native').textContent = '—';
+      const gl0 = (state.mode === 'vesting' ? 2_500_000n : 1_500_000n) + 1_000_000n;   // 最坏：先授权再锁
+      let fee0 = null;
+      try {
+        const fd = await provider(state.chain).getFeeData();
+        const px = fd.maxFeePerGas ?? fd.gasPrice ?? null;
+        if (px) fee0 = px * gl0;
+      } catch { fee0 = null; }
+      state.needApprove = true; state.fee = null; state.gas = null;
+      $('ntx').textContent = '2 (estimated) — approve, then the lock';
+      $('fee').textContent = fee0 === null ? '— (gas price unreadable)' : 'up to ' + fmtAmount(fee0, 18, 6) + ' ' + sym;
+      $('costhint').textContent = 'The fee is an upper bound — our gas limit times the current gas price — and it needs no '
+        + 'wallet. Connect one to see your balance and whether one confirmation is enough.';
+      return;
+    }
+    const bal = await nativeBalance(state.chain, state.addr);
+    state.gas = bal;
+    $('native').textContent = bal === null ? '—' : fmtAmount(bal, 18, 6) + ' ' + sym;
+
+    // 授权额度够不够 —— 决定这次是一笔还是两笔
+    let need = true;
+    if (state.token && state.amountWei != null) {
+      try { need = (await erc20(state.chain, state.token).allowance(state.addr, ADAPTER)) < state.amountWei; }
+      catch { need = true; }
+    }
+    state.needApprove = need;
+
+    // 上界 = 我们自己发出去的 gas limit × 当前 gas 价。是上界，不是报价。
+    const gl = (need ? 1_000_000n : 0n) + (state.mode === 'vesting' ? 2_500_000n : 1_500_000n);
+    let fee = null;
+    try {
+      const fd = await provider(state.chain).getFeeData();
+      const px = fd.maxFeePerGas ?? fd.gasPrice ?? null;
+      if (px) fee = px * gl;
+    } catch { fee = null; }
+    state.fee = fee;
+
+    $('ntx').textContent = need ? '2 — approve, then the lock' : '1 — the lock only';
+    $('fee').textContent = fee === null ? '— (gas price unreadable)' : 'up to ' + fmtAmount(fee, 18, 6) + ' ' + sym;
+    let hint = need
+      ? 'Two wallet confirmations the first time: an approval for your whole balance (it covers later locks of this token), then the lock.'
+      : 'One confirmation: your allowance already covers this amount.';
+    hint += ' The fee shown is an upper bound — our gas limit times the current gas price — not a quote.';
+    if (bal !== null && fee !== null && bal < fee) hint += ' Your balance is below that bound, so the transaction would fail — top up first.';
+    $('costhint').textContent = hint;
+    update();
+  }
+
+  /* ── 步骤追踪器 ─────────────────────────────────────────────────────────
+   * 用户点下去之后，屏幕上必须一直有个东西在说"现在到哪一步了"：
+   *   等钱包确认（wallet）→ 已发出、等上块（sent，这时已经有 tx 链接了）→ 确认（done）
+   * 失败的那一步标红，**不再往下走**。这笔交易到底发出去没有，一眼能看清。
+   */
+  const track = {
+    show: (on) => { $('track').style.display = on ? 'grid' : 'none'; },
+    reset() {
+      this.show(true);
+      for (const li of document.querySelectorAll('#track li')) li.dataset.state = 'idle';
+      for (const id of ['tx-approve', 'tx-lock']) { const a = $(id); a.style.display = 'none'; a.removeAttribute('href'); }
+      const skip = state.needApprove === false && !!state.token && !!state.amountWei;
+      document.querySelector('#track li[data-step="approve"]').style.display = skip ? 'none' : 'grid';
+      $('t-approve').textContent = skip ? 'Already approved — nothing to sign' : 'Waiting';
+      $('t-lock').textContent = 'Waiting';
+      state.activeStep = skip ? 'lock' : 'approve';
+      state.trackMode = 'running';
+    },
+    set(step, st, msg, hash) {
+      const li = document.querySelector('#track li[data-step="' + step + '"]');
+      if (!li) return;
+      li.dataset.state = st;
+      $('t-' + step).textContent = msg;
+      if (hash) {
+        const url = explorerHref('/tx/' + hash, state.chain);
+        const a = $('tx-' + step);
+        if (url) { a.href = url; a.style.display = ''; }
+        else { a.textContent = hash.slice(0, 10) + '…'; a.style.display = ''; }   // 没有浏览器的链：至少把哈希摆出来
+      }
+      if (st === 'wallet' || st === 'sent') state.activeStep = step;
+    },
+  };
+
+  /** 跑的时候别让用户再改表单（改了也没有用 —— 发出去的是点下去那一刻的值）。 */
+  function lockForm(on) {
+    for (const el of document.querySelectorAll('.panel .body input, .panel .body .seg button, #max, #actionbtn, #st1btn')) el.disabled = !!on;
+  }
+
+  /* ── 一句话摘要 ─────────────────────────────────────────────────────── */
+  function readForm() {
+    const amount = $('amount').value.trim();
+    const label = $('label').value.trim();
+    const benef = $('useowner').checked ? $('benef').value.trim() : '';   // 没勾就当没填 —— 锁给自己
+    if (state.mode === 'once') {
+      const d = $('date').value ? new Date($('date').value) : null;
+      return { amount, label, benef, date: d, vest: null };
+    }
+    const tge = $('tge').value ? new Date($('tge').value) : null;
+    return {
+      amount, label, benef, date: tge,
+      vest: { tge, tgePct: Number($('tgepct').value), days: Number($('cyc').value), pct: Number($('cycpct').value) },
+    };
+  }
+  function validate() {
+    const f = readForm();
+    const errs = [];
+
+    // 金额：**整数算**（parseUnits → BigInt）。浮点比大小在 18 位小数上会失准。
+    state.amountWei = null;
+    if (!f.amount) errs.push('Enter an amount.');
+    else {
+      try { state.amountWei = window.ethers.parseUnits(f.amount, state.decimals); }
+      catch (e) { errs.push(/decimal/i.test(String(e && e.message)) ? 'Too many decimal places for this token.' : 'That is not a number.'); }
+    }
+    if (state.amountWei != null && state.amountWei <= 0n) errs.push('Enter an amount.');
+    else if (state.amountWei != null && state.balance > 0n && state.amountWei > state.balance) errs.push('That is more than your balance.');
+
+    // 收款人（受益人是链上的说法）：留空就是自己
+    state.beneficiary = state.addr;
+    if (f.benef) {
+      if (!/^0x[0-9a-fA-F]{40}$/.test(f.benef)) errs.push('The "lock for" address is not an address.');
+      else if (/^0x0{40}$/i.test(f.benef)) errs.push('That is the zero address — nobody could claim it.');
+      else state.beneficiary = f.benef;
+    }
+
+    if (!state.chain) errs.push('Pick a chain first.');
+    if (!state.addr) errs.push('Connect a wallet first.');
+    if (!state.token) {
+      errs.push(state.tokenReading
+        ? 'Still reading that token — one moment, then press again.'
+        : 'Enter a token address.');
+    }
+    if (!f.date || isNaN(f.date)) errs.push('Pick the first date.');
+    else if (f.date.getTime() <= (state.nowSec ? state.nowSec * 1000 : Date.now()) + 60_000) errs.push('The date must be in the future.');
+    if (f.vest) {
+      if (!(f.vest.tgePct >= 0 && f.vest.tgePct <= 100)) errs.push('TGE % must be between 0 and 100.');
+      // 整数天：合约里存的是秒，而记录页读回来的是「天」—— 允许 1.5 天就会在回读时被截断，
+      // 页面上写的排期和链上排期差半天，且看不出来。
+      if (!(f.vest.days >= 1) || !Number.isInteger(f.vest.days)) errs.push('Cycle length must be a whole number of days (1 or more).');
+      if (!(f.vest.pct > 0 && f.vest.pct <= 100)) errs.push('Release % per cycle must be between 0 and 100.');
+      /**
+       * ⚠ 每期下限 **0.01%** = 链上的 1 个基点（bps = 百分比 × 100）。
+       * 比它更小的比例在 `Math.round(pct * 100)` 那一步会**静默变成 0 个基点** ——
+       * 于是链上多出一档"释放 0"的排期，页面上写着"每 30 天释放 0.005%"，
+       * 而实际那几档一个币都不放。这是那种"两边都不报错、数字对不上"的错。
+       */
+      else if (f.vest.pct < 0.01) errs.push('Each release must be at least 0.01% — the vault stores steps in basis points, so anything smaller becomes zero.');
+      const steps = f.vest.pct > 0 ? Math.floor((100 - f.vest.tgePct) / f.vest.pct) : 0;
+      if (f.vest.tgePct < 100 && steps < 1) errs.push('With that TGE %, one cycle must release at least the whole remainder.');
+      if (steps > 9999) errs.push('Too many steps — raise the release % per cycle.');
+    }
+    if (state.fee !== null && state.gas !== null && state.gas < state.fee) errs.push('Not enough ' + (state.chain.native || 'ETH') + ' for gas.');
+    return { f, errs };
+  }
+  /**
+   * 五步状态机：**1 连钱包 → 2 输 CA → 3 选数量 → 4 授权 → 5 锁定**。
+   * 每一步"够不够格"只看 state（有地址 / 代币读出来了 / 金额合法 / 授权够了），
+   * 不看用户点过什么 —— 所以回退、换代币、改金额之后状态全都自己落回去。
+   * 没到第 1 步，2/3 的输入框全部禁用：顺序就是页面上写的那五步。
+   */
+  function paintSteps(f, errs) {
+    const connected = !!state.addr;
+    const hasToken = !!state.token;
+    const amountOk = state.amountWei != null && state.amountWei > 0n
+      && !(state.balance > 0n && state.amountWei > state.balance);
+    const approved = state.needApprove === false && state.amountWei != null && hasToken;
+
+    // 1 · 连钱包
+    $('st1').classList.toggle('done', connected);
+    $('st1ok').innerHTML = connected
+      ? '<span class="mono">' + short(state.addr) + '</span>' + (state.chain ? ' · ' + state.chain.name : '')
+      : '';
+    $('st1btn').style.display = connected ? 'none' : '';
+    $('st1btn').disabled = state.busy;
+
+    // 2 · 输 CA —— ⚠ **字段不跟着钱包禁用**：读代币只需要 RPC，没连钱包也该能先把 CA 填好。
+    //    （前两轮把 2/3 全禁了：访客打开页面连地址都填不了，一看就是"用不成"。）
+    $('token').disabled = state.busy;
+    $('st2').classList.toggle('done', hasToken);
+    $('st2ok').innerHTML = hasToken
+      ? '<span class="mono">' + state.symbol + '</span> · ' + state.decimals + ' decimals'
+      : '';
+
+    // 3 · 选数量（+ 排期/标题，都属于这一步）—— 同样只在一笔交易跑着的时候禁用
+    for (const id of ['amount', 'benef', 'date', 'tge', 'tgepct', 'cyc', 'cycpct', 'label', 'useowner', 'usevest']) {
+      $(id).disabled = state.busy;
+    }
+    $('max').disabled = state.busy || !connected || !hasToken || !(state.balance > 0n);
+    $('st3').classList.toggle('done', amountOk);
+    $('st3ok').textContent = amountOk ? f.amount + ' ' + (state.symbol || '') : '';
+
+    // 4 / 5 · **一颗会变身的按钮**（PinkSale 的做法）：没连钱包就是"连钱包"，
+    //   连上后额度不够写 4 · Approve，批完自己变 5 · Lock —— 一颗按钮走完全程。
+    const ab = $('actionbtn');
+    const lockPhase = approved;
+    const ready = hasToken && amountOk && (!lockPhase || errs.length === 0);
+    /* 余额不够 gas 时，连 Approve 也会失败 —— 按钮不能装作能点。 */
+    const noGas = errs.some((e) => /^Not enough .* for gas\.$/.test(e));
+    ab.disabled = state.busy || (connected && (!ready || noGas));
+    ab.textContent = state.busy ? 'Working…'
+      : (!connected ? 'Connect a wallet'
+        : (noGas ? 'Not enough gas'
+          : (lockPhase ? '5 · Lock' : '4 · Approve' + (hasToken ? ' ' + state.symbol : ''))));
+
+    /* Five-segment progress bar: one glance says where the user is. */
+    let step = 1;
+    if (connected) step = 2;
+    if (connected && hasToken) step = 3;
+    if (hasToken && amountOk) step = 4;
+    if (approved) step = 5;
+    document.querySelectorAll('#progresssteps .ps').forEach((el, i) => {
+      el.classList.toggle('done', i + 1 < step);
+      el.classList.toggle('active', i + 1 === step);
+    });
+  }
+
+  function update() {
+    const { f, errs } = validate();
+    const sym = state.symbol || 'tokens';
+    if (!f.amount || !f.date) {
+      $('sumtext').className = 'muted';
+      $('sumtext').textContent = 'Fill the form — the summary appears here, in one sentence.';
+      $('sumline2').textContent = '';
+    } else {
+      const when = f.date.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+      const mine = !state.beneficiary || !state.addr || state.beneficiary.toLowerCase() === state.addr.toLowerCase();
+      $('sumtext').className = '';
+      $('sumtext').innerHTML = (f.vest
+        ? 'You are locking <b>' + f.amount + ' ' + sym + '</b>: <b>' + f.vest.tgePct + '%</b> releases on <b>' + when
+          + '</b>, then <b>' + f.vest.pct + '%</b> every <b>' + f.vest.days + ' days</b>.'
+        : 'You are locking <b>' + f.amount + ' ' + sym + '</b> until <b>' + when + '</b>. Nothing moves before then.')
+        + (mine ? '' : ' The lock will be owned by <b>' + short(state.beneficiary) + '</b> — not by you.');
+
+      const bits = [];
+      bits.push(state.needApprove === false
+        ? 'Nothing to approve — the allowance already covers it.'
+        : 'You will approve your whole balance of this token — it covers later locks too.');
+      bits.push(mine ? 'Irrevocable: once it lands, you cannot claim early.' : 'Irrevocable: once it lands, neither of you can claim early or cancel it.');
+      if (state.lp) bits.push('Marked as an LP lock.');
+      $('sumline2').textContent = bits.join(' ');
+    }
+
+    // 标题在链上只存 31 字节 —— 超了就说清会存成什么，别让用户以为能存 64 个字符
+    const st = storedTitle(f.label);
+    $('titlehint').className = st.truncated ? 'hint warnline' : 'hint';
+    $('titlehint').textContent = st.truncated
+      ? 'On chain a title is 31 bytes — this one will be stored as "' + st.text + '".'
+      : 'Shown on the lock\'s record page.';
+
+    paintSteps(f, errs);
+
+    /**
+     * 点之前就把两步摆出来：用户看到的是"要签几次、每一步是什么"，
+     * 而不是一个按钮点下去之后才开始猜。跑起来之后（running / done）不再改写它 ——
+     * 那上面的状态是这次交易的真实进度，不能被一次重画抹掉（连错误行也一样：
+     * 跑的时候归追踪器说话，别让一次 update() 把报错擦掉）。
+     */
+    if (state.trackMode !== 'running' && state.trackMode !== 'done') {
+      /**
+       * 校验错误**列出来**（最多 3 条），不是只露第一条 —— 排期那几条（每期 <0.01%、
+       * 档数上限）在金额没填的时候会被"Enter an amount."顶掉，用户永远看不见它们。
+       * 逐条用 textContent 落 DOM（用户输入不进 innerHTML）。
+       */
+      /* 哪些字段出错了 —— 按错误的**文案**归类（`errs` 本来就是给人看的一句话，够用且不会漂） */
+      const badOf = (t) => errs.some((e) => e === t || e.indexOf(t) === 0);
+      const mark = (id, bad) => { const el = $(id); if (el) { if (bad) el.dataset.bad = '1'; else delete el.dataset.bad; } };
+      mark('token', !state.token && !!$('token').value.trim());
+      mark('amount', badOf('Enter an amount') || badOf('That is more than your balance') || badOf('Too many decimal places') || badOf('That is not a number'));
+      mark('date', badOf('The date must be in the future') || badOf('Pick the first date'));
+      mark('tge', badOf('The date must be in the future') || badOf('Pick the first date'));
+      mark('tgepct', badOf('TGE %'));
+      mark('cyc', badOf('Cycle length'));
+      mark('cycpct', badOf('Release % per cycle') || badOf('Each release must be at least') || badOf('Too many steps'));
+      mark('benef', badOf('The "lock for" address') || badOf('That is the zero address'));
+      const errEl = $('err');
+      errEl.classList.toggle('hide', errs.length === 0 || !state.token);
+      errEl.innerHTML = '';
+      for (const t of errs.slice(0, 3)) { const d = document.createElement('div'); d.textContent = t; errEl.appendChild(d); }
+      if (errs.length > 3) { const d = document.createElement('div'); d.textContent = '…and ' + (errs.length - 3) + ' more'; errEl.appendChild(d); }
+      if (state.token) {   // 不必先连钱包：先让人看见要签几次
+        const skip = state.addr && state.needApprove === false && state.amountWei != null;
+        const li = document.querySelector('#track li[data-step="approve"]');
+        if (li) li.style.display = skip ? 'none' : 'grid';
+        for (const x of document.querySelectorAll('#track li')) x.dataset.state = 'idle';
+        $('t-approve').textContent = skip ? 'Already approved — nothing to sign'
+          : (state.needApprove === false ? 'Checking your allowance…' : 'One approval for your whole balance — it covers every later lock of this token');
+        $('t-lock').textContent = 'The lock itself. The schedule is fixed once it lands.';
+        for (const id of ['tx-approve', 'tx-lock']) { const a = $(id); a.style.display = 'none'; a.removeAttribute('href'); }
+        track.show(true);
+        state.trackMode = 'preview';
+      } else {
+        track.show(false);
+        state.trackMode = 'hidden';
+      }
+    }
+    return { f, errs };
+  }
+  /**
+   * `?token=0x…` 预填 —— 从发射台（或别处）带过来的地址，用户不用再抄一遍。
+   * 只认合法地址，别的什么都不做。
+   */
+  {
+    const qs = new URLSearchParams(location.search);
+    const q = qs.get('token');
+    if (q && /^0x[0-9a-fA-F]{40}$/.test(q)) { $('token').value = q; loadToken(); }
+    const amount = qs.get('amount');
+    if (amount && /^\d*(?:\.\d+)?$/.test(amount) && Number(amount) > 0) {
+      $('amount').value = amount;
+      $('amount').dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+
+  for (const id of ['amount', 'benef', 'date', 'tge', 'tgepct', 'cyc', 'cycpct', 'label']) {
+    $(id).addEventListener('input', () => { if (id === 'amount') scheduleCosts(); update(); });
+  }
+  update();
+
+  /* ── 提交（第 4 步与第 5 步）───────────────────────────────────────────
+   * 4 · Approve：只关心"金额"这一件事（排期还没填也能先授权），批的是**精确额度**。
+   * 5 · Lock：完整的校验 + 保险起见再看一眼额度（差就先补一笔 approve，再锁）。
+   */
+  async function doApprove() {
+    if (!state.addr) {
+      // 按钮在没连钱包时写的就是「Connect a wallet」—— 点了就连，连上再点一次审批
+      try { await wallet.connect(); await refreshWallet(); }
+      catch (e) { toast(String((e && e.message) || e).slice(0, 140), 'bad'); }
+      return;
+    }
+    if (!state.token) { toast('Enter a token address first.', 'bad'); return; }
+    const { errs } = validate();                       // 里面会把 amountWei 算出来
+    if (state.amountWei == null || state.amountWei <= 0n || (state.balance > 0n && state.amountWei > state.balance)) {
+      toast('Enter a valid amount first.', 'bad'); return;
+    }
+    /* 快照要在这里就拿（校验刚过、还没 await 过任何东西）—— 见 loadToken 上面那段注释 */
+    const tokenAddr = state.token;
+    const me = state.addr;
+    state.busy = true; update(); lockForm(true); $('steps').textContent = '';
+    track.show(true);
+    /* 全局交易通知：Pending（带浏览器链接）→ Success / Fail。
+       追踪器说"这一步到哪了"，提示条负责"你那笔在链上是什么状态"。 */
+    let note = null;
+    try {
+      await wallet.ensureChain(state.chain);
+      const signer = await wallet.signer();
+      const token = erc20(state.chain, tokenAddr, signer);
+      /**
+       * 批**整个余额**（PinkSale 就是这么做的）：一次授权覆盖之后所有的锁，按钮也就能一直停在
+       * 「5 · Lock」。在这个站上是安全的 —— 适配器只从**调用者本人**拉币、且只拉进你自己发起的
+       * 那把锁，别人用不了你的额度；想收回随时可以 revoke。余额读不到（=0）就退回批这次的金额。
+       */
+      const approveFor = state.balance > 0n ? state.balance : state.amountWei;
+      note = txNotice(state.chain, 'Approval');
+      track.set('approve', 'wallet', 'Confirm the approval in your wallet — one approval for your whole ' +
+        fmtAmount(approveFor, state.decimals) + ' ' + (state.symbol || '') + ' balance, covering later locks too.');
+      const t = await token.approve(ADAPTER, approveFor, { gasLimit: 1_000_000n });
+      note.sent(t.hash);
+      track.set('approve', 'sent', 'Approval sent — waiting for the block…', t.hash);
+      await t.wait();
+      note.ok('Approval confirmed — step 5 is ready.');
+      track.set('approve', 'done', 'Approved ' + fmtAmount(state.amountWei, state.decimals) + ' ' + (state.symbol || ''));
+      state.trackMode = 'preview';                     // 让 update() 重新接管（额度变了 → 第 5 步亮）
+    } catch (e) {
+      const msg = humanizeTxError(e, state.chain);
+      track.set('approve', 'fail', msg.slice(0, 140));
+      state.trackMode = 'done';
+      $('err').classList.remove('hide');
+      $('err').textContent = msg;
+      if (note) note.fail(msg); else toast(msg.slice(0, 120), 'bad');
+    } finally {
+      state.busy = false; lockForm(false);
+      await refreshCosts();                            // 重新读 allowance
+      update();
+    }
+  }
+
+  async function doLock() {
+    const { f, errs } = validate();
+    if (errs.length) { toast(errs[0], 'bad'); return; }
+    /**
+     * Forced confirmation for the token behaviours that break a lock quietly.
+     * The page cannot detect fee-on-transfer/rebase/blacklist tokens reliably,
+     * so the user has to acknowledge the risk before the first signature.
+     */
+    if (!window.confirm('Before you sign:\n\nFee-on-transfer, rebasing, blacklisting or pausable tokens can make this lock hold less than it says, or block the release. The vault only counts what actually arrives.\n\nIf your token does any of that, do not lock it here. Continue?')) return;
+    /* ⚠ 快照在**这一行**取：校验刚过、还没 await 过任何东西。往下挪任何一步都会重新打开
+       "读到一半 state.token 是空的"那个窗口（真链 E2E 抓过两次）。 */
+    const tokenAddr = state.token;
+    const me = state.addr;
+    state.busy = true; update();
+    lockForm(true);
+    track.reset();
+    $('steps').textContent = '';
+    let note = null;
+    try {
+      if (!state.addr) { await wallet.connect(); await refreshWallet(); }
+      await wallet.ensureChain(state.chain);          // 手选的链在这里落到钱包上
+      const signer = await wallet.signer();
+
+      /**
+       * ⚠ **地址要在开跑前快照下来**，中途不再读 `state.token`。
+       *
+       * `loadToken()` 是"先清空、读完再填"的：读在飞的时候用户点了 Lock，
+       * 下面任何一处 `state.token` 都会拿到空串 —— 而空串在 ethers 里会变成
+       * 一句 ENS 报错（真链 E2E 抓到的那一幕）。快照之后窗口就没了。
+       */
+      const token = erc20(state.chain, tokenAddr, signer);
+      const amount = state.amountWei;
+      const beneficiary = state.beneficiary;
+      const description = f.label || '';
+
+      // ① 授权（够了就不发）。批的是**精确额度**，不是无限授权 —— 页面上也是这么写的。
+      const cur = await safeRead(() => erc20(state.chain, tokenAddr).allowance(me, ADAPTER),
+        { chain: state.chain, label: 'allowance' });
+      if (cur < amount) {
+        note = txNotice(state.chain, 'Approval');
+        track.set('approve', 'wallet', 'Confirm the approval in your wallet — exactly ' +
+          fmtAmount(amount, state.decimals) + ' ' + (state.symbol || '') + ', not unlimited.');
+        const t = await token.approve(ADAPTER, amount, { gasLimit: 1_000_000n });
+        note.sent(t.hash);
+        track.set('approve', 'sent', 'Approval sent — waiting for the block…', t.hash);
+        await t.wait();
+        note.ok('Approval confirmed.');
+        track.set('approve', 'done', 'Approved ' + fmtAmount(amount, state.decimals) + ' ' + (state.symbol || ''));
+      } else {
+        track.set('approve', 'done', 'Already approved — nothing to sign for this step');
+      }
+
+      // ② 锁
+      const lockNote = txNotice(state.chain, 'Lock');
+      note = lockNote;
+      track.set('lock', 'wallet', 'Confirm the lock in your wallet…');
+      const a = adapter(state.chain, signer);
+      /**
+       * 兜底用的计数，**不是主判据**：主判据是收据里金库的 LockCreated。
+       * 写后读在节点滞后时会读到锁之前的数（→ "Lock #?"），只在拿不到日志时才用它，
+       * 而且要"恰好 +1"才敢认。
+       */
+      let before = null;
+      try { before = Number(await adapter(state.chain).getTotalLockCount()); } catch { before = null; }
+      const secs = Math.floor(f.date.getTime() / 1000);
+      let tx;
+      if (f.vest) {
+        // ⚠ `cycle` 的单位是**秒**（界面按天填，这里换算一次；合约里不再换算）
+        tx = await a.vestingLock(
+          beneficiary, state.token, state.lp, amount, secs,
+          Math.round(f.vest.tgePct * 100), Math.round(f.vest.days * 86400), Math.round(f.vest.pct * 100),
+          description, { gasLimit: 2_500_000n },
+        );
+      } else {
+        tx = await a.lock(beneficiary, state.token, state.lp, amount, secs, description, { gasLimit: 1_500_000n });
+      }
+      track.set('lock', 'sent', 'Lock sent — waiting for the block…', tx.hash);
+      lockNote.sent(tx.hash);
+      const receipt = await tx.wait();
+
+      // 锁号与**实收**数量：金库那条事件说了算
+      const created = lockCreatedFromReceipt(receipt, state.chain);
+      let id = created ? String(created.lockId) : null;
+      if (!id && before !== null) {
+        try {
+          const after = Number(await adapter(state.chain).getTotalLockCount());
+          if (after === before + 1) id = String(after);
+        } catch { /* 读不到就是读不到，下面如实说 */ }
+      }
+      const credited = created ? created.amount : null;
+      const st = storedTitle(description);
+      const mine = beneficiary.toLowerCase() === state.addr.toLowerCase();
+      const exTx = explorerHref('/tx/' + tx.hash, state.chain);
+
+      track.set('lock', 'done', id ? ('Locked as #' + id + ' on ' + state.chain.name) : ('Confirmed on ' + state.chain.name));
+
+      $('done').classList.remove('hide');
+      $('steps').textContent = '';
+      $('donebody').innerHTML = '<div style="display:grid;gap:10px">'
+        + '<div>Lock <b class="mono">#' + (id ?? '?') + '</b> is on ' + state.chain.name + '.</div>'
+        + (id ? '' : '<div class="warnline">We could not read the lock id back from the receipt — the transaction still landed. '
+            + (exTx ? 'Check the transaction on the explorer.' : '') + '</div>')
+        + (credited !== null && credited < amount
+            ? '<div class="warnline">You asked for ' + fmtAmount(amount, state.decimals) + ' ' + (state.symbol || '')
+              + ', the token delivered ' + fmtAmount(credited, state.decimals) + ' — it takes a fee on transfer, and the lock is for what arrived.</div>'
+            : '')
+        + (mine ? '' : '<div class="muted">Owned by <span class="mono">' + beneficiary + '</span> — you cannot claim, transfer or rename it.</div>')
+        + (st.truncated ? '<div class="muted">Title stored as "' + st.text + '" (31 bytes on chain).</div>' : '')
+        + '<div class="mono muted" style="font-size:12px;word-break:break-all">tx ' + tx.hash + '</div>'
+        + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">'
+        + (id ? '<a class="btn btn-p" href="/locks/' + state.chain.slug + '/record/' + id + '">Open the record →</a>' : '')
+        + (exTx ? '<a class="btn btn-s" href="' + exTx + '" target="_blank" rel="noopener">See it on the explorer</a>' : '')
+        + '<a class="btn btn-s" href="/locks/create">Lock another</a>'
+        + '</div></div>';
+      state.trackMode = 'done';
+      /* 成功那条通知带两个去处：记录页 + 浏览器（记录页链接是清单点名要的"明显按钮"）。 */
+      lockNote.ok(id ? ('Locked as #' + id + ' on ' + state.chain.name) : ('Locked on ' + state.chain.name),
+        id ? [{ label: 'Open the record →', href: '/locks/' + state.chain.slug + '/record/' + id }] : []);
+      /* 成功仪式：交易日真的落地了才播；reduced-motion / 起播失败时它自己跳过 */
+      sealMoment({
+        chain: state.chain.name,
+        id,
+        href: id ? '/locks/' + state.chain.slug + '/record/' + id : null,
+        title: 'Locked and sealed.',
+      });
+      refreshCosts();   // 授权额度变了，确认次数跟着变（多半已经降到 1）
+    } catch (e) {
+      const msg = humanizeTxError(e, state.chain);
+      const which = state.activeStep || 'lock';
+      track.set(which, 'fail', msg.slice(0, 140));
+      state.trackMode = 'done';   // 失败也停在屏幕上：哪一步、为什么，用户要能回看
+      $('err').classList.remove('hide');
+      $('err').textContent = msg;
+      if (note) note.fail(msg); else toast(msg.slice(0, 120), 'bad');
+    } finally {
+      state.busy = false; lockForm(false); update();
+    }
+  }
+
+  /* 第 4、5 步共用这一颗按钮：额度不够走 doApprove，够了走 doLock（PinkSale 的做法）。 */
+  $('actionbtn').onclick = () => (state.needApprove === false ? doLock() : doApprove());
+</script>
+</body>
+</html>

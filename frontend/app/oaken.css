@@ -1,0 +1,1231 @@
+/* OAKEN 的设计系统 —— 自己的站，不用 Tailwind，也不套任何现成框架。
+ *
+ * 三条原则（对着 owner 那几条意见来的）：
+ *   ① **颜色干净**：只有四个色阶 —— 树皮（底）、羊皮纸（字）、一个金（强调）、
+ *      一个灰褐（次要文字）。不用第二套棕、不用渐变堆叠、不用赛博滤镜。
+ *   ② **排版和源站不一样**：源站是**左侧工具栏 + 密集表格**，我们是**顶栏 + 宽版心**，
+ *      大留白、大标题、卡片浮在暗底上。一眼就不一样。
+ *   ③ **动效克制**：只有 hover 的位移/描边、进入视口的淡入。别的地方不动。
+ */
+@font-face {
+  font-family: 'Oaken Display';
+  src: url('/oaken/bevan.ttf') format('truetype');
+  font-display: swap;
+}
+/* 视觉 v3 的两套字（都自托管、woff2、只留 latin 子集 —— 13 KB / 20 KB）。
+   分区职责和 [[aeonpad-style-taste]] 那条一致：字面（Bevan）/ 正文（Manrope）/
+   读数（JetBrains Mono）各一套，别让系统字体同时干三份活。 */
+@font-face {
+  font-family: 'Oaken Text';
+  src: url('/app/fonts/manrope.woff2') format('woff2');
+  font-weight: 200 800; font-display: swap;
+}
+@font-face {
+  font-family: 'Oaken Mono';
+  src: url('/app/fonts/jetbrains-mono.woff2') format('woff2');
+  font-weight: 400 700; font-display: swap;
+}
+
+:root {
+  --bark: #14110d;
+  --panel: #1c1712;
+  --panel-2: #221b15;
+  --line: rgba(240, 228, 208, .10);
+  --line-gold: rgba(217, 163, 67, .30);
+  --parch: #f3eadb;
+  --muted: #a08f78;
+  --gold: #d9a343;
+  --gold-2: #e8b85c;
+  --bad: #e0785f;
+  --ok: #9dbf7a;
+  --r: 4px;
+  --shadow: 0 24px 60px -30px rgba(0, 0, 0, .9);
+  /* v3 新增：光、帘、缓动 */
+  --glow: rgba(217, 163, 67, .13);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-soft: cubic-bezier(.22, .61, .36, 1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bark);
+  color: var(--parch);
+  font: 15.5px/1.7 "Oaken Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+a { color: var(--gold); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+h1, h2, h3, .display { font-family: 'Oaken Display', Georgia, serif; font-weight: 400; letter-spacing: .01em; }
+.mono { font-family: "Oaken Mono", ui-monospace, "SF Mono", Consolas, monospace; letter-spacing: .02em; }
+.wrap { width: min(1120px, calc(100% - 48px)); margin: 0 auto; }
+.muted { color: var(--muted); }
+.hide { display: none !important; }
+
+/* ── 顶栏 ───────────────────────────────────────────────────────────── */
+header.top {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(20, 17, 13, .92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.top .topbar { display: flex; align-items: center; gap: 28px; height: 70px; }
+.brand { display: flex; align-items: center; gap: 11px; color: var(--parch); }
+.brand:hover { text-decoration: none; }
+.brand img { width: 34px; height: 34px; }
+.brand b { font-family: 'Oaken Display', Georgia, serif; font-weight: 400; font-size: 22px; letter-spacing: .18em; }
+nav.main { display: flex; align-items: center; gap: 20px; font-size: 14.5px; }
+nav.main a { color: var(--muted); white-space: nowrap; }   /* 导航项也不折行（'My OAKEN' 被挤成两行过） */
+nav.main a:hover, nav.main a.on { color: var(--parch); text-decoration: none; }
+nav.main a.on { color: var(--gold); }
+.top .right { margin-left: auto; display: flex; align-items: center; gap: 12px; flex: none; }
+/* 左边这排可以被压（窄屏本来就换行），但**右边那一组不许被压** ——
+   2026-10-16 加了 "Switch to Robinhood Chain" 那颗更长的胶囊之后，它把 Connect 挤窄、
+   地址折成了两行。压的空间从导航这边出。 */
+nav.main { min-width: 0; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px; padding: 7px 13px; white-space: nowrap;
+  background: transparent; font-family: inherit; cursor: default;
+}
+.chip b { color: var(--parch); font-weight: 600; }
+.chip.warn { color: var(--bad); border-color: rgba(224, 120, 95, .45); background: rgba(224, 120, 95, .07); }
+.chip.warn svg { width: 15px; height: 15px; }
+
+/* 网络菜单（顶栏标签点开）—— 挂在 body 上，别塞进 header 里被 overflow 裁掉 */
+.chain-menu { position: fixed; z-index: 60; min-width: 232px; background: var(--panel-2);
+              border: 1px solid var(--line-gold); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; }
+.chain-menu button { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; width: 100%;
+                     background: transparent; border: 0; border-bottom: 1px solid var(--line); color: var(--parch);
+                     font: 14px/1 "Segoe UI", system-ui, sans-serif; padding: 13px 14px; cursor: pointer; text-align: left; }
+.chain-menu button:last-of-type { border-bottom: 0; }
+.chain-menu button:hover { background: rgba(217, 163, 67, .08); }
+.chain-menu button.on { color: var(--gold); }
+.chain-menu button span { font-size: 12px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px rgba(157, 191, 122, .18); }
+
+/* 钱包选择面板：复用 .chain-menu 的壳，行里多一枚钱包图标（6963 给的是 data: URI） */
+.wallet-menu button { align-items: center; justify-content: flex-start; gap: 10px; }
+.wallet-menu button b { flex: 1; }
+.wallet-menu img { border-radius: 5px; flex: none; }
+.wallet-menu .wbal { padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--parch); }
+.wallet-menu .wbal b { color: var(--gold); }
+.wallet-menu .wdot { width: 20px; height: 20px; border-radius: 5px; flex: none;
+                     background: linear-gradient(180deg, var(--gold-2), var(--gold)); }
+
+/* ── 连接面板（WalletConnect + 装/没装的钱包）─────────────────────────────
+   一张居中的卡片：WalletConnect 一行、本机已装的（Installed 标）、没装的给官网/商店链接。
+   只在"一把都没装"时由 connect() 拉起来 —— 装了的照旧一点直连，不多一次点击。 */
+.wp-overlay { position: fixed; inset: 0; z-index: 70; background: rgba(10, 7, 4, .66);
+              display: flex; align-items: center; justify-content: center; padding: 20px; }
+/* ⚠ 高度用 100% 而不是 vh —— JS 会把这一层钉在 visualViewport 上（手机上两者不是一回事），
+   百分比跟着那一层走；`max-height: 86vh` 在手机上会按 999px 的布局视口算，卡片会超出屏幕 */
+.wp { width: min(420px, 100%); max-height: 100%; display: flex; flex-direction: column;
+      background: var(--panel-2); border: 1px solid var(--line-gold); border-radius: 8px; box-shadow: var(--shadow); overflow: hidden; }
+.wp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+           padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.wp-head b { font-size: 15px; color: var(--parch); }
+.wp-x { background: transparent; border: 0; color: var(--muted); cursor: pointer; padding: 4px; display: grid; }
+.wp-x:hover { color: var(--gold); }
+.wp-body { overflow-y: auto; }
+.wp-sec { padding: 13px 16px 6px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.wp-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 16px; text-align: left;
+          background: transparent; border: 0; border-bottom: 1px solid var(--line); color: var(--parch);
+          font: 14px/1 "Segoe UI", system-ui, sans-serif; text-decoration: none; cursor: pointer; }
+.wp-row:last-of-type { border-bottom: 0; }
+.wp-row:hover { background: rgba(217, 163, 67, .08); text-decoration: none; }
+.wp-row b { flex: 1; font-weight: 600; }
+.wp-row img { border-radius: 6px; flex: none; }
+.wp-row .wdot { width: 26px; height: 26px; border-radius: 6px; flex: none;
+                background: linear-gradient(180deg, var(--gold-2), var(--gold)); }
+.wp-row svg { flex: none; color: var(--gold); }
+.wp-tag { font-size: 10px; letter-spacing: .08em; padding: 3px 6px; border-radius: 4px;
+          border: 1px solid var(--line); color: var(--muted); font-style: normal; }
+.wp-tag.ok { color: var(--ok); border-color: rgba(157, 191, 122, .35); }
+.wp-tag.get, .wp-tag.tag-gold { color: var(--gold); border-color: var(--line-gold); }
+.wp-note { padding: 12px 16px; font-size: 12.5px; line-height: 1.5; color: var(--muted); border-top: 1px solid var(--line); }
+.wp-note b { color: var(--parch); }
+.wp-foot { padding: 11px 16px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); }
+/* QR 视图：**深色点阵必须画在浅底上**（暗色面板上反着画扫不出来）*/
+.wp-qr { padding: 18px 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.wp-qrbox { background: #f7f2e8; border-radius: 10px; padding: 10px; display: grid; place-items: center;
+            min-width: 236px; min-height: 236px; }
+.wp-qrbox svg, .wp-qrbox canvas, .wp-qrbox img { display: block; max-width: 100%; height: auto; }
+.wp-wait { display: flex; align-items: center; gap: 8px; color: #6b5a44; font-size: 13px; text-align: center; }
+.wp-err { color: #8c3b2a; font-size: 13px; line-height: 1.5; text-align: center; max-width: 28ch; }
+.wp-wait .spin { width: 12px; height: 12px; border-radius: 50%; flex: none;
+                border: 2px solid rgba(107, 90, 68, .3); border-top-color: #8c6a34; animation: spin .9s linear infinite; }
+.wp-hint { font-size: 12.5px; color: var(--muted); text-align: center; max-width: 34ch; line-height: 1.5; }
+
+/* ── 按钮 ───────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font: 600 14px/1 "Segoe UI", system-ui, sans-serif; letter-spacing: .04em;
+  padding: 12px 18px; border-radius: var(--r); border: 1px solid transparent;
+  cursor: pointer; transition: transform .12s ease, background .15s ease, border-color .15s ease;
+  white-space: nowrap;   /* 地址/文案不许折行 —— 挤窄了宁可整颗按钮往外顶 */
+}
+.btn:hover { transform: translateY(-1px); text-decoration: none; }
+.btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.btn-p { background: linear-gradient(180deg, var(--gold-2), var(--gold)); color: #1b1409; box-shadow: 0 10px 24px -14px rgba(217, 163, 67, .9); }
+.btn-s { border-color: var(--line-gold); color: var(--gold); background: transparent; }
+.btn-s:hover { background: rgba(217, 163, 67, .10); }
+.btn-g { border-color: var(--line); color: var(--muted); background: transparent; }
+.icon-btn {
+  width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); border-radius: var(--r); color: var(--muted);
+}
+.icon-btn:hover { color: var(--gold); border-color: var(--line-gold); text-decoration: none; }
+.icon-btn svg { width: 17px; height: 17px; }
+
+/* ── 版心与分节 ─────────────────────────────────────────────────────── */
+main { padding-bottom: 90px; }
+.hero { display: grid; grid-template-columns: 1.05fr .95fr; gap: 56px; align-items: center; padding: 76px 0 40px; }
+.hero h1 { font-size: clamp(40px, 5vw, 66px); line-height: 1.04; }
+.hero h1 em { font-style: normal; color: var(--gold); }
+.hero .lead { color: var(--muted); font-size: 16.5px; line-height: 1.8; margin-top: 20px; max-width: 54ch; }
+.hero .actions { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
+.hero-art { position: relative; border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow); }
+.hero-art img { width: 100%; height: auto; display: block; }   /* ⚠ 高度属性不带 height:auto 会被当成实际高度，图会被拉长 */
+.hero-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20,17,13,0) 45%, rgba(20,17,13,.72) 100%); }
+
+section.band { padding: 64px 0 0; }
+.eyebrow { display: flex; align-items: center; gap: 12px; font: 600 11.5px/1 "Segoe UI", system-ui, sans-serif;
+           letter-spacing: .22em; text-transform: uppercase; color: var(--muted); margin-bottom: 18px; }
+.eyebrow::before { content: ''; width: 26px; height: 2px; background: var(--gold); }
+h2.sec { font-size: clamp(26px, 2.6vw, 36px); line-height: 1.15; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 30px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; margin-top: 30px; }
+
+/* ── 卡片 / 面板 ────────────────────────────────────────────────────── */
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 24px; transition: border-color .15s ease, transform .15s ease;
+}
+.card:hover { border-color: var(--line-gold); }
+.card .n { font-family: 'Oaken Display', Georgia, serif; font-size: 26px; color: var(--gold); display: block; margin-bottom: 10px; }
+.card h3 { font-size: 16.5px; color: var(--parch); margin-bottom: 8px; }
+.card p { color: var(--muted); font-size: 14.5px; }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.panel .head { padding: 18px 22px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 14px; }
+.panel .head h3 { font-size: 16px; }
+.panel .body { padding: 22px; }
+
+/* 统计条 */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line);
+         border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; margin-top: 40px; }
+.stats > div { background: var(--panel); padding: 22px 24px; }
+.stats .k { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+.stats .v { font-family: 'Oaken Display', Georgia, serif; font-size: 30px; color: var(--gold); line-height: 1; }
+
+/* ── 表格 ───────────────────────────────────────────────────────────── */
+table.list { width: 100%; border-collapse: collapse; }
+table.list th { text-align: left; font: 600 11.5px/1 "Segoe UI", system-ui, sans-serif; letter-spacing: .14em;
+                text-transform: uppercase; color: var(--muted); padding: 12px 14px; border-bottom: 1px solid var(--line); }
+table.list td { padding: 15px 14px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
+table.list tbody tr:hover { background: rgba(217, 163, 67, .045); }
+table.list tbody tr:last-child td { border-bottom: 0; }
+.pill { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 999px;
+        padding: 4px 11px; font-size: 12px; color: var(--muted); }
+.pill.ok { color: var(--ok); border-color: rgba(157, 191, 122, .35); }
+.pill.lock { color: var(--gold); border-color: var(--line-gold); }
+
+/* ── 表单 ───────────────────────────────────────────────────────────── */
+label.f { display: block; font-size: 13px; color: var(--muted); letter-spacing: .04em; margin: 18px 0 7px; }
+input.i, select.i {
+  width: 100%; background: var(--bark); border: 1px solid var(--line); border-radius: var(--r);
+  color: var(--parch); font: 15px/1.4 "Segoe UI", system-ui, sans-serif; padding: 13px 14px; outline: none;
+  transition: border-color .15s ease;
+}
+input.i:focus, select.i:focus { border-color: var(--line-gold); }
+input.i::placeholder { color: #6f6353; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.hint { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+.err { color: var(--bad); font-size: 13px; margin-top: 10px; }
+.steps-mini { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+.steps-mini b { color: var(--gold); }
+
+/* ── 记录页：年轮进度 ───────────────────────────────────────────────── */
+.ring-wrap { display: flex; gap: 30px; align-items: center; flex-wrap: wrap; }
+.ring { position: relative; width: 190px; height: 190px; flex: 0 0 auto; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring .mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.ring .mid b { font-family: 'Oaken Display', Georgia, serif; font-size: 30px; color: var(--gold); line-height: 1; }
+.ring .mid span { font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+/* 记录页的圆环：数据一到就从满圈长到实际进度（不是画好一个静止的圈） */
+.ring .prog { animation: ringGrow 1.7s var(--ease-out) .18s both; }
+@keyframes ringGrow { from { stroke-dashoffset: var(--c); } to { stroke-dashoffset: var(--off); } }
+.kv { display: grid; grid-template-columns: 170px 1fr; gap: 10px 18px; }
+.kv dt { color: var(--muted); font-size: 13.5px; }
+.kv dd { font-size: 14.5px; word-break: break-all; }
+
+/* ── 页脚 ───────────────────────────────────────────────────────────── */
+footer.bottom { border-top: 1px solid var(--line); background: var(--panel); margin-top: 70px; }
+footer.bottom .wrap { display: flex; gap: 26px; align-items: center; flex-wrap: wrap; padding: 26px 0; font-size: 13px; color: var(--muted); }
+footer.bottom .sp { margin-left: auto; }
+
+/* 宽幅带：一张图 + 一段话叠在上面（rings 那张用在这儿） */
+.band-art { position: relative; border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); }
+.band-art img { width: 100%; height: auto; display: block; opacity: .9; }
+.band-art::after { content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(20,17,13,.94) 0%, rgba(20,17,13,.72) 46%, rgba(20,17,13,.18) 100%); }
+.band-art-cap { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center;
+                padding: 0 clamp(22px, 5vw, 64px); max-width: 620px; }
+@media (max-width: 940px) {
+  .band-art::after { background: linear-gradient(180deg, rgba(20,17,13,.55) 0%, rgba(20,17,13,.94) 62%); }
+  .band-art-cap { position: static; padding: 22px; }
+}
+
+/* ── 平台层：发射台 / 流水 / 榜单 / 我的 ────────────────────────────────
+ *
+ * 同一套令牌，不引第二套色。新增的零件只有三类：
+ *   · 字母章（代币标识，不挂源站图床）
+ *   · 进度条（募资进度，唯一一处会动的东西）
+ *   · 标签页 / 名次 / 流水行（把表格式的密排拆成"宽版心"里能读的几栏）
+ */
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tabs a { padding: 9px 15px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 13.5px; }
+.tabs a:hover { text-decoration: none; border-color: var(--line-gold); color: var(--parch); }
+.tabs a.on { border-color: var(--line-gold); color: var(--gold); background: rgba(217, 163, 67, .08); }
+
+.controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 24px 0 6px; }
+.controls input.i, .controls select.i { width: auto; padding: 10px 13px; font-size: 14px; }
+.controls input.i { flex: 1 1 260px; max-width: 380px; }
+
+.pad-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 20px; }
+@media (max-width: 1040px) { .pad-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 700px) { .pad-grid { grid-template-columns: 1fr; } }
+
+.fcard { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 20px;
+         display: flex; flex-direction: column; gap: 14px; color: var(--parch); text-decoration: none;
+         transition: border-color .15s ease, transform .15s ease; }
+/* 卡片本身就是链接 —— 全局的 `a:hover{underline}` 会把整张卡的每个字都划上 */
+.fcard:hover { border-color: var(--line-gold); transform: translateY(-2px); text-decoration: none; }
+.fcard .top { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.fcard .nm { min-width: 0; flex: 1 1 auto; }
+.fcard .nm b { display: block; font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fcard .nm span { font-size: 12.5px; color: var(--muted); }
+.fcard .desc { color: var(--muted); font-size: 13.5px; line-height: 1.62; min-height: 44px;
+               display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fcard .foot { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+
+/* 字母章：源站图床（photos.pinksale.finance）不挂 —— 见 explore.js 的 monogram() */
+.tile { width: 42px; height: 42px; border-radius: 6px; flex: 0 0 auto;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: linear-gradient(180deg, rgba(217,163,67,.16), rgba(217,163,67,.04));
+        border: 1px solid var(--line-gold); color: var(--gold);
+        font-family: 'Oaken Display', Georgia, serif; font-size: 15px; letter-spacing: .06em; }
+.tile.lg { width: 58px; height: 58px; font-size: 20px; border-radius: 8px; }
+
+/* 进度条 + 那一行数字 */
+.bar { height: 6px; border-radius: 99px; background: rgba(243, 234, 219, .07);
+       border: 1px solid var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), var(--gold-2)); }
+.bar i.ok { background: linear-gradient(90deg, #7fa85f, var(--ok)); }
+.raise { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px;
+         color: var(--muted); margin-top: 7px; }
+.raise b { color: var(--parch); font-weight: 600; }
+
+.chip.ours { color: var(--gold); border-color: var(--line-gold); }
+
+/* 详情：正文 + 侧栏 */
+.dossier { display: grid; grid-template-columns: 1.55fr .95fr; gap: 26px; align-items: start; margin-top: 26px; }
+@media (max-width: 940px) { .dossier { grid-template-columns: 1fr; } }
+.dossier .side { display: grid; gap: 18px; }
+.stack { display: grid; gap: 18px; }
+
+/* 活动流水：一行一件事 */
+.feed { display: flex; flex-direction: column; }
+.feed .row { display: flex; gap: 14px; align-items: baseline; padding: 13px 18px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.feed .row:last-child { border-bottom: 0; }
+.feed .row:hover { background: rgba(217, 163, 67, .045); }
+.feed .t { color: var(--muted); font-size: 12.5px; white-space: nowrap; min-width: 92px; }
+.tag { font: 600 10.5px/1 "Segoe UI", system-ui, sans-serif; letter-spacing: .14em; text-transform: uppercase;
+       padding: 5px 8px; border-radius: 3px; border: 1px solid var(--line-gold); color: var(--gold); white-space: nowrap; }
+.tag.q { border-color: var(--line); color: var(--muted); }
+
+/* 榜单：名次用同一套衬线数字 */
+.rank { width: 34px; font-family: 'Oaken Display', Georgia, serif; font-size: 18px; color: var(--muted); }
+tr:hover .rank { color: var(--gold); }
+
+/* 分页 */
+.pager { display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 26px; color: var(--muted); font-size: 13.5px; }
+.pager button { font: inherit; background: transparent; border: 1px solid var(--line); color: var(--parch);
+                border-radius: var(--r); padding: 9px 14px; cursor: pointer; }
+.pager button:hover:not(:disabled) { border-color: var(--line-gold); color: var(--gold); }
+.pager button:disabled { opacity: .4; cursor: not-allowed; }
+
+/* 侧栏里的外链行 */
+.links { display: grid; gap: 10px; }
+.links a { display: flex; align-items: center; gap: 10px; color: var(--parch); font-size: 14px; }
+.links a:hover { color: var(--gold); text-decoration: none; }
+.links a svg { width: 15px; height: 15px; color: var(--muted); flex: 0 0 auto; }
+
+/* 骨架（读快照要 350ms —— 上游延迟是给镜像水合留的，留着不动） */
+.skel { color: var(--muted); }
+.skel::after { content: '…'; }
+
+/* 进入视口的淡入（唯一的滚动动效） */
+.reveal { opacity: 0; transform: translateY(14px); transition: opacity .5s ease, transform .5s ease; }
+.reveal.in { opacity: 1; transform: none; }
+
+@media (max-width: 940px) {
+  .hero { grid-template-columns: 1fr; gap: 34px; padding-top: 46px; }
+  .grid3, .grid2, .stats { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  nav.main { gap: 14px; }
+  .kv { grid-template-columns: 1fr; gap: 2px 0; }
+  .kv dd { margin-bottom: 10px; }
+}
+
+/* 文件选择统一用"按钮 + 隐藏 input"：原生 <input type=file> 的文案是**浏览器语言**的
+   （中文浏览器会显示"选择文件 / 未选择任何文件"）—— 全英文的页面不能漏这一格。 */
+.filebtn { cursor: pointer; display: inline-block; }
+
+/* 复制按钮（任何页面都能用：配合 oaken.js 的 [data-copy] 委托监听） */
+.copybtn { background: none; border: 0; color: var(--gold); cursor: pointer; padding: 0 2px;
+           font: 600 12px/1 "Segoe UI", system-ui, sans-serif; }
+.copybtn:hover { text-decoration: underline; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   视觉 v3 —— 电影感的底，活的动（2026-10-14）
+   ───────────────────────────────────────────────────────────────────────
+   原则没变（树皮底 / 羊皮纸字 / 一个金），变的是**密度与光**：
+     · 底：全站一层胶片颗粒 + 暗角（fixed 覆盖层，不挡交互、不糊顶栏）
+     · 光：面板是"被照亮的"而不是"画了边的"——顶缘一抹金 + 深投影 + 悬停扫光
+     · 动：进入视口错峰入场 / 数字滚动 / 进度生长 / 年轮点亮 / 跑马灯 /
+           hero 满幅影视底 + 浮尘 canvas
+     · 字：Bevan（字面）· Manrope（正文）· JetBrains Mono（读数）三套各司其职
+   ⚠ 交互面板一律**不套 clip-path** —— 它会剪掉后代弹层
+     （[[clippath-kills-descendant-popups]]）；切角只给不装弹层的按钮。
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── 胶片颗粒 + 暗角 ─────────────────────────────────────────────────── */
+body::before {
+  content: ''; position: fixed; inset: -60px; z-index: 46; pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.55'/></svg>");
+  opacity: .05; animation: grain 1.1s steps(1) infinite;
+}
+body::after {
+  content: ''; position: fixed; inset: 0; z-index: 45; pointer-events: none;
+  background: radial-gradient(130% 95% at 50% 12%, transparent 52%, rgba(6, 4, 2, .42) 100%);
+}
+@keyframes grain {
+  0% { transform: translate(0, 0); }      12.5% { transform: translate(-18px, 9px); }
+  25% { transform: translate(11px, -14px); } 37.5% { transform: translate(-7px, -6px); }
+  50% { transform: translate(14px, 11px); }  62.5% { transform: translate(-13px, 4px); }
+  75% { transform: translate(6px, -11px); }  87.5% { transform: translate(-4px, 13px); }
+  100% { transform: translate(0, 0); }
+}
+
+/* ── 顶栏：在 hero 上透明，滚下去变实 ───────────────────────────────── */
+header.top {
+  background: transparent; backdrop-filter: none; border-bottom-color: transparent;
+  transition: background .35s ease, border-color .35s ease, backdrop-filter .35s ease;
+}
+header.top.scrolled {
+  background: rgba(20, 17, 13, .9);
+  backdrop-filter: blur(12px);
+  border-bottom-color: var(--line);
+}
+/* 品牌图记：慢转的细环（图记本身就是年轮 + 钥匙孔） */
+.brand img { transition: transform .6s var(--ease-out); }
+.brand:hover img { transform: rotate(14deg) scale(1.04); }
+
+/* 滚动进度：顶栏底下一条发丝金线 */
+.scroll-progress {
+  position: fixed; top: 0; left: 0; height: 2px; width: 100%; z-index: 55;
+  transform-origin: 0 50%; transform: scaleX(0);
+  background: linear-gradient(90deg, rgba(217,163,67,.0), var(--gold) 30%, var(--gold-2));
+  pointer-events: none; opacity: .8;
+}
+
+/* ── 满幅 hero（首页） ──────────────────────────────────────────────── */
+.hero-full {
+  position: relative; min-height: min(100svh, 960px);
+  display: flex; align-items: flex-end; overflow: hidden;
+  margin-top: -70px; padding-top: 70px;   /* 钻到透明顶栏下面 */
+}
+.hero-bg { position: absolute; inset: 0; }
+.hero-bg video, .hero-bg img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* hero 极慢推近：机位锁死但画面有呼吸，和叠在上面的浮尘/滚动视差一起给首屏纵深 */
+.hero-bg video { animation: heroDrift 34s ease-in-out infinite alternate; transform-origin: 50% 46%; }
+@keyframes heroDrift { from { transform: scale(1.025); } to { transform: scale(1.062); } }
+.hero-embers { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hero-content { transform: translate3d(0, calc(var(--hero-y, 0px) * -.055), 0); will-change: transform; }
+.hero-embers { transform: translate3d(0, calc(var(--hero-y, 0px) * -.11), 0); }
+.hero-scrim {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(180deg, rgba(14,11,8,.66) 0%, rgba(14,11,8,.18) 34%, rgba(14,11,8,.46) 66%, var(--bark) 99%),
+    linear-gradient(92deg, rgba(14,11,8,.86) 0%, rgba(14,11,8,.42) 46%, rgba(14,11,8,0) 78%);
+}
+.hero-content { position: relative; z-index: 2; width: 100%; padding: clamp(40px, 8vh, 90px) 0 clamp(34px, 6vh, 66px); }
+.hero-full h1 {
+  font-size: clamp(44px, 7.4vw, 96px); line-height: 1.02; max-width: 16ch;
+  text-shadow: 0 2px 40px rgba(0, 0, 0, .55);
+}
+.hero-full h1 em { font-style: normal; color: var(--gold); }
+.hero-full .lead {
+  color: rgba(243, 234, 219, .78); font-size: 17px; line-height: 1.85;
+  margin-top: 22px; max-width: 56ch; text-shadow: 0 1px 24px rgba(0, 0, 0, .6);
+}
+.hero-full .actions { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
+/* hero 底部一排"链上现况"读数 —— 数字由 oaken.js 数完填进来，滚动到位 */
+.hero-live {
+  display: flex; gap: 26px; flex-wrap: wrap; align-items: center;
+  margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(240, 228, 208, .14);
+}
+.hero-live .hl { display: flex; align-items: baseline; gap: 8px; font-size: 13px; color: rgba(243,234,219,.62); }
+.hero-live .hl b { font-family: 'Oaken Display', Georgia, serif; font-weight: 400; font-size: 21px; color: var(--gold-2); }
+.scroll-cue {
+  position: absolute; left: 50%; bottom: 18px; z-index: 3; transform: translateX(-50%);
+  width: 26px; height: 42px; border: 1px solid rgba(240,228,208,.28); border-radius: 14px;
+  display: flex; justify-content: center; padding-top: 7px;
+}
+.scroll-cue i { width: 3px; height: 9px; border-radius: 3px; background: var(--gold); animation: cue 2.1s var(--ease-soft) infinite; }
+@keyframes cue { 0%, 100% { transform: translateY(0); opacity: 1; } 58% { transform: translateY(15px); opacity: .15; } }
+@media (max-width: 940px) { .scroll-cue { display: none; } }
+
+/* ── 入场编排 ──────────────────────────────────────────────────────── */
+/* 单元素淡入（全站既有 .reveal 的 v3 版：多了模糊收敛和 --d 错峰） */
+.reveal {
+  opacity: 0; transform: translateY(20px); filter: blur(7px);
+  transition: opacity .85s var(--ease-soft) var(--d, 0ms),
+              transform .95s var(--ease-out) var(--d, 0ms),
+              filter .85s var(--ease-soft) var(--d, 0ms);
+}
+.reveal.in { opacity: 1; transform: none; filter: none; }
+/* 行级遮罩（hero 大标题一行一行升起来）：<span class="mask"><span>一行</span></span> */
+.mask { display: block; overflow: hidden; }
+.mask > span { display: block; transform: translateY(114%); transition: transform 1.05s var(--ease-out) var(--d, 0ms); }
+.in > .mask > span, .mask.in > span { transform: none; }
+/* 标题下的金线：从 0 拉到 56px */
+.sec-rule { height: 2px; width: 0; background: linear-gradient(90deg, var(--gold), rgba(217,163,67,0)); margin-top: 16px; transition: width 1.1s var(--ease-out) var(--d, 120ms); }
+.reveal.in .sec-rule, .sec-rule.in { width: 56px; }
+
+/* ── 跑马灯（链条/合约地址在那条带上滚动） ─────────────────────────── */
+.ticker { position: relative; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+          background: rgba(26, 21, 16, .72); overflow: hidden; }
+.ticker::before, .ticker::after { content: ''; position: absolute; top: 0; bottom: 0; width: 90px; z-index: 2; pointer-events: none; }
+.ticker::before { left: 0; background: linear-gradient(90deg, var(--bark), rgba(20,17,13,0)); }
+.ticker::after { right: 0; background: linear-gradient(270deg, var(--bark), rgba(20,17,13,0)); }
+.ticker-track { display: flex; gap: 54px; align-items: center; width: max-content; padding: 13px 0;
+                white-space: nowrap; animation: marquee 52s linear infinite; }
+.ticker:hover .ticker-track { animation-play-state: paused; }
+.ticker .tk { display: inline-flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); }
+.ticker .tk b { color: var(--parch); font-weight: 600; }
+.ticker .tk .mono { color: var(--gold); font-size: 12px; }
+.ticker .sep { color: rgba(217,163,67,.5); }
+@keyframes marquee { to { transform: translateX(-50%); } }
+
+/* ── 面板/卡片：被照亮，而不是画了边 ───────────────────────────────── */
+.card, .panel, .fcard {
+  background:
+    radial-gradient(120% 90% at 50% -10%, rgba(217, 163, 67, .055), rgba(217, 163, 67, 0) 52%),
+    var(--panel);
+  box-shadow: inset 0 1px 0 rgba(240, 228, 208, .05), 0 22px 48px -34px rgba(0, 0, 0, .95);
+}
+.card, .fcard { position: relative; overflow: hidden; }
+/* 悬停扫光：一道很淡的金从左扫到右 */
+.card::after, .fcard::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(232, 184, 92, .085) 47%, rgba(232, 184, 92, .028) 55%, transparent 68%);
+  transform: translateX(-38%); transition: opacity .4s ease, transform .9s var(--ease-out);
+}
+.card:hover::after, .fcard:hover::after { opacity: 1; transform: translateX(38%); }
+.card:hover, .fcard:hover { border-color: var(--line-gold); }
+/* 跟随鼠标的暖光斑（z-index:-1 + isolation：只垫在内容下面，不碰任何子元素的定位） */
+@media (hover: hover) and (pointer: fine) {
+  .card, .zero, .fcard { isolation: isolate; }
+  .card::before, .zero::before, .fcard::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
+    background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 0%),
+                rgba(232, 184, 92, .13), rgba(232, 184, 92, .035) 46%, rgba(232, 184, 92, 0) 68%);
+    opacity: 0; transition: opacity .35s ease;
+  }
+  .card:hover::before, .zero:hover::before, .fcard:hover::before { opacity: 1; }
+}
+.panel .head { background: rgba(217, 163, 67, .035); }
+
+/* ⚠ 类名撞车：`.bar` 既是**进度条**（6px 药丸底，见上面 .bar i）又是**顶栏那行**
+   （`<div class="wrap bar">`）。旧版顶栏有 92% 的暗底盖着，那个 7% 亮药丸看不出来；
+   v3 把顶栏改成"在 hero 上透明"之后，它就在视频上显形了（一个圆角亮块）。
+   这里把顶栏那行复位成透明。 */
+header.top .topbar { background: transparent; border: 0; border-radius: 0; overflow: visible; height: 70px; }
+
+/* ── 按钮：主按钮切一角（不装弹层，安全） ──────────────────────────── */
+.btn { position: relative; overflow: hidden; }
+.btn::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 46%; left: -60%; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(255, 245, 220, .28), transparent);
+  transform: skewX(-18deg); transition: left .55s var(--ease-out);
+}
+.btn:hover::after { left: 116%; }
+.btn-p { clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 0 100%); }
+.btn-p:hover { box-shadow: 0 14px 34px -12px rgba(217, 163, 67, .55); }
+
+/* 主按钮的"呼吸光"（hero 里那颗最显眼） */
+.btn-p.glow { animation: btnbreathe 3.6s ease-in-out infinite; }
+@keyframes btnbreathe {
+  0%, 100% { box-shadow: 0 10px 24px -14px rgba(217, 163, 67, .9); }
+  50% { box-shadow: 0 10px 30px -8px rgba(217, 163, 67, .62); }
+}
+
+/* ── 读数：数字滚动 + live 呼吸点 ─────────────────────────────────── */
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: inline-block;
+            box-shadow: 0 0 0 0 rgba(157, 191, 122, .5); animation: pulse 2.4s var(--ease-soft) infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(157,191,122,.45); } 62% { box-shadow: 0 0 0 8px rgba(157,191,122,0); } 100% { box-shadow: 0 0 0 0 rgba(157,191,122,0); } }
+.stats .v { font-variant-numeric: tabular-nums; }
+
+/* 进度条：从 0 长出来（JS 把内联宽度收成 --w） */
+.bar i { transition: width 1.35s var(--ease-out) var(--d, 0ms); }
+
+/* ── "我们没有的东西"三枚印章 ─────────────────────────────────────── */
+.zeros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 30px; }
+.zero { position: relative; padding: 30px 26px 26px; border: 1px solid var(--line); border-radius: var(--r);
+        background: radial-gradient(120% 100% at 50% 0%, rgba(217,163,67,.05), rgba(217,163,67,0) 55%), var(--panel); overflow: hidden; }
+.zero .n { font-family: 'Oaken Display', Georgia, serif; font-size: 58px; line-height: 1; color: var(--gold); display: block; }
+.zero h3 { margin: 12px 0 8px; font-size: 17px; }
+.zero p { color: var(--muted); font-size: 14px; }
+.stamp {
+  position: absolute; top: 18px; right: 16px; transform: rotate(8deg) scale(.6); opacity: 0;
+  border: 2px solid rgba(217, 163, 67, .55); color: var(--gold); border-radius: 3px;
+  font: 700 10.5px/1 "Oaken Mono", monospace; letter-spacing: .18em; padding: 6px 9px; text-transform: uppercase;
+  transition: transform .7s var(--ease-out) calc(var(--d, 0ms) + 350ms), opacity .45s ease calc(var(--d, 0ms) + 350ms);
+}
+.reveal.in .stamp { transform: rotate(-7deg) scale(1); opacity: .85; }
+
+/* ── 年轮那一节：一圈一圈亮起来 ───────────────────────────────────── */
+.rings-stage { position: relative; display: grid; grid-template-columns: 1.02fr .98fr; gap: 54px; align-items: center; }
+.rings-art { position: relative; aspect-ratio: 1; max-width: 560px; justify-self: center; width: 100%; }
+.rings-art img, .rings-art video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; opacity: .85;
+                 box-shadow: 0 0 0 1px var(--line-gold), 0 40px 90px -40px rgba(0,0,0,.95); }
+/* 年轮盘上的暗心 + 压暗：让金弧与中心读数立出来 */
+.rings-art::before { content: ''; position: absolute; inset: 0; border-radius: 50%; z-index: 1; pointer-events: none;
+  background: radial-gradient(62% 62% at 50% 50%, rgba(14,11,8,.62) 0%, rgba(14,11,8,.16) 52%, rgba(14,11,8,.5) 100%); }
+.rings-svg { position: absolute; inset: 0; transform: rotate(-90deg); z-index: 2; }
+.rings-svg circle { fill: none; stroke-linecap: round; }
+.rings-svg .track { stroke: rgba(243, 234, 219, .10); }
+.rings-svg .lit { stroke: url(#ringGold); stroke-dasharray: var(--c); stroke-dashoffset: var(--c);
+                  transition: stroke-dashoffset 1.5s var(--ease-out) var(--d, 0ms); }
+.rings-stage.in .rings-svg .lit { stroke-dashoffset: var(--off, 0); }
+.rings-keyhole { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 3; }
+.rings-keyhole b { font-family: 'Oaken Display', Georgia, serif; font-weight: 400; font-size: clamp(30px, 3.4vw, 46px); color: var(--gold-2); line-height: 1; }
+.rings-keyhole span { font: 600 10.5px/1 "Oaken Mono", monospace; letter-spacing: .24em; text-transform: uppercase; color: var(--muted); margin-top: 10px; }
+
+/* ── 工具四卡：图标会走一步 ───────────────────────────────────────── */
+.toolcard .ic { width: 40px; height: 40px; border-radius: 9px; display: grid; place-items: center; margin-bottom: 16px;
+                border: 1px solid var(--line-gold); color: var(--gold);
+                background: linear-gradient(180deg, rgba(217,163,67,.14), rgba(217,163,67,.03)); }
+.toolcard .ic svg { width: 19px; height: 19px; transition: transform .5s var(--ease-out); }
+.toolcard:hover .ic svg { transform: translateY(-2px) scale(1.12); }
+.toolcard:hover .ic { box-shadow: 0 12px 26px -16px rgba(217, 163, 67, .8); }
+
+/* ── 各页头带（全幅窄带：方舟底片在推近，眉题 + 大标题压在暗侧） ─────── */
+.pagehead { position: relative; overflow: hidden; border-bottom: 1px solid var(--line-gold); }
+.pagehead::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(217,163,67,.5), transparent); }
+.pagehead .ph-bg { position: absolute; inset: 0; }
+.pagehead .ph-bg img, .pagehead .ph-bg video { width: 100%; height: 100%; object-fit: cover; display: block; transform: scale(1.04); }
+/* 每个页头也极慢推近 —— 一帧静图撑一整条带子会"死"，1.04→1.075 就够了 */
+.pagehead .ph-bg video, .bg-wrap > .bgi video { animation: phDrift 38s ease-in-out infinite alternate; transform-origin: 50% 48%; }
+@keyframes phDrift { from { transform: scale(1.04); } to { transform: scale(1.075); } }
+.pagehead .ph-scrim { position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(14,11,8,.66), rgba(14,11,8,.34) 46%, var(--bark) 100%),
+              linear-gradient(92deg, rgba(14,11,8,.84), rgba(14,11,8,.26) 62%, rgba(14,11,8,.10)); }
+.pagehead .ph-in { position: relative; z-index: 2; padding: clamp(56px, 9vh, 96px) 0 clamp(34px, 6vh, 58px); }
+.pagehead h1 { font-size: clamp(30px, 4.2vw, 54px); line-height: 1.08; }
+.pagehead .ph-lede { color: rgba(243, 234, 219, .72); font-size: 15.5px; margin-top: 14px; max-width: 74ch; }
+/* 动态页（记录/代币/仓位/池子）用**窄带**：这些页自己会画标题（锁号、代币名），
+   再压一层静态标题就是两行标题打架 —— 窄带只做"电影感的第一帧"。 */
+.pagehead.slim { height: clamp(92px, 13vh, 168px); }
+.pagehead.slim .ph-scrim { background: linear-gradient(180deg, rgba(14,11,8,.5), rgba(14,11,8,.28) 45%, var(--bark) 100%); }
+
+/* ── CTA 幕（首页收尾 + 内页也可能用） ────────────────────────────── */
+.cta-band { position: relative; overflow: hidden; border-top: 1px solid var(--line); margin-top: 90px; margin-bottom: -90px; }
+/*                                          ↑ 负边距吃掉 main 的 padding-bottom：收尾幕直接顶到页脚 */
+.cta-band .ct-bg { position: absolute; inset: 0; }
+.cta-band .ct-bg img, .cta-band .ct-bg video { width: 100%; height: 100%; object-fit: cover; opacity: .52; display: block; }
+.cta-band .ct-scrim { position: absolute; inset: 0; background: radial-gradient(90% 130% at 50% 30%, rgba(14,11,8,.42), rgba(14,11,8,.92) 72%); }
+.cta-band .ct-in { position: relative; z-index: 2; text-align: center; padding: clamp(64px, 10vh, 108px) 0; }
+/* 收尾幕的心跳光：和片子里钥匙孔的呼吸同频，落在字后面，不抢文字 */
+.cta-band .ct-in::before {
+  content: ''; position: absolute; left: 50%; top: 44%; width: min(780px, 86vw); aspect-ratio: 1;
+  transform: translate(-50%, -50%); pointer-events: none; z-index: -1;
+  background: radial-gradient(circle, rgba(232,184,92,.13), rgba(232,184,92,.04) 42%, rgba(232,184,92,0) 66%);
+  animation: ctbreathe 6.5s ease-in-out infinite;
+}
+@keyframes ctbreathe { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.cta-band h2 { font-size: clamp(30px, 4.4vw, 58px); }
+.cta-band .actions { display: flex; gap: 12px; justify-content: center; margin-top: 30px; flex-wrap: wrap; }
+
+/* ── 小件：发光分隔、章节间距 ─────────────────────────────────────── */
+.band { padding: 92px 0 0; }
+.band.tight { padding-top: 54px; }
+.glowline { height: 1px; border: 0; background: linear-gradient(90deg, transparent, rgba(217,163,67,.55), transparent); margin: 0; }
+.eyebrow { font-family: "Oaken Mono", ui-monospace, monospace; letter-spacing: .26em; font-size: 11px; }
+h2.sec { font-size: clamp(28px, 3.1vw, 44px); line-height: 1.12; }
+
+/* 分节底图（整节铺一张暗图/一段片子：.bg-wrap > .bgi 图 + .bgs 帘） */
+.bg-wrap { position: relative; overflow: hidden; }
+.bg-wrap > .bgi { position: absolute; inset: 0; }
+.bg-wrap > .bgi img, .bg-wrap > .bgi video { width: 100%; height: 100%; object-fit: cover; opacity: .72; display: block; }
+.bg-wrap > .bgs { position: absolute; inset: 0;
+  background: linear-gradient(180deg, var(--bark) 0%, rgba(20,17,13,.62) 20%, rgba(20,17,13,.62) 80%, var(--bark) 100%); }
+/* 暗区环境层（vis4）：根系 + 埋火，极低透明度铺在 How / Contracts / Recent 三节底下。
+   上下用 mask 化掉，滚动时由 motion() 给 --amb-y 做视差 —— 页面中段不再是一刀切的纯黑。 */
+.band.ambient { position: relative; overflow: hidden; }
+.band.ambient > .amb {
+  position: absolute; inset: -9% 0; z-index: 0; pointer-events: none;
+  opacity: var(--amb-o, .2); will-change: transform;
+  transform: translate3d(0, var(--amb-y, 0px), 0);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+}
+.band.ambient > .amb video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.band.ambient > .wrap { position: relative; z-index: 1; }
+.band.ambient.amb-mid { --amb-o: .17; }
+.band.ambient.amb-mid > .amb video { object-position: 72% 52%; }
+.band.ambient.amb-low { --amb-o: .12; }
+.band.ambient.amb-low > .amb video { object-position: 45% 38%; }
+#how > .amb video { object-position: 28% 50%; }
+
+/* 四列（工具） */
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 30px; }
+@media (max-width: 1040px) { .grid4 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .grid4 { grid-template-columns: 1fr; } }
+.routes { display: flex; gap: 9px; flex-wrap: wrap; }
+
+/* 方形/宽幅的"画板"图（不裁圆） */
+.plate-art { position: relative; border-radius: var(--r); overflow: hidden;
+             box-shadow: 0 40px 90px -46px rgba(0, 0, 0, .95), 0 0 0 1px var(--line); }
+.plate-art img, .plate-art video { width: 100%; height: auto; display: block; }
+
+/* ── 各级导航与菜单的动 ──────────────────────────────────────────────
+ *   ① 顶栏：导航项下面一条**滑动的金线**（悬停滑过去，移开滑回当前项）
+ *   ② 下拉（链/钱包）：菜单弹入 + 逐项错峰；行悬停左移 + 左侧金条
+ *   ③ 分段控件 .seg：一条滑动的下划线
+ *   ④ 表格行：面板入场时逐行淡入（前 12 行错峰）
+ *   ⑤ 页面进入：main 淡入、头带升起
+ */
+/* ① 导航滑线（JS 在 shell() 里放 .nav-ind 并移动它） */
+nav.main { position: relative; }
+nav.main a { transition: color .18s ease; }
+.nav-ind {
+  position: absolute; left: 0; bottom: -9px; height: 2px; width: 0; opacity: 0; pointer-events: none;
+  background: linear-gradient(90deg, rgba(217,163,67,0), var(--gold) 35%, var(--gold-2) 65%, rgba(217,163,67,0));
+  transition: transform .38s var(--ease-out), width .3s var(--ease-out), opacity .3s ease;
+}
+.nav-ind.live { opacity: 1; }
+/* 子菜单（Locks / Tools 悬停展开的第二级） */
+nav.main a.has-sub::after { content: ''; display: inline-block; width: 5px; height: 5px; margin-left: 7px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-1px); opacity: .6; transition: transform .25s var(--ease-out), opacity .2s; }
+nav.main a.has-sub:hover::after { transform: rotate(225deg) translateY(2px); opacity: 1; }
+.nav-sub {
+  position: absolute; top: calc(100% + 13px); left: 0; z-index: 58; min-width: 264px; padding: 6px;
+  background: var(--panel-2); border: 1px solid var(--line-gold); border-radius: var(--r);
+  box-shadow: 0 30px 60px -28px rgba(0, 0, 0, .95);
+  opacity: 0; visibility: hidden; transform: translateY(-7px) scale(.98); transform-origin: top left;
+  transition: opacity .18s ease, transform .24s var(--ease-out), visibility .2s;
+}
+.nav-sub.open { opacity: 1; visibility: visible; transform: none; }
+.nav-sub a { display: block; padding: 10px 12px; border-radius: 3px; color: var(--parch);
+             animation: itemIn .3s var(--ease-out) both; }
+.nav-sub a:nth-child(2) { animation-delay: .04s; }
+.nav-sub a:nth-child(3) { animation-delay: .08s; }
+.nav-sub a:nth-child(4) { animation-delay: .12s; }
+.nav-sub a b { display: block; font-size: 13.5px; font-weight: 600; }
+.nav-sub a span { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.nav-sub a:hover { background: rgba(217, 163, 67, .10); text-decoration: none; padding-left: 16px; }
+
+/* ② 下拉菜单：弹入 + 逐项错峰（≤8 项够用了） */
+@keyframes menuIn { from { opacity: 0; transform: translateY(-7px) scale(.975); } to { opacity: 1; transform: none; } }
+@keyframes itemIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+.chain-menu { transform-origin: top right; animation: menuIn .22s var(--ease-out) both; }
+.chain-menu button { position: relative; animation: itemIn .3s var(--ease-out) both;
+                     transition: background .16s ease, padding-left .22s var(--ease-out); }
+.chain-menu button:nth-child(1) { animation-delay: .03s; }
+.chain-menu button:nth-child(2) { animation-delay: .06s; }
+.chain-menu button:nth-child(3) { animation-delay: .09s; }
+.chain-menu button:nth-child(4) { animation-delay: .12s; }
+.chain-menu button:nth-child(5) { animation-delay: .15s; }
+.chain-menu button:nth-child(6) { animation-delay: .18s; }
+.chain-menu button:hover { padding-left: 20px; background: rgba(217, 163, 67, .10); }
+.chain-menu button::before { content: ''; position: absolute; left: 8px; top: 50%; width: 2px; height: 0;
+  background: var(--gold); border-radius: 2px; transform: translateY(-50%); transition: height .22s var(--ease-out); }
+.chain-menu button:hover::before { height: 18px; }
+.chain-menu button.on::before { height: 18px; background: var(--gold-2); }
+
+/* ③ 分段控件：滑动的下划线（JS 放 .seg-ind） */
+.seg { position: relative; }
+.seg-ind { position: absolute; bottom: 0; left: 0; height: 2px; width: 0; pointer-events: none;
+  background: linear-gradient(90deg, var(--gold), var(--gold-2));
+  transition: transform .32s var(--ease-out), width .26s var(--ease-out); }
+
+/* ③b 标签页（.tabs）：悬停抬一点 + 选中发光 */
+.tabs a { transition: transform .18s var(--ease-out), border-color .18s ease, color .18s ease, box-shadow .25s ease; }
+.tabs a:hover { transform: translateY(-1px); }
+.tabs a.on { box-shadow: 0 8px 22px -12px rgba(217, 163, 67, .85); }
+
+/* ④ 表格行入场：宿主面板 .reveal.in 且带 data-rowin（首帧后由 JS 摘掉）时，前 12 行错峰淡入 */
+@keyframes rowIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.panel.reveal:not(.in) .list tbody tr { opacity: 0; }
+.panel.reveal.in[data-rowin] .list tbody tr { animation: rowIn .45s var(--ease-out) both; animation-delay: calc(min(var(--ri, 0), 12) * 45ms); }
+
+/* ⑤ 页面进入 */
+@keyframes pageFade { from { opacity: 0; } }
+@keyframes pageRise { from { opacity: 0; transform: translateY(12px); } }
+main { animation: pageFade .7s ease both; }
+.pagehead { animation: pageRise .75s var(--ease-out) both; }
+header.top .topbar > * { animation: pageRise .6s var(--ease-out) both; }
+header.top .topbar > *:nth-child(2) { animation-delay: .07s; }
+header.top .topbar > *:nth-child(3) { animation-delay: .14s; }
+
+/* ══ 开机片 ══════════════════════════════════════════════════════════
+ * 一次会话放一次。闸门在每页 <head> 里**同步**跑（oaken-boot-gate）——
+ * 它只给 <html> 挂一个 class，CSS 立刻铺底色（这就是"不闪"的全部机制）；
+ * 覆盖层由 oaken.js 的 shell() 建（`#boot`），放完自己拆掉。
+ * z-index 压过站上一切浮层（顶栏 50 / 菜单 60 / 颗粒 46）。
+ */
+html.boot-run::before { content: ''; position: fixed; inset: 0; background: var(--bark); z-index: 2147483001; }
+html.boot-run, html.boot-run body { overflow: hidden; }
+#boot { position: fixed; inset: 0; z-index: 2147483002; background: var(--bark); overflow: hidden; cursor: pointer;
+        transition: opacity .6s ease; }
+#boot.bt-out { opacity: 0; }
+#boot video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  opacity: 0; transition: opacity .5s ease; }
+#boot.ready video { opacity: 1; }   /* 真能放了才淡进来（起播前显示的是底色，不是黑框） */
+#boot .bt-scrim { position: absolute; inset: 0;
+  background: radial-gradient(125% 90% at 50% 44%, rgba(14,11,8,0) 38%, rgba(14,11,8,.52) 100%); }
+#boot .bt-title { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; opacity: 0;
+  transform: translateY(18px); filter: blur(9px);
+  /* ⚠ 不用 animation-delay 定时 —— 那是**从元素创建**算的，缓冲慢的时候字会先于画面浮出来。
+     改成 JS 听着 `timeupdate`、播到 4.4 秒才挂 .on（见 bootFilm）。 */
+  transition: opacity 1.5s var(--ease-out), transform 1.5s var(--ease-out), filter 1.5s var(--ease-out); }
+#boot .bt-title.on { opacity: 1; transform: none; filter: none; }
+#boot .bt-title img { width: 76px; height: 76px; filter: drop-shadow(0 0 30px rgba(217, 163, 67, .5)); }
+#boot .bt-title b { font-family: 'Oaken Display', Georgia, serif; font-weight: 400;
+  font-size: clamp(50px, 7.6vw, 92px); letter-spacing: .3em; text-indent: .3em; color: var(--parch);
+  margin-top: 20px; text-shadow: 0 2px 44px rgba(0, 0, 0, .65); }
+#boot .bt-title span { font: 600 12px/1 "Oaken Mono", monospace; letter-spacing: .3em;
+  text-transform: uppercase; color: var(--gold); margin-top: 22px; padding: 10px 15px 10px 18px;
+  /* 标语正好落在树洞的亮光上 —— 给一块暗底印章，不然金字压在金亮上读不出来 */
+  background: rgba(14, 11, 8, .58); border: 1px solid rgba(217, 163, 67, .38); border-radius: 3px; }
+#boot .bt-skip { position: absolute; right: 22px; bottom: 20px; z-index: 3;
+  font: 600 10.5px/1 "Oaken Mono", monospace; letter-spacing: .24em; text-transform: uppercase;
+  color: rgba(243, 234, 219, .45); }
+
+/* ── 骨架屏（加载占位）─────────────────────────────────────────────
+ * 评审第 3 条：没有骨架屏、空状态差。加载中的占位一律用它，而不是干巴巴的 "Reading…"。
+ */
+.skel-row td { border-bottom: 1px solid var(--line); }
+.skel-bar { height: 12px; border-radius: 4px;
+  background: linear-gradient(90deg, rgba(240,228,208,.06) 25%, rgba(240,228,208,.15) 37%, rgba(240,228,208,.06) 63%);
+  background-size: 400% 100%; animation: skel 1.5s ease infinite; }
+@keyframes skel { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+
+/* ── 读不到链上数据：统一那一行 + 重试按钮（见 oaken.js 的 showReadFail）────
+   它要显眼（用户得知道这不是"没有数据"，是"这次没读到"），但别吓人。 */
+.readfail { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  border: 1px solid rgba(224,120,95,.45); background: rgba(224,120,95,.06);
+  border-radius: var(--r); padding: 11px 13px; font-size: 13px; color: var(--parch); }
+.readfail b { color: var(--bad); font-weight: 600; }
+.readfail .btn { padding: 5px 12px; font-size: 12.5px; }
+
+/* "还在读"：超过几秒还没画完才出现的小行（带一个转圈点和立刻重试的入口）。
+   用户不该对着一片骨架屏猜自己是死是活。 */
+.stillreading { display: flex; align-items: center; gap: 8px; padding: 10px 2px 0; }
+.stillreading .spin { width: 11px; height: 11px; border-radius: 50%; flex: none;
+  border: 2px solid rgba(240,228,208,.25); border-top-color: var(--gold); animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── 列表空状态：图标 + 一句话 + 去做的按钮 ─────────────────────────────── */
+.empty { text-align: center; padding: 40px 18px; }
+.empty-ic { width: 40px; height: 40px; margin: 0 auto 12px; border-radius: 50%;
+  border: 1px solid var(--line-gold); color: var(--gold); display: grid; place-items: center; font-size: 17px; }
+.empty b { color: var(--parch); font-size: 15px; }
+.empty p { margin: 7px auto 0; max-width: 46ch; }
+.empty-acts { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+
+/* ── 提示条：把 toast 的样式从 JS 内联挪到这里（好改、也好被 reduced-motion 收掉）─ */
+.toast { display: flex; align-items: center; gap: 2px; animation: toastin .22s ease; }
+.toast a { text-decoration: none; }
+.toast a:hover { text-decoration: underline; }
+@keyframes toastin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ── 英文 / 美式时间选择器（见 oaken.js 的 mountDatePicker）────────────────
+   原生 datetime-local 的弹层跟浏览器语言走，中文系统上没法变英文，所以自建这一个。 */
+.dtp { position: absolute; left: 0; top: calc(100% + 6px); z-index: 60; width: 272px;
+       background: var(--panel); border: 1px solid var(--line-gold); border-radius: var(--r);
+       padding: 10px 12px 12px; box-shadow: 0 26px 60px -30px #000; }
+.dtp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.dtp-head b { font-size: 14px; color: var(--parch); }
+.dtp-head button { background: none; border: 0; color: var(--gold); font-size: 17px; cursor: pointer; padding: 0 8px; line-height: 1; }
+.dtp-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
+.dtp-dow span { text-align: center; font-size: 11.5px; color: var(--muted); }
+.dtp-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.dtp-pad { height: 30px; }
+.dtp-day { height: 30px; background: none; border: 1px solid transparent; border-radius: 4px;
+           color: var(--parch); font-size: 13px; cursor: pointer; }
+.dtp-day:hover { border-color: var(--line-gold); }
+.dtp-day.today { border-color: rgba(240,228,208,.25); }
+.dtp-day.sel { background: var(--gold); color: #1b1409; font-weight: 600; }
+.dtp-time { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+.dtp-time select { background: var(--bark); color: var(--parch); border: 1px solid var(--line);
+                   border-radius: 4px; padding: 4px 6px; font-size: 13px; }
+.dtp-ampm { display: flex; gap: 4px; margin-left: auto; }
+.dtp-ampm button { background: none; border: 1px solid var(--line); border-radius: 4px; color: var(--muted);
+                   padding: 4px 9px; cursor: pointer; font-size: 12.5px; }
+.dtp-ampm button.on { border-color: var(--line-gold); color: var(--gold); background: rgba(217,163,67,.1); }
+.dtp-foot { display: flex; gap: 10px; margin-top: 12px; align-items: center; }
+.dtp-foot button { background: none; border: 0; color: var(--gold); cursor: pointer; font-size: 12.5px; padding: 0; }
+.dtp-foot .btn-p { margin-left: auto; color: #1b1409; padding: 6px 14px; }
+.dtp-foot .btn-p:hover { text-decoration: none; }
+.dtp-echo { margin-top: 4px; }
+
+/* ── 黄框警告（费用/限额代币、第三方工厂的中心化风险…）─────────────────────
+   原来只在创建锁页的页面级 <style> 里，别的页要用就得各抄一份 —— 提到共享层。 */
+.warnbox { border: 1px solid rgba(217,163,67,.55); background: rgba(217,163,67,.07);
+           border-radius: var(--r); padding: 12px 14px; margin-top: 18px; font-size: 13px;
+           color: var(--parch); line-height: 1.55; }
+.warnbox b { color: var(--gold); }
+
+/* 文字按钮（"Retry" / "copy" 这种）—— 创建锁页与发射页都在用，提到共享层 */
+.copybtn { background: none; border: 0; color: var(--gold); cursor: pointer; padding: 0 2px;
+           font: 600 12px/1 "Segoe UI", system-ui, sans-serif; }
+.copybtn:hover { text-decoration: underline; }
+
+/* ── 钱包那边的 gas 余额（连上之后顶栏就有一个数，不用点开面板才看得到）── */
+.gaschip { display: inline-flex; align-items: center; gap: 7px; }
+.gaschip .g { color: var(--parch); font-weight: 600; }
+
+/* ── 成功仪式（sealMoment）：锁单确认后播一次，再落到明细面板 ───────── */
+.seal-veil {
+  position: fixed; inset: 0; z-index: 130; display: grid; place-items: center; padding: 26px;
+  background: radial-gradient(80% 80% at 50% 38%, rgba(20,17,13,.84), rgba(8,6,4,.95));
+  -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px);
+  opacity: 0; transition: opacity .45s ease;
+}
+.seal-veil.in { opacity: 1; }
+.seal-card { position: relative; width: min(600px, 92vw); text-align: center;
+  transform: translateY(16px) scale(.985); transition: transform .7s var(--ease-out); }
+.seal-veil.in .seal-card { transform: none; }
+.seal-card video {
+  display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover;
+  border-radius: var(--r); border: 1px solid var(--line-gold); background: #0b0805;
+  box-shadow: 0 50px 120px -46px #000, 0 0 90px -26px rgba(217,163,67,.4);
+}
+.seal-card .eyebrow { justify-content: center; margin: 26px 0 12px; color: var(--gold); }
+.seal-card .eyebrow::before { display: none; }
+.seal-card h3 { font-size: clamp(24px, 3.4vw, 36px); }
+.seal-card p { color: var(--muted); margin-top: 10px; font-size: 14.5px; }
+.seal-card .actions { display: flex; gap: 10px; justify-content: center; margin-top: 22px; flex-wrap: wrap; }
+.seal-close { position: absolute; top: -16px; right: -10px; width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center; background: rgba(20,17,13,.88); border: 1px solid var(--line-gold);
+  color: var(--parch); font-size: 20px; line-height: 1; cursor: pointer; padding: 0; }
+.seal-close:hover { color: var(--gold-2); border-color: var(--gold); }
+html.seal-open, html.seal-open body { overflow: hidden; }
+
+/* 路由切换：同源普通链接的离场淡出（motion() 接线，reduced-motion 不接） */
+html.page-leaving body { opacity: 0; transition: opacity .2s ease; }
+
+/* 顶栏比正文略宽：7 个导航项 + gas + 连接 + 链胶囊在 1120 里放不下，最后一项会钻到
+   链胶囊下面（2026-10-21 截图）。窄屏仍走下面 ≤1500 的两行布局。 */
+@media (min-width: 1501px) {
+  header.top .wrap { width: min(1240px, calc(100% - 48px)); }
+}
+
+/* ── 顶栏：品牌+右侧胶囊一行，导航独占一行（**所有宽度**） ──────────────
+   flex 不会让文字自动变窄：nav 被压到 445px 而内容要 487px 时，最后一项
+   "My OAKEN" 会**溢出 nav 的盒子**、钻到右边那组下面（2026-10-17 截图）。
+   2026-10-23 加到 9 项（Names）之后，>1500 的一行式在 1536/1600/1920 上
+   右边已经贴住/压住导航 —— 所以把两行式改成**默认**，不再只在 <=1500 生效。
+   导航自己也可以换行（390 两行）。 */
+header.top .topbar { flex-wrap: wrap; height: auto; padding: 9px 0 8px; row-gap: 4px; }
+.brand { order: 1; }
+.top .right { order: 2; margin-left: auto; }
+nav.main { order: 3; width: 100%; gap: 20px; padding: 3px 0 2px; flex-wrap: wrap; row-gap: 6px; }
+.hero-full { margin-top: 0; padding-top: 0; }   /* 两行顶栏更高，hero 不再钻到它下面 */
+/* 锚点（hero 的 scroll-cue 之类）别把目标顶到吸顶顶栏下面 */
+section[id] { scroll-margin-top: 107px; }
+@media (max-width: 700px) { section[id] { scroll-margin-top: 145px; } }
+@media (max-width: 520px) { section[id] { scroll-margin-top: 170px; } }
+/* 768 这种平板宽度，品牌 + gas + X + Connect + 链胶囊在同一行放不下，右侧会掉到第二行、
+   导航再被挤到第三行。gas 和 X 在这里不是必需（gas 在钱包菜单里还能看），先收掉。 */
+@media (max-width: 940px) {
+  .top .right .gaschip, .top .right .icon-btn { display: none !important; }
+}
+@media (max-width: 640px) {
+  .brand b { display: none; }                     /* 只留图记，给链胶囊让位 */
+  nav.main { gap: 18px; font-size: 13.5px; }
+}
+@media (max-width: 520px) {
+  .chip .cid { display: none; }                   /* 链 ID 在手机上不是第一眼要读的 */
+  /* 换行而不是横向滚动：六项在 390px 上放不下，滚动会把最后一项藏起来 */
+  nav.main { gap: 7px 16px; flex-wrap: wrap; font-size: 13px; }
+  nav.main .nav-ind { display: none; }            /* 换行之后下划线只对得上其中一行，不如收掉 */
+  .top .right { gap: 9px; }
+  .top .topbar { column-gap: 12px; }
+}
+
+/* ── 动效开关：系统说"少动"就全部收掉 ─────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; filter: none; transition: none; }
+  .mask > span { transform: none; transition: none; }
+  body::before { animation: none; }
+  .ticker-track { animation: none; }
+  .scroll-cue i { animation: none; }
+  .btn-p.glow { animation: none; }
+  .live-dot { animation: none; }
+  .rings-stage.in .rings-svg .lit { transition: none; }
+  .bar i { transition: none; }
+  html { scroll-behavior: auto; }
+  .chain-menu, .chain-menu button, main, .pagehead, header.top .topbar > * { animation: none; }
+  .panel.reveal:not(.in) .list tbody tr { opacity: 1; }
+  .panel.reveal.in .list tbody tr { animation: none; }
+  .nav-ind, .seg-ind { transition: none; }
+  .tabs a, .chain-menu button { transition: none; }
+  #boot { display: none !important; }          /* 闸门已经会跳过；这里再兜一道 */
+  /* v4：这一轮加的推近/视差/心跳/圆环生长，同样一帧都不动 */
+  .hero-bg video, .pagehead .ph-bg video, .bg-wrap > .bgi video,
+  .cta-band .ct-in::before, .ring .prog { animation: none; }
+  .hero-content, .hero-embers, .band.ambient > .amb { transform: none; }
+  .card::before, .zero::before, .fcard::before { display: none; }
+  html.page-leaving body { transition: none; opacity: 1; }
+}
+
+@media (max-width: 940px) {
+  .rings-stage { grid-template-columns: 1fr; gap: 30px; }
+  .rings-art { max-width: 380px; }
+  .zeros { grid-template-columns: 1fr; }
+  .hero-full { min-height: 92svh; }
+}
+
+/* Mobile tables: keep every column readable by scrolling the panel body, not the page.
+   The page itself must never scroll sideways on a phone. */
+@media (max-width: 720px) {
+  .panel .body { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .panel .body table.list { min-width: 560px; }
+}
+
+/* A table that sits directly in a panel (no .body wrapper) needs its own scroller. */
+.tablewrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+@media (max-width: 720px) { .tablewrap table.list { min-width: 640px; } }
+
+/* ══════════════════════════════════════════════════════════════════════
+   2026-10-18 · brand layer — oak, amber, still.
+   Visual weight for the numbers; a film card; a ring calendar; icons.
+   All backgrounds are the Ark oak/amber stills in app/media.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Hero stats as four cards, not a line of loose text. */
+.hero-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;
+  margin-top: 38px; max-width: 800px; }
+.hero-stats .stat { position: relative; padding: 15px 16px 13px; border-radius: var(--r);
+  border: 1px solid rgba(240, 228, 208, .13);
+  background: linear-gradient(180deg, rgba(28, 23, 18, .88), rgba(20, 17, 13, .60));
+  backdrop-filter: blur(8px); overflow: hidden; }
+.hero-stats .stat::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(217, 163, 67, .42), transparent); }
+.hero-stats .stat b { display: block; font-family: 'Oaken Display', Georgia, serif; font-weight: 400;
+  font-size: 36px; line-height: 1; color: var(--gold-2); }
+.hero-stats .stat span { display: block; margin-top: 9px; font-size: 11px; letter-spacing: .14em;
+  text-transform: uppercase; color: rgba(243, 234, 219, .52); }
+.hero-stats .stat.static b { font-size: 25px; color: var(--parch); }
+.hero-stats .stat .live-dot { display: inline-block; margin-right: 6px; vertical-align: 3px; }
+@media (max-width: 940px) { .hero-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 430px) { .hero-stats .stat b { font-size: 27px; } .hero-stats .stat { padding: 12px; } }
+
+/* Film card + lightbox. */
+.film-section { display: grid; grid-template-columns: 1.15fr .85fr; gap: 36px; align-items: center; }
+.film-card { position: relative; display: block; width: 100%; border: 1px solid var(--line-gold);
+  border-radius: var(--r); overflow: hidden; background: #0c0907; cursor: pointer; padding: 0; }
+.film-card img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; opacity: .92;
+  transition: opacity .4s, transform .9s var(--ease-out); }
+.film-card:hover img { opacity: 1; transform: scale(1.02); }
+.film-play { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.film-play i { width: 66px; height: 66px; border-radius: 50%; border: 1px solid rgba(243, 234, 219, .5);
+  background: rgba(12, 9, 7, .55); backdrop-filter: blur(4px); display: grid; place-items: center;
+  transition: border-color .3s, background .3s; }
+.film-card:hover .film-play i { border-color: var(--gold-2); background: rgba(12, 9, 7, .72); }
+.film-play i::after { content: ''; width: 0; height: 0; margin-left: 5px;
+  border-left: 14px solid var(--gold-2); border-top: 9px solid transparent; border-bottom: 9px solid transparent; }
+.film-meta { position: absolute; left: 16px; right: 16px; bottom: 14px; display: flex;
+  justify-content: space-between; gap: 10px; font-size: 11.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: rgba(243, 234, 219, .72); }
+.film-modal { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center;
+  justify-content: center; padding: 24px; background: rgba(8, 6, 4, .92); }
+.film-modal .box { width: min(960px, 100%); border: 1px solid var(--line-gold); border-radius: var(--r);
+  overflow: hidden; background: #0c0907; box-shadow: 0 40px 120px -30px #000; }
+.film-modal video { width: 100%; aspect-ratio: 16/9; display: block; background: #000; }
+.film-modal .cap { display: flex; justify-content: space-between; gap: 14px; align-items: center;
+  padding: 13px 16px; font-size: 12.5px; color: var(--muted); }
+.film-modal .x { background: none; border: 0; color: var(--parch); font-size: 22px; line-height: 1;
+  cursor: pointer; padding: 0 4px; }
+@media (max-width: 820px) { .film-section { grid-template-columns: 1fr; } }
+
+/* Empty states: the brand mark instead of a diamond character. */
+.empty-ic { width: 54px; height: 54px;
+  border: 1px solid var(--line-gold); border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, rgba(217, 163, 67, .14), transparent 70%);
+  display: grid; place-items: center; }
+.empty-ic img { width: 38px; height: 38px; display: block; }
+
+/* Chain glyphs. */
+.chain-ico { display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; color: var(--gold-2); vertical-align: -2px; }
+.seg button .chain-ico { margin-right: 5px; }
+.chain-menu button .chain-ico { margin-right: 8px; color: var(--gold); }
+.chain-menu button { display: flex; align-items: center; gap: 2px; }
+
+/* Copy buttons: icon + label, copied state only changes the label. */
+.copybtn { display: inline-flex; align-items: center; gap: 4px; vertical-align: -1px; }
+.copybtn svg { width: 12px; height: 12px; }
+
+/* A five-segment progress bar for the create-lock form. */
+.progress-steps { display: flex; gap: 5px; margin: 0 0 18px; }
+.progress-steps .ps { flex: 1; height: 3px; border-radius: 2px;
+  background: rgba(240, 228, 208, .12); transition: background .3s, box-shadow .3s; }
+.progress-steps .ps.done { background: var(--gold); }
+.progress-steps .ps.active { background: linear-gradient(90deg, var(--gold), var(--gold-2));
+  box-shadow: 0 0 10px rgba(217, 163, 67, .28); }
+
+/* Third-party routes get a visual warning edge, not only a paragraph. */
+.route.third { border-left: 2px solid rgba(224, 120, 95, .55); }
+.route .third-tag { color: #e0a85f; border-color: rgba(224, 120, 95, .4); }
+.warnbox.risk { border-color: rgba(224, 120, 95, .55); background: rgba(224, 120, 95, .06); }
+.warnbox.risk b { color: var(--bad); }
+
+/* Ring calendar for stepped locks: one ring per release, gold = released. */
+.ring-cal { position: relative; width: 230px; height: 230px; flex: 0 0 auto; }
+.ring-cal svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring-cal circle { fill: none; stroke-linecap: round; }
+.ring-cal .track { stroke: rgba(243, 234, 219, .085); }
+.ring-cal .done { stroke: url(#ringGoldCal); }
+.ring-cal .next { stroke: rgba(232, 184, 92, .55); stroke-dasharray: 3 6; }
+.ring-cal .mid { position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center; }
+.ring-cal .mid b { font-family: 'Oaken Display', Georgia, serif; font-weight: 400;
+  font-size: 27px; line-height: 1; color: var(--gold); }
+.ring-cal .mid span { margin-top: 7px; max-width: 124px; font-size: 10.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted); }
+
+/* The Ark stills, used as quiet backgrounds. */
+.ark-rings { position: relative; }
+.ark-rings::before { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: url('/app/media/ark-rings-bg.jpg') center/cover no-repeat;
+  opacity: .28; mix-blend-mode: screen; }
+.ark-rings > .wrap, .ark-rings > * { position: relative; z-index: 1; }
+.head-grid.ark-rings::before { opacity: .20; }
+.band.ark-rings::before { opacity: .22; }
+.band.ark-rings::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, rgba(20, 17, 13, .94) 0%, rgba(20, 17, 13, .60) 52%, rgba(20, 17, 13, .22) 100%); }
+.iso-band { position: relative; background: url('/app/media/ark-oak-band.jpg') center/cover no-repeat;
+  background-color: var(--bark); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.iso-band::before { content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(20, 17, 13, .95), rgba(20, 17, 13, .55)); }
+.iso-band > .wrap { position: relative; z-index: 1; }
+
+/* A large, quiet ring ornament used between text blocks. */
+.ring-orn { width: 46px; height: 46px; border: 1px solid var(--line-gold); border-radius: 50%;
+  position: relative; opacity: .8; }
+.ring-orn::before, .ring-orn::after { content: ''; position: absolute; border-radius: 50%;
+  border: 1px solid var(--line-gold); }
+.ring-orn::before { inset: 7px; }
+.ring-orn::after { inset: 15px; border-color: rgba(232, 184, 92, .55); }
+
+/* ── Launch route cards, lock preview, sign checklist (2026-10-18) ───── */
+.routes { grid-template-columns: 1fr 1fr; }
+.route.own { grid-column: 1 / -1; border-color: var(--line-gold);
+  background: linear-gradient(90deg, rgba(217, 163, 67, .09), rgba(28, 23, 18, .72)); }
+.route-main { min-width: 0; }
+.route-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.route-title b { font-size: 15px; }
+.route .pill.rec { color: var(--gold-2); border-color: var(--line-gold); }
+.route-points { display: block; margin-top: 6px; color: var(--gold-2); font-size: 12px; letter-spacing: .02em; }
+@media (max-width: 720px) { .routes { grid-template-columns: 1fr; } .route.own { grid-column: auto; } }
+.warnbox.ownnote { border-color: rgba(217, 163, 67, .55); background: rgba(217, 163, 67, .06); }
+.warnbox.ownnote b { color: var(--gold); }
+
+.lock-preview { display: flex; gap: 16px; align-items: center; margin-top: 14px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: var(--r); background: rgba(20, 17, 13, .5); }
+.lp-ring { position: relative; width: 64px; height: 64px; flex: none; }
+.lp-ring svg { width: 100%; height: 100%; }
+.lp-ring .lp-track { fill: none; stroke: rgba(240, 228, 208, .12); stroke-width: 5; }
+.lp-ring .lp-prog { fill: none; stroke: url(#lpgrad); stroke-width: 5; stroke-linecap: round;
+  transform: rotate(-90deg); transform-origin: center; transition: stroke-dashoffset .4s var(--ease-out); }
+.lp-ring b { position: absolute; inset: 0; display: grid; place-items: center;
+  font-family: 'Oaken Display', Georgia, serif; font-size: 15px; color: var(--gold); }
+.lp-copy b { display: block; color: var(--parch); font-size: 13.5px; }
+.lp-copy span { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.5; }
+
+.signcheck { list-style: none; display: grid; gap: 8px; }
+.signcheck li { display: flex; justify-content: space-between; gap: 12px; font-size: 13px;
+  border-bottom: 1px solid var(--line); padding-bottom: 7px; }
+.signcheck li:last-child { border-bottom: 0; padding-bottom: 0; }
+.signcheck li span { color: var(--muted); }
+.signcheck li b { color: var(--parch); font-weight: 600; text-align: right; }
+.signcheck li.warn b { color: #e0a85f; }
+.signcheck li.ok b { color: var(--ok); }
+
+.art-preview { width: 96px; height: 96px; object-fit: cover; border-radius: var(--r);
+  border: 1px solid var(--line-gold); margin-top: 10px; display: block; }
+
+/* ── Route comparison + Before-you-sign empty state (2026-10-18) ─────── */
+.routetable { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--r);
+  background: rgba(20, 17, 13, .45); }
+.routetable > summary { cursor: pointer; padding: 10px 14px; font-size: 12.5px;
+  color: var(--gold-2); letter-spacing: .03em; }
+.routetable > summary::marker { color: var(--gold); }
+.routetable .tablewrap { padding: 0 14px 12px; overflow-x: auto; }
+.routetable table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.routetable th { text-align: left; padding: 6px 12px 6px 0; color: var(--muted); font-weight: 500;
+  border-bottom: 1px solid var(--line); white-space: nowrap; }
+.routetable td { padding: 7px 12px 7px 0; color: var(--parch); border-bottom: 1px solid rgba(243, 234, 219, .05);
+  vertical-align: top; }
+.routetable tr:last-child td { border-bottom: 0; }
+.routetable tr.own td { color: var(--gold-2); }
+@media (max-width: 720px) { .routetable table { min-width: 640px; } }
+
+.sumlead { display: block; margin-bottom: 9px; font-size: 10.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--muted); }
+.sumstep { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; line-height: 1.55;
+  color: var(--parch); }
+.sumstep + .sumstep { margin-top: 7px; }
+.sumstep b { flex: none; width: 18px; height: 18px; margin-top: 1px; display: grid; place-items: center;
+  border: 1px solid var(--line-gold); border-radius: 50%; font-size: 10px; font-weight: 600; color: var(--gold); }
+
+/* ── Official Robinhood Chain CA slot (homepage hero) ─────────────────────
+   Always visible. Empty until OAKEN_CA is filled in app/index.html; then it
+   becomes the CA + copy + explorer row. Kept on one line on desktop, wraps on
+   phones. */
+.ca-slot {
+  display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap;
+  max-width: 820px; margin: 20px 0 0; padding: 12px 16px;
+  border: 1px solid var(--line-gold); border-left: 3px solid var(--gold);
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(217, 163, 67, .10), rgba(217, 163, 67, .03));
+}
+.ca-badge {
+  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  font-size: 10.5px; letter-spacing: .18em; color: var(--gold); white-space: nowrap;
+}
+.ca-value {
+  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  font-size: 14px; color: var(--parch); word-break: break-all;
+}
+.ca-value.ca-empty { font-family: inherit; color: rgba(240, 228, 208, .62); font-size: 13.5px; white-space: nowrap; }
+.ca-note { flex: 1 1 240px; min-width: 180px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.ca-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ca-acts .btn { padding: 5px 11px; font-size: 12.5px; }
+@media (max-width: 640px) {
+  .ca-slot { padding: 11px 13px; gap: 7px 10px; }
+  .ca-value { font-size: 12.5px; }
+  .ca-note { flex-basis: 100%; min-width: 0; }
+}

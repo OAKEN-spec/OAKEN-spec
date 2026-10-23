@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About · OAKEN</title>
+<meta name="description" content="Why OAKEN exists: ownerless token and LP locks, the same address on four chains, every number read live from the chain — and a plain statement of where that promise stops.">
+<meta property="og:title" content="About OAKEN — what we kept, and what we removed">
+<meta property="og:description" content="No owner, no upgrade, no admin key. The same lock address on four chains. And a clear line between Locks and Bonds.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://oaken.one/about">
+<meta property="og:image" content="https://oaken.one/logo512.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/key.webp"><source src="/app/media/key.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">About</div>
+    <h1 class="reveal">What we kept, and what we removed.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <p class="muted reveal" style="max-width:72ch">OAKEN is a small set of contracts that hold tokens and
+      liquidity, and a website that reads them. The product decision was not "add more features" — it was
+      to remove the parts that create a reason to trust an operator: no owner, no upgrade path, no admin key,
+      no protocol fee, no custody of your wallet. What remains is a schedule written once, on a contract
+      anyone can call.</p>
+
+    <div class="grid2" data-stagger style="margin-top:34px">
+      <div class="panel">
+        <div class="head"><h3>Why no owner?</h3></div>
+        <div class="body">
+          <ul style="list-style:none;display:grid;gap:14px;color:var(--muted);font-size:14.5px">
+            <li><b style="color:var(--parch)">An owner key is a promise.</b> It says "someone can change the rules
+              later". We did not want the product to depend on that promise being kept.</li>
+            <li><b style="color:var(--parch)">No upgrade path.</b> The contract that holds your tokens cannot be
+              replaced, patched, paused or pointed somewhere else. What is deployed is what runs.</li>
+            <li><b style="color:var(--parch)">No rescue function.</b> That cuts both ways: we cannot recover a
+              mistake, and nobody else can either. Read the schedule before you sign it.</li>
+            <li><b style="color:var(--parch)">Nothing to renounce.</b> Renouncing an owner key is still a promise
+              that the key existed. Here there is no key to renounce.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="head"><h3>Why the same address everywhere?</h3></div>
+        <div class="body">
+          <p class="muted" style="font-size:14.5px">Every contract is deployed with a deterministic salt. The
+            address is derived from the bytecode, so the vault, the adapter, the position lock and the four
+            tools land on <b>the same address on Robinhood Chain, BNB Chain, Base and Polygon</b>. There is one
+            address to check, not one per chain — and the verification links are the same bytes on each.</p>
+          <p class="muted" style="font-size:14.5px;margin-top:14px">The chain picker in the header only lists
+            chains where those contracts actually exist. A chain we are not on would take your signature and
+            do nothing with it, so it is not offered.</p>
+          <p style="margin-top:18px"><a class="btn btn-s" href="/verify">How to verify a deployment →</a></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel reveal" style="margin-top:26px">
+      <div class="head"><h3>OAKEN next to a typical locker</h3></div>
+      <div class="body">
+        <table class="list">
+          <thead><tr><th>Question</th><th>Typical locker</th><th>OAKEN locks</th></tr></thead>
+          <tbody>
+            <tr><td>Can an operator change the lock later?</td><td>Often yes — owner or upgrade proxy</td><td><b>No owner, no upgrade</b></td></tr>
+            <tr><td>Where does the number on the page come from?</td><td>Their database</td><td><b>eth_call from your browser</b></td></tr>
+            <tr><td>What does it cost?</td><td>A locking fee or a token percentage</td><td><b>0 protocol fee — gas only</b></td></tr>
+            <tr><td>Do you have to trust the website to stay up?</td><td>Often yes</td><td><b>No — the schedule lives in the contract</b></td></tr>
+            <tr><td>Is the contract audited?</td><td>Usually a badge</td><td><b>We claim no audit. The code is short and public — read it.</b></td></tr>
+          </tbody>
+        </table>
+        <div class="hint" style="margin-top:14px">"Typical" is a description of the category, not of a named
+          product. Read the specific contract you are about to use — including ours.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band iso-band">
+    <div class="wrap">
+      <div class="film-section">
+        <div class="reveal"><img src="/app/media/ark-acorn-amber.jpg" alt="An acorn suspended in a drop of amber"
+          style="width:100%;display:block;border:1px solid var(--line-gold);border-radius:var(--r)"></div>
+        <div class="reveal">
+          <div class="eyebrow">THE STILL</div>
+          <h2 class="sec">Amber is not a promise.</h2>
+          <div class="sec-rule"></div>
+          <p class="muted" style="margin-top:18px;max-width:48ch">It is a material fact: the acorn is inside,
+            and it stays inside. That is the product, and the whole brand.</p>
+          <p class="hint" style="margin-top:14px">The 15-second film is on the <a href="/#film">home page</a>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band ambient" id="boundary">
+    <div class="wrap">
+      <div class="reveal">
+        <div class="eyebrow">THE LINE WE DO NOT BLUR</div>
+        <h2 class="sec">Locks are ownerless. Bonds are not.</h2>
+        <div class="sec-rule"></div>
+        <p class="muted" style="margin-top:18px;max-width:70ch"><b>Do not read "no owner" on this site and assume
+          it applies to every product.</b> Locks and Bonds have different trust assumptions, and we say which
+          is which on every page.</p>
+      </div>
+      <div class="grid2" data-stagger style="margin-top:26px">
+        <div class="panel">
+          <div class="head"><h3>Locks · vault, positions, tools</h3></div>
+          <div class="body">
+            <ul style="list-style:none;display:grid;gap:12px;color:var(--muted);font-size:14.5px">
+              <li><b style="color:var(--parch)">No admin, no pause, no upgrade.</b> The schedule is fixed when the lock lands.</li>
+              <li><b style="color:var(--parch)">Anybody can pay the gas</b> to release a due lock; the vault pays the beneficiary and nobody else.</li>
+              <li><b style="color:var(--parch)">The tools are ownerless too</b> — fixed-supply token factory, MultiSender, Merkle airdrop, presale with refunds.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="head"><h3>Bonds · aOAKEN</h3></div>
+          <div class="body">
+            <ul style="list-style:none;display:grid;gap:12px;color:var(--muted);font-size:14.5px">
+              <li><b style="color:var(--parch)">Parameters are managed by a 2-of-3 Safe behind a 24h Timelock.</b>
+                Fees, NAV limits and keeper settings can change — that is a governance surface, and it is disclosed.</li>
+              <li><b style="color:var(--parch)">The Safe cannot move vault reserves</b>, mint aOAKEN without USDG,
+                or force a user's assets. Redemptions are paid from reserves, and can be limited by them.</li>
+              <li><b style="color:var(--parch)">No external yield is promised.</b> OAKEN emissions are token
+                emissions, not a market yield. There is no aOAKEN secondary market on this site.</li>
+            </ul>
+            <p style="margin-top:16px"><a class="btn btn-s" href="/bonds">Open the bond market →</a></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="reveal">
+        <div class="eyebrow">VERIFICATION, NOT MARKETING</div>
+        <h2 class="sec">"Source verified" is not "audited".</h2>
+        <div class="sec-rule"></div>
+        <p class="muted" style="margin-top:18px;max-width:70ch">Verification means the published source compiles
+          to the bytecode running at that address. It does not mean the code was reviewed for every way it can
+          fail. We claim no audit. What we do claim is smaller and checkable: the contracts are short, they have
+          no owner, and every number on this site is read from them.</p>
+      </div>
+      <div class="grid3" data-stagger style="margin-top:26px">
+        <a class="card" href="/verify"><span class="n">01</span><h3>Verify the bytecode</h3>
+          <p>Open Sourcify or Blockscout, paste an address, and compare the source to the deployed bytecode.</p></a>
+        <a class="card" href="/docs"><span class="n">02</span><h3>Read the limits</h3>
+          <p>The known limitations — rebase, fee-on-transfer, position NFTs, no recovery — are on the docs page, not in a footnote.</p></a>
+        <a class="card" href="/faq"><span class="n">03</span><h3>Ask the hard questions</h3>
+          <p>Why no audit? What if the site disappears? What happens to a failed transaction? The FAQ answers them directly.</p></a>
+      </div>
+      <div class="panel reveal" style="margin-top:26px"><div class="body" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <b>Put it where it cannot be moved.</b>
+        <span class="muted">No protocol fee on locks or our own factory — you pay gas only.</span>
+        <a class="btn btn-p" style="margin-left:auto" href="/locks/create">Lock tokens</a>
+        <a class="btn btn-s" href="/launch">Launch a token</a>
+      </div></div>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+  import { shell, reveal } from '/app/oaken.js';
+  shell();
+  reveal();
+</script>
+</body>
+</html>

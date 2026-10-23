@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tools · OAKEN</title>
+<meta name="description" content="Batch sends, token creation, airdrops and sales — the four tools, on every chain we deploy to.">
+<meta property="og:title" content="Tools · OAKEN">
+<meta property="og:description" content="Batch sends, token creation, airdrops and sales — the four tools, on every chain we deploy to.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://oaken.one/tools">
+<meta property="og:image" content="https://oaken.one/logo512.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/forge.webp"><source src="/app/media/forge-live.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Tools</div>
+    <h1 class="reveal">Four tools, one address each.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <p class="muted" style="max-width:64ch;margin-top:10px">Source verified: all of these are
+      <b>exact matches on Sourcify</b> — the code you can read is the bytecode that is deployed.
+      <a href="https://sourcify.dev/#/lookup/0x1f380ef5eFF9113314Ee175dCE4F226DFd75A50C" target="_blank" rel="noopener">Check the MultiSender</a>
+      as an example, or paste any address from this page into Sourcify or a block explorer.</p>
+
+    <p class="muted" style="max-width:64ch">Everything here is a contract at the same address on every
+      chain we deploy to — the same bytecode, verifiable on the explorer, with no owner behind any of it. Your wallet's
+      chain decides which one you are talking to. <b>No protocol fee on any tool — you pay gas only.</b></p>
+
+    <div class="stats reveal" style="margin-top:34px">
+      <div><div class="v" id="s-chains">—</div><div class="k">Chains deployed</div></div>
+      <div><div class="v" id="s-tokens">—</div><div class="k">Tokens created here</div></div>
+      <div><div class="v" id="s-campaigns">—</div><div class="k">Airdrop campaigns</div></div>
+      <div><div class="v" id="s-sales">—</div><div class="k">Sales launched here</div></div>
+    </div>
+
+    <div class="grid2" style="margin-top:26px">
+      <a class="card reveal" href="/tools/multisender" style="text-decoration:none;color:inherit">
+        <span class="n">01</span><h3>Multi-sender</h3>
+        <p>Pay or distribute to up to 400 addresses in one transaction. Native currency or any ERC-20; the even split
+          gives the division remainder back rather than keeping it.</p>
+        <div class="hint" id="c-multi" style="margin-top:14px"></div>
+      </a>
+      <a class="card reveal" href="/tools/token" style="text-decoration:none;color:inherit">
+        <span class="n">02</span><h3>Token</h3>
+        <p>Deploy a fixed-supply ERC-20 in one transaction. No owner, no mint, no pause, no burn — the whole supply goes
+          to whoever signs, and nothing can create more.</p>
+        <div class="hint" id="c-token" style="margin-top:14px"></div>
+      </a>
+      <a class="card reveal" href="/tools/airdrop" style="text-decoration:none;color:inherit">
+        <span class="n">03</span><h3>Airdrop</h3>
+        <p>Publish a list as a Merkle root and let people claim their own share. The list never goes on chain; the root
+          is the commitment, and anyone can submit a claim for someone else.</p>
+        <div class="hint" id="c-airdrop" style="margin-top:14px"></div>
+      </a>
+      <a class="card reveal" href="/tools/presale" style="text-decoration:none;color:inherit">
+        <span class="n">04</span><h3>Launchpad</h3>
+        <p>Run a sale: a fixed price, a window, a soft cap that decides whether it happens at all. Miss the soft cap and
+          every contribution goes back — the contract has no way to keep it.</p>
+        <div class="hint" id="c-presale" style="margin-top:14px"></div>
+      </a>
+    </div>
+
+    <div class="hint" id="note" style="margin-top:22px"></div>
+  </section>
+</main>
+
+<script src="/app/vendor/ethers.umd.min.js" defer></script>
+<script type="module">
+  import { shell, reveal, chains , onChainSwitch} from '/app/oaken.js';
+  import { ADDR, contract } from '/app/tools.js';
+  import { esc } from '/app/explore.js';
+  shell({ active: 'tools' });
+
+    /* 2026-10-16：这一页的数据**不是按钱包那条链渲染的**（跨链读 / 由 URL 决定）——
+       钱包换链不改变这里的任何一块。登记一个空的处理器 = 换链时不整页重载（不白闪），
+       结果和以前重载完一模一样。没登记的页面仍走整页重载，见 oaken.js 的 onChainSwitch。 */
+    onChainSwitch(() => { /* 见上 */ });
+  (async () => {
+    const live = await chains();
+    document.getElementById('s-chains').textContent = live.length ? String(live.length) : '—';
+    if (!live.length) { document.getElementById('note').textContent = 'Could not load the chain list — refresh once.'; return; }
+
+    let tokens = 0, campaigns = 0, sales = 0, ok = 0;
+    for (const c of live) {
+      try {
+        const [t, a, p] = await Promise.all([
+          contract(c, 'tokenFactory', ADDR.tokenFactory).tokenCount(),
+          contract(c, 'airdrop', ADDR.airdrop).campaignCount(),
+          contract(c, 'presaleFactory', ADDR.presaleFactory).saleCount(),
+        ]);
+        tokens += Number(t); campaigns += Number(a); sales += Number(p); ok++;
+      } catch { /* 这条链读不到就不加进去，也不假装 0 */ }
+    }
+    if (ok === 0) {
+      document.getElementById('note').textContent = 'None of the chains answered — the public RPCs may be rate-limiting. Refresh in a moment.';
+      return;
+    }
+    document.getElementById('s-tokens').textContent = String(tokens);
+    document.getElementById('s-campaigns').textContent = String(campaigns);
+    document.getElementById('s-sales').textContent = String(sales);
+    document.getElementById('c-multi').textContent = `deployed on all ${ok} chains · ${esc(ADDR.multiSender)}`;
+    document.getElementById('c-token').textContent = tokens
+      ? `${tokens} token${tokens === 1 ? '' : 's'} created so far · ${esc(ADDR.tokenFactory)}`
+      : 'Be the first — deploy a fixed-supply token · ' + esc(ADDR.tokenFactory);
+    document.getElementById('c-airdrop').textContent = campaigns
+      ? `${campaigns} campaign${campaigns === 1 ? '' : 's'} so far · ${esc(ADDR.airdrop)}`
+      : 'No campaign yet — publish the first list · ' + esc(ADDR.airdrop);
+    document.getElementById('c-presale').textContent = sales
+      ? `${sales} sale${sales === 1 ? '' : 's'} launched here · ${esc(ADDR.presaleFactory)}`
+      : 'Be the first — open a sale · ' + esc(ADDR.presaleFactory);
+    const partial = ok < live.length
+      ? ` ${live.length - ok} of ${live.length} chains did not answer, so these totals may be incomplete.`
+      : '';
+    document.getElementById('note').textContent =
+      'Counts are read from the contracts on every chain we are deployed to, right now — not from a snapshot. '
+      + 'A chain that fails to answer is left out of the total rather than counted as zero.' + partial;
+    reveal();
+  })();
+</script>
+</body>
+</html>

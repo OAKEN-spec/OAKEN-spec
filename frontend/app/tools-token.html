@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token · OAKEN</title>
+<meta name="description" content="Deploy a fixed-supply ERC-20 in one transaction — no owner, no mint, no pause.">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+<style>
+  .flow { display: grid; grid-template-columns: 1.1fr .9fr; gap: 26px; align-items: start; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; flex-wrap: wrap; }
+  .seg button { background: transparent; border: 0; color: var(--muted); font: 600 13.5px/1 "Segoe UI", system-ui, sans-serif;
+                padding: 11px 16px; cursor: pointer; }
+  .seg button.on { background: rgba(217,163,67,.12); color: var(--gold); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .summary { background: var(--panel); border: 1px solid var(--line-gold); border-radius: var(--r); padding: 20px 22px; }
+  .summary b { color: var(--gold); }
+  @media (max-width: 940px) { .flow { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/mold.webp"><source src="/app/media/mold-head.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Token</div>
+    <h1 class="reveal">A token with nothing hidden in it.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <p class="muted" style="margin-top:12px;max-width:64ch">One transaction deploys a plain ERC-20 with the whole supply
+      sent to you. There is no owner, no mint function, no pause and no burn — not "renounced", not "locked": the code
+      has no such function, so there is nothing to renounce and nothing to unlock later.</p>
+
+    <div class="flow" style="margin-top:30px">
+      <div class="panel">
+        <div class="head"><h3>New token</h3></div>
+        <div class="body">
+          <label class="f">Chain</label>
+          <div class="seg" id="chainseg"><button type="button" class="on">Loading…</button></div>
+          <div class="hint" id="chainhint"></div>
+
+          <label class="f" for="name">Name</label>
+          <input class="i" id="name" placeholder="Ex: Oaken Test Token" maxlength="64" autocomplete="off">
+
+          <div class="row2">
+            <div>
+              <label class="f" for="symbol">Symbol</label>
+              <input class="i" id="symbol" placeholder="OAKT" maxlength="16" autocomplete="off">
+            </div>
+            <div>
+              <label class="f" for="decimals">Decimals</label>
+              <input class="i" id="decimals" value="18" inputmode="numeric" autocomplete="off">
+            </div>
+          </div>
+
+          <label class="f" for="supply">Total supply</label>
+          <input class="i" id="supply" placeholder="1000000" inputmode="decimal" autocomplete="off">
+          <div class="hint" id="supplyhint">The entire supply is minted to your address in the constructor and never
+            changes. 18 decimals means the number you type here is what people will see.</div>
+
+          <div class="err hide" id="err"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="summary" id="summary">
+          <div class="eyebrow" style="margin-bottom:12px">Before you sign</div>
+          <div id="sumtext" class="muted">Fill the form — the summary appears here, in one sentence.</div>
+        </div>
+        <div style="display:grid;gap:10px;margin-top:16px">
+          <button class="btn btn-p" id="go" style="width:100%" disabled>Connect a wallet first</button>
+          <div class="hint" id="steps"></div>
+        </div>
+        <div class="panel hide" id="done" style="margin-top:16px">
+          <div class="head"><h3>Created</h3></div>
+          <div class="body" id="donebody"></div>
+        </div>
+
+        <div class="panel" style="margin-top:16px">
+          <div class="head"><h3>Tokens created here</h3><span class="muted" id="list-note" style="margin-left:auto;font-size:12.5px"></span></div>
+          <div class="body" style="padding:6px 0"><div id="tokens" class="muted" style="padding:16px 20px">Reading…</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+    <div class="panel" style="margin-top:16px"><div class="head"><h3>If it fails — self-check</h3></div>
+      <div class="body muted" style="font-size:13.5px">
+        <ul style="list-style:none;display:grid;gap:10px">
+          <li><b style="color:var(--parch)">The supply is fixed at deployment.</b> There is no mint, no burn and no owner — check the number before you sign.</li>
+          <li><b style="color:var(--parch)">Decimals are immutable.</b> 18 is the common choice; a different value changes how every wallet displays the supply.</li>
+          <li><b style="color:var(--parch)">The whole supply goes to the deploying wallet.</b> Locking a part of it is a separate step on the lock page.</li>
+          <li><b style="color:var(--parch)">The image is off-chain.</b> For this factory the chain has no image field; the picture is stored on our image host and can disappear without affecting the token.</li>
+        </ul>
+      </div>
+    </div>
+</main>
+
+<script src="/app/vendor/ethers.umd.min.js" defer></script>
+<script type="module">
+  import { shell, wallet, chains, currentChain, erc20, fmtAmount, toast, explorerHref, reveal,
+    safeRead, cachedRead, cacheDrop, showReadFail, txNotice, humanizeTxError, onWallet,
+    stillReadingAfter, showChainSegFailed , onChainSwitch, chainIcon} from '/app/oaken.js';
+  import { ADDR, contract } from '/app/tools.js';
+  import { esc, shortAddr } from '/app/explore.js';
+
+  shell({ active: 'tools' });
+
+  const $ = (id) => document.getElementById(id);
+  /** 本地链没有 explorer —— 硬拼出来的 `/tx/0x…` 是同源 404（链接检查器会报出来）。 */
+  const exLink = (path, label, cls = 'btn btn-s') => {
+    const h = explorerHref(path, state.chain);
+    return h ? `<a class="${cls}" target="_blank" rel="noopener" href="${h}">${label}</a>` : '';
+  };
+  const state = { chain: null, addr: null, busy: false };
+
+  /* ── 链 ──────────────────────────────────────────────────────────── */
+  async function bootChains() {
+    const live = await chains();
+    if (!live.length) { showChainSegFailed('chainseg', 'chainhint', bootChains); return; }
+    state.chain = await currentChain();
+    const seg = $('chainseg');
+    seg.innerHTML = live.map((c) => `<button type="button" data-id="${c.id}" class="${c.id === state.chain.id ? 'on' : ''}"><span class="chain-ico">${chainIcon(c.id, 13)}</span>${c.name}</button>`).join('');
+    $('chainhint').innerHTML = `The token is deployed on <b>${state.chain.name}</b> — the same contract address as everywhere else.`;
+    seg.onclick = async (ev) => {
+      const b = ev.target.closest('button'); if (!b) return;
+      const c = live.find((x) => x.id === Number(b.dataset.id));
+      if (!c || c.id === state.chain.id) return;
+      state.chain = c;
+      for (const x of seg.querySelectorAll('button')) x.classList.toggle('on', x === b);
+      $('chainhint').innerHTML = `The token is deployed on <b>${state.chain.name}</b>.`;
+      if (state.addr) { try { await wallet.ensureChain(c); } catch (e) { toast(String(e.message || e), 'bad'); } }
+      update(); loadTokens();
+    };
+    /* 2026-10-16：钱包自己换链（或用户在顶栏切的）→ **走同一个入口**点一下链选择器，
+       这一页就按新链重画 —— 不再整页 location.reload() 白闪那一下。 */
+    onChainSwitch((id) => { const b = seg.querySelector('button[data-id="' + id + '"]'); if (b) b.click(); });
+    loadTokens();
+    update();
+  }
+  bootChains();
+
+  /* ── 列出这条链上已经发出来的代币 ──────────────────────────────────
+   * ⚠ 这一块以前停在 "Reading…" 就再也不会变（一条公共 RPC 卡住 = 永远转圈）。
+   * 现在：每次都有超时（`safeRead`）、成功值缓存 45 秒、读不到就换成
+   * 统一那句 + **重试按钮**（清单 8.3 点名的那条）。
+   */
+  async function loadTokens() {
+    const host = $('tokens');
+    if (!state.chain) return;
+    host.textContent = 'Reading…';
+    $('list-note').textContent = '';
+    const stop = stillReadingAfter(host.parentElement || host, 3500, { what: 'the tokens created here', onRetry: () => { cacheDrop(); loadTokens(); } });
+    const store = contract(state.chain, 'tokenFactory', ADDR.tokenFactory);
+    try {
+      /* 4 秒超时（+ 换端点重试一次）—— 公共 RPC"连上了但不回"时，10 秒×2 会让这块
+         停在 "Reading…" 二十秒（2026-10-15 实测 21 秒）。 */
+      const count = await safeRead(
+        () => cachedRead('token.count.' + state.chain.id, 45_000, async () => Number(await store.tokenCount())),
+        { chain: state.chain, timeout: 4000, retries: 1, label: 'token factory' },
+      );
+      $('list-note').textContent = count ? `${count} on ${state.chain.name}` : '';
+      if (!count) { stop(); host.innerHTML = '<span class="muted">Nothing has been created here yet.</span>'; return; }
+      const all = await safeRead(
+        () => cachedRead('token.list.' + state.chain.id, 45_000, () => store.allTokens()),
+        { chain: state.chain, timeout: 4000, retries: 1, label: 'token list' },
+      );
+      /**
+       * ⚠ **ethers v6 返回的数组是冻结的**，`slice()` 出来的还是冻结的那个类 ——
+       * 原地 `reverse()` 在严格模式（ES module 就是严格模式）会抛
+       * `Cannot assign to read only property '0' of object '[object Array]'`。
+       * 这块列表因此**从来没成功过**，而且报的是一句看不出所以然的英文（2026-10-15 线上实测）。
+       * 先摊平成普通数组再动它。
+       */
+      const newestFirst = [...all].reverse();
+      const shown = newestFirst.slice(0, 8);     // 新的在前，一页最多看 8 个
+      /**
+       * 每行四个字段：**各读各的、各兜各的**，而且**行与行之间并发**。
+       *
+       * 两个坑叠在一起才变成"整列都是 —"（2026-10-15 实测）：
+       *   · 四个调用是**串行**的（ethers 默认不批处理），这台机器一次往返 1 秒多 → 4 秒超时
+       *     把整行打掉，而 `retries: 0` 没有第二次机会；
+       *   · 一个字段读不到就 `Promise.all` 整行 reject → 连读到的符号也一起丢。
+       * 现在：每个字段自己 `.catch()` 兜底，行与行一起发，超时放宽到 9 秒。
+       */
+      const rows = await Promise.all(shown.map(async (address) => {
+        const t = erc20(state.chain, address);
+        const [symbol, name, supply, decimals] = await safeRead(() => Promise.all([
+          t.symbol().catch(() => '—'),
+          t.name().catch(() => ''),
+          t.totalSupply().catch(() => null),
+          t.decimals().catch(() => 18),
+        ]), { chain: state.chain, timeout: 9000, retries: 1 }).catch(() => ['—', '', null, 18]);
+        const dp = Number(decimals) || 18;
+        return `<div class="row" style="display:flex;gap:12px;align-items:baseline;padding:11px 20px;border-bottom:1px solid var(--line)">
+          <span style="flex:1 1 auto;min-width:0">
+            <a href="/locks/${state.chain.slug}/${address}">${esc(symbol)}</a>
+            <span class="muted" style="font-size:12.5px"> ${esc(name)}</span>
+          </span>
+          <span class="muted" style="font-size:12.5px">${supply === null ? '' : fmtAmount(supply, dp, 2)}</span>
+          <span class="mono muted" style="font-size:12px">${shortAddr(address)}</span>
+        </div>`;
+      }));
+      stop();
+      host.innerHTML = rows.join('') + (all.length > shown.length
+        ? `<div class="hint" style="padding:10px 20px">Showing the last ${shown.length} of ${all.length}.</div>` : '');
+    } catch (e) {
+      stop();
+      /* 统一那句 + 重试（重试会先轮换 RPC、清缓存，再重跑这一段） */
+      showReadFail(host, {
+        what: 'the tokens created on ' + state.chain.name,
+        detail: (e && e.message) || '',
+        chain: state.chain,
+        onRetry: () => loadTokens(),
+      });
+    }
+  }
+
+  /* ── 钱包 ────────────────────────────────────────────────────────── */
+  /**
+   * ⚠ 参数是**事件送来的地址**（`onWallet('accounts', ...)` 的载荷）。
+   *
+   * 事件的回调里**不能再 `wallet.accounts()` 回查一次** —— 真钱包在授权那一刻、
+   * 假钱包在每次 `eth_accounts` 之后都会补发 `accountsChanged`，回查就是自己喂自己：
+   * 一圈圈跑下去（2026-10-15 实测：每秒 400 次 update()，gas 预估永远排不上队，
+   * 而控制台一条错都没有）。事件给了地址用地址；没有载荷（首次调用）才去问。
+   */
+  async function refreshWallet(addrFromEvent, fromEvent = false) {
+    const a = fromEvent ? (addrFromEvent || null) : ((await wallet.accounts())[0] || null);
+    state.addr = a;
+    update();
+  }
+  onWallet('accounts', (a) => refreshWallet(a, true));
+  refreshWallet();
+
+  /* ── 摘要与校验 ──────────────────────────────────────────────────── */
+  function read() {
+    const name = $('name').value.trim();
+    const symbol = $('symbol').value.trim();
+    const decimals = Number($('decimals').value.trim());
+    const supplyText = $('supply').value.trim();
+    let supply = null, supplyErr = null;
+    try { supply = supplyText ? window.ethers.parseUnits(supplyText, decimals) : null; }
+    catch { supplyErr = 'Supply has more decimal places than the token has decimals.'; }
+    return { name, symbol, decimals, supplyText, supply, supplyErr };
+  }
+
+  function update() {
+    const f = read();
+    const errs = [];
+    if (!state.chain) errs.push('Pick a chain first.');
+    if (!f.name) errs.push('Give it a name.');
+    if (!f.symbol) errs.push('Give it a symbol.');
+    if (!(f.decimals >= 0 && f.decimals <= 18)) errs.push('Decimals must be between 0 and 18.');
+    if (f.supplyErr) errs.push(f.supplyErr);
+    if (!f.supply || f.supply <= 0n) errs.push('Supply must be a positive number.');
+    if (f.name.length > 64) errs.push('Names are capped at 64 characters.');
+    if (f.symbol.length > 16) errs.push('Symbols are capped at 16 characters.');
+
+    const errEl = $('err');
+    errEl.classList.toggle('hide', errs.length === 0);
+    errEl.innerHTML = '';
+    for (const t of errs.slice(0, 3)) { const d = document.createElement('div'); d.textContent = t; errEl.appendChild(d); }
+
+    if (f.name && f.symbol && f.supply) {
+      $('sumtext').className = '';
+      $('sumtext').innerHTML = `You are creating <b>${esc(f.name)} (${esc(f.symbol)})</b> with
+        <b>${esc(f.supplyText)}</b> tokens, ${f.decimals} decimals, on <b>${state.chain?.name ?? '—'}</b>.
+        The whole supply goes to your address and nothing can ever mint more.`;
+    } else {
+      $('sumtext').className = 'muted';
+      $('sumtext').textContent = 'Fill the form — the summary appears here, in one sentence.';
+    }
+
+    const btn = $('go');
+    btn.disabled = state.busy || errs.length > 0;
+    btn.textContent = state.busy ? 'Working…' : (!state.addr ? 'Connect a wallet first' : 'Create the token');
+  }
+  for (const id of ['name', 'symbol', 'decimals', 'supply']) $(id).addEventListener('input', update);
+
+  /* ── 创建 ────────────────────────────────────────────────────────── */
+  $('go').onclick = async () => {
+    const f = read();
+    update();
+    if ($('go').disabled) return;
+    state.busy = true; update();
+    let note = null;
+    try {
+      if (!state.addr) { await wallet.connect(); await refreshWallet(); }
+      await wallet.ensureChain(state.chain);
+      const signer = await wallet.signer();
+      const factory = contract(state.chain, 'tokenFactory', ADDR.tokenFactory, signer);
+      $('steps').textContent = 'Deploying…';
+      note = txNotice(state.chain, 'Token deploy');
+      // Deploying a contract costs more than a call; 4663 needs the limit spelled out.
+      const tx = await factory.createToken(f.name, f.symbol, f.decimals, f.supply, { gasLimit: 2_000_000n });
+      note.sent(tx.hash);
+      const rc = await tx.wait();
+      let address = null;
+      for (const log of rc.logs) {
+        try {
+          const parsed = factory.interface.parseLog(log);
+          if (parsed?.name === 'TokenCreated') { address = parsed.args.token; break; }
+        } catch { /* 不是这个合约的日志 */ }
+      }
+      $('done').classList.remove('hide');
+      $('donebody').innerHTML = `
+        <div style="display:grid;gap:10px">
+          <div><b>${esc(f.symbol)}</b> is live${address ? ` at <span class="mono" style="font-size:13px">${esc(address)}</span>` : ''}.</div>
+          <div class="mono muted" style="font-size:12px;word-break:break-all">tx ${tx.hash}</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">${exLink('/tx/' + tx.hash, 'See the deploy transaction ↗')}</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+            ${address ? `<a class="btn btn-p" href="/locks/create?token=${address}">Lock some of it →</a>
+            <a class="btn btn-s" href="/tools/airdrop">Airdrop it</a>
+            <a class="btn btn-s" target="_blank" rel="noopener" href="https://sourcify.dev/#/lookup/${address}">Verify on Sourcify ↗</a>
+            ${exLink('/token/' + address, 'Explorer ↗', 'btn btn-s')}` : ''}
+          </div>
+        </div>`;
+      /* 工厂的清单变了 —— 把缓存丢掉再重读，否则"刚发的那个"要等 45 秒才出现
+         （清单 8.3：部署成功后要能立刻看到它）。 */
+      cacheDrop();
+      note.ok(f.symbol + ' deployed' + (address ? ' at ' + shortAddr(address) : '') + '.',
+        address ? [{ label: 'Open token page →', href: '/locks/' + state.chain.slug + '/' + address }] : []);
+      reveal();
+      loadTokens();
+    } catch (e) {
+      const msg = humanizeTxError(e, state.chain);
+      $('err').classList.remove('hide');
+      $('err').textContent = msg;
+      if (note) note.fail(msg); else toast(msg.slice(0, 120), 'bad');
+    } finally {
+      state.busy = false;
+      $('steps').textContent = '';
+      update();
+    }
+  };
+</script>
+</body>
+</html>

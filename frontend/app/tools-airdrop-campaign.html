@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campaign · OAKEN</title>
+<meta name="description" content="One airdrop campaign: the root on chain, and the claim built from the published list.">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below — '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+<style>
+  textarea.i { width: 100%; min-height: 120px; background: var(--bark); border: 1px solid var(--line); border-radius: var(--r);
+               color: var(--parch); font: 12.5px/1.7 ui-monospace, Consolas, monospace; padding: 12px 14px; outline: none; resize: vertical; }
+  textarea.i:focus { border-color: var(--line-gold); }
+  input[type=file] { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead slim">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/seedfall.webp"><source src="/app/media/seedfall-head.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:44px">
+    <a class="muted" href="/tools/airdrop" style="font-size:13.5px">← All campaigns</a>
+    <div id="head" style="margin-top:18px"><span class="muted skel">Reading the chain</span></div>
+    <div id="body"></div>
+  </section>
+</main>
+
+<script src="/app/vendor/ethers.umd.min.js" defer></script>
+<script type="module">
+  import { shell, wallet, chainBySlug, currentChain, erc20, fmtAmount, fmtDate, toast, explorerHref, reveal, short,
+    safeRead, showReadFail, txNotice, humanizeTxError , onChainSwitch, chainNow} from '/app/oaken.js';
+  import { ADDR, contract, readClaimFile } from '/app/tools.js';
+  import { esc, shortAddr } from '/app/explore.js';
+
+  shell({ active: 'tools' });
+
+    /* 2026-10-16：这一页的数据**不是按钱包那条链渲染的**（跨链读 / 由 URL 决定）——
+       钱包换链不改变这里的任何一块。登记一个空的处理器 = 换链时不整页重载（不白闪），
+       结果和以前重载完一模一样。没登记的页面仍走整页重载，见 oaken.js 的 onChainSwitch。 */
+    onChainSwitch(() => { /* 见上 */ });
+  const parts = location.pathname.split('/').filter(Boolean);   // ['tools','airdrop',slug,id]
+  const slug = parts[2] || '';
+  const id = Number(parts[3]);
+  const state = { chain: null, camp: null, symbol: '', decimals: 18, addr: null, list: null, file: null, now: null };
+
+  const kv = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
+
+  (async () => {
+    if (!Number.isInteger(id)) { document.getElementById('head').innerHTML = '<h2 class="sec">That is not a campaign id.</h2>'; return; }
+    const chain = (await chainBySlug(slug)) || (await currentChain());
+    if (!chain) { document.getElementById('head').innerHTML = '<h2 class="sec">Could not load the chain list.</h2>'; return; }
+    state.chain = chain;
+    document.title = `Airdrop #${id} · OAKEN`;
+
+    const store = contract(chain, 'airdrop', ADDR.airdrop);
+    /* ⚠ 读失败和"这个 id 上什么都没有"**必须分开**：混成一句话的话，RPC 抖一下
+       就等于告诉用户"你的空投不存在"（清单通用第 1 条）。 */
+    let camp;
+    try { camp = await safeRead(() => store.campaign(id), { chain, timeout: 10_000, retries: 1, label: 'airdrop campaign' }); }
+    catch (e) {
+      document.getElementById('head').innerHTML = `
+        <div class="eyebrow">Airdrop</div><h2 class="sec">Could not read campaign #${id} from ${esc(chain.name)}.</h2>`;
+      document.getElementById('body').innerHTML = '<div id="campfail" style="margin-top:16px;max-width:52ch"></div>';
+      showReadFail(document.getElementById('campfail'), {
+        what: `campaign #${id} on ${chain.name}`,
+        detail: (e && e.message) || '',
+        chain,
+        onRetry: () => location.reload(),
+      });
+      return;
+    }
+    if (!camp || camp.creator === '0x0000000000000000000000000000000000000000') {
+      document.getElementById('head').innerHTML = `
+        <div class="eyebrow">Airdrop</div><h2 class="sec">No campaign #${id} on ${esc(chain.name)}.</h2>`;
+      document.getElementById('body').innerHTML = `<p class="muted" style="margin-top:14px">The contract answered, and there is nothing at that id. <a href="/tools/airdrop">See what is running →</a></p>`;
+      return;
+    }
+    state.camp = camp;
+    /* 链上的"现在"——sweep 的开关按它算，不按访客电脑时钟（设备慢几天时按钮永远灰）。 */
+    state.now = await chainNow(chain).catch(() => Math.floor(Date.now() / 1000));
+    try { const [s, d] = await Promise.all([erc20(chain, camp.token).symbol(), erc20(chain, camp.token).decimals()]); state.symbol = s; state.decimals = Number(d); }
+    catch { state.symbol = 'TOKEN'; }
+
+    paintHead();
+    paintBody();
+    reveal();
+    bootWallet();
+  })();
+
+  function paintHead() {
+    const c = state.camp;
+    const pct = Number(c.total) > 0 ? Number(c.claimed) * 100 / Number(c.total) : 0;
+    const past = Number(c.deadline) * 1000 < (state.now ?? Math.floor(Date.now() / 1000)) * 1000;
+    document.getElementById('head').innerHTML = `
+      <div class="eyebrow">Airdrop · read live from ${esc(state.chain.name)}</div>
+      <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+        <span class="tile lg">#${id}</span>
+        <div>
+          <h2 class="sec" style="margin:0">${esc(state.symbol)} airdrop</h2>
+          <div class="muted" style="margin-top:6px;font-size:14px">${fmtAmount(c.total, state.decimals, 2)} ${esc(state.symbol)}
+            funded by <span class="mono">${shortAddr(c.creator)}</span></div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
+          <span class="chip">${esc(state.chain.name)}</span>
+          ${c.swept ? '<span class="pill">swept</span>' : past ? '<span class="pill ok">claims open</span>' : '<span class="pill lock">claims open</span>'}
+        </div>
+      </div>
+      <div class="bar" style="margin-top:22px"><i class="${pct >= 100 ? 'ok' : ''}" style="width:${Math.min(100, pct).toFixed(1)}%"></i></div>
+      <div class="raise"><span><b>${fmtAmount(c.claimed, state.decimals, 2)}</b> claimed (${pct.toFixed(1)}%)</span>
+        <span>${c.claimedRows} row${Number(c.claimedRows) === 1 ? '' : 's'} of the list</span></div>`;
+  }
+
+  function paintBody() {
+    const c = state.camp;
+    const past = Number(c.deadline) * 1000 < (state.now ?? Math.floor(Date.now() / 1000)) * 1000;
+    document.getElementById('body').innerHTML = `
+      <div class="dossier">
+        <div class="stack">
+          <div class="panel reveal">
+            <div class="head"><h3>Claim your row</h3><span class="muted" style="margin-left:auto;font-size:12.5px">built from the published list</span></div>
+            <div class="body">
+              <p class="muted" style="font-size:14px;margin-bottom:14px">The list itself is not on chain — only its fingerprint is. Load the file the creator published; this page rebuilds the root from it and <b style="color:var(--parch)">refuses it if it does not match</b> the chain, then picks out your address.</p>
+
+              <input type="file" id="file" accept="application/json,.json" style="display:none">
+              <label class="btn btn-s filebtn" for="file">Choose the file…</label>
+              <div class="hint" style="margin:10px 0 14px">…or paste it here:</div>
+              <textarea class="i" id="paste" spellcheck="false" placeholder='{"kind":"oaken-airdrop","entries":[…]}'></textarea>
+              <div id="check" class="hint" style="margin-top:12px"></div>
+
+              <div id="mine" style="margin-top:18px"></div>
+            </div>
+          </div>
+
+          <div class="panel reveal">
+            <div class="head"><h3>Where the tokens go</h3></div>
+            <div class="body">
+              <dl class="kv">
+                ${kv('Token', `${esc(state.symbol)} <span class="mono muted" style="font-size:12px">${esc(shortAddr(c.token))}</span>
+                   ${explorerHref('/token/' + c.token, state.chain) ? `<a class="mono" style="font-size:12px" target="_blank" rel="noopener"
+                     href="${explorerHref('/token/' + c.token, state.chain)}">explorer ↗</a>` : ''}`)}
+                ${kv('Funded', `${fmtAmount(c.total, state.decimals, 2)} ${esc(state.symbol)}`)}
+                ${kv('Claimed so far', `${fmtAmount(c.claimed, state.decimals, 2)} ${esc(state.symbol)} · ${c.claimedRows} rows`)}
+                ${kv('Deadline', `${fmtDate(c.deadline)}${past ? ' <span class="muted">(passed)</span>' : ''}`)}
+                ${kv('Remainder', c.swept
+                  ? '<span class="muted">swept back to the creator — claims are over</span>'
+                  : `${fmtAmount(BigInt(c.total) - BigInt(c.claimed), state.decimals, 2)} ${esc(state.symbol)}
+                     <span class="muted">— claimable by the list until the creator sweeps</span>`)}
+              </dl>
+            </div>
+          </div>
+        </div>
+
+        <div class="side">
+          <div class="panel reveal">
+            <div class="head"><h3>On chain</h3></div>
+            <div class="body">
+              <dl class="kv" style="grid-template-columns:110px 1fr">
+                ${kv('Contract', `<span class="mono" style="font-size:12px">${esc(ADDR.airdrop)}</span>`)}
+                ${kv('Root', `<span class="mono" style="font-size:11.5px;word-break:break-all">${esc(c.root)}</span>`)}
+                ${kv('Creator', `<span class="mono" style="font-size:12px">${esc(c.creator)}</span>`)}
+              </dl>
+              <p class="hint" style="margin-top:12px">The root above is what every claim is checked against. If the file you load does not hash to it, the mismatch is printed and nothing is offered to sign.</p>
+            </div>
+          </div>
+          <div class="panel reveal" id="creatorbox"></div>
+        </div>
+      </div>`;
+  }
+
+  /* ── 钱包 ────────────────────────────────────────────────────────── */
+  async function bootWallet() {
+    const [a] = await wallet.accounts();
+    state.addr = a || null;
+    if (state.list) paintMine();
+    paintCreatorBox();
+  }
+
+  /* ── 读名单文件 ──────────────────────────────────────────────────── */
+  async function loadText(text) {
+    const check = document.getElementById('check');
+    try {
+      const obj = JSON.parse(text);
+      const { root, proof, rows, file } = readClaimFile(obj);
+      state.list = { root, proof, rows, file };
+      const match = root.toLowerCase() === String(state.camp.root).toLowerCase();
+      if (!match) {
+        check.innerHTML = `<span style="color:var(--bad)">This file is not this campaign's list.</span>
+          <div class="mono" style="font-size:11.5px;margin-top:6px;word-break:break-all;color:var(--muted)">
+            file root ${esc(root)}<br>chain root ${esc(state.camp.root)}</div>`;
+        state.list = null;
+        paintMine();
+        return;
+      }
+      if (file.chainId && Number(file.chainId) !== state.chain.id) {
+        check.innerHTML = `<span style="color:var(--bad)">This file belongs to chain ${esc(String(file.chainId))}, not ${esc(state.chain.name)}.</span>`;
+        state.list = null; paintMine(); return;
+      }
+      check.innerHTML = `<span style="color:var(--ok)">✓ ${rows.length} rows, and the root matches the chain.</span>`;
+      paintMine();
+    } catch (e) {
+      check.innerHTML = `<span style="color:var(--bad)">Could not read that: ${esc(e.message)}</span>`;
+      state.list = null;
+      paintMine();
+    }
+  }
+
+  function paintMine() {
+    const host = document.getElementById('mine');
+    if (!state.list) { host.innerHTML = ''; return; }
+    const me = state.addr;
+    if (!me) {
+      host.innerHTML = '<div class="hint">Connect a wallet (top right) to pick your row out of the list.</div>';
+      return;
+    }
+    const row = state.list.rows.find((r) => r.account.toLowerCase() === me.toLowerCase());
+    if (!row) {
+      host.innerHTML = `<div class="hint">This address is not in the list. ${state.list.rows.length} rows were loaded, and yours is not one of them.</div>`;
+      return;
+    }
+    host.innerHTML = `
+      <div style="border-top:1px solid var(--line);padding-top:16px">
+        <div class="muted" style="font-size:13px">Your row (#${row.index})</div>
+        <div style="font-family:'Oaken Display',Georgia,serif;font-size:26px;color:var(--gold);margin:6px 0 12px">
+          ${fmtAmount(row.amount, state.decimals, 4)} ${esc(state.symbol)}</div>
+        <button class="btn btn-p" id="claim">Claim</button>
+        <div class="hint" style="margin-top:10px">Anyone can submit this claim — the tokens always go to <span class="mono">${shortAddr(row.account)}</span>, the address in the row.</div>
+      </div>`;
+
+    document.getElementById('claim').onclick = async () => {
+      /* 全局交易通知：Pending（带浏览器链接）→ Success / Fail —— 领完 reload 之前先让用户看见。 */
+      const note = txNotice(state.chain, 'Claim');
+      try {
+        await wallet.connect(state.chain);
+        await wallet.ensureChain(state.chain);
+        const signer = await wallet.signer();
+        const store = contract(state.chain, 'airdrop', ADDR.airdrop, signer);
+        const tx = await store.claim(id, row.index, row.account, row.amount, state.list.proof(row.index), { gasLimit: 400_000n });
+        note.sent(tx.hash);
+        await tx.wait();
+        note.ok('Claimed.');
+        setTimeout(() => location.reload(), 1200);   // 给提示条一点时间被看见
+      } catch (e) {
+        note.fail(humanizeTxError(e, state.chain));
+      }
+    };
+  }
+
+  function paintCreatorBox() {
+    const box = document.getElementById('creatorbox');
+    const c = state.camp;
+    const isCreator = state.addr && state.addr.toLowerCase() === c.creator.toLowerCase();
+    const past = Number(c.deadline) * 1000 < (state.now ?? Math.floor(Date.now() / 1000)) * 1000;
+    if (!isCreator) {
+      box.innerHTML = `<div class="head"><h3>If you funded this</h3></div><div class="body muted" style="font-size:13.5px">
+        After the deadline the creator can take back whatever nobody claimed. That button appears here for the funding address.</div>`;
+      return;
+    }
+    box.innerHTML = `
+      <div class="head"><h3>You funded this</h3></div>
+      <div class="body">
+        <p class="muted" style="font-size:13.5px">${c.swept ? 'You already took the remainder back.'
+          : past ? 'The deadline has passed — you can take back whatever is still unclaimed. Claims stop being possible after a sweep.'
+          : `The remainder cannot be taken back until ${fmtDate(c.deadline)}.`}</p>
+        <button class="btn ${c.swept || !past ? 'btn-g' : 'btn-s'}" id="sweep" ${c.swept || !past ? 'disabled' : ''} style="margin-top:12px">
+          Take the remainder</button>
+      </div>`;
+    const btn = document.getElementById('sweep');
+    if (btn) btn.onclick = async () => {
+      try {
+        await wallet.connect(state.chain);
+        await wallet.ensureChain(state.chain);
+        const signer = await wallet.signer();
+        const store = contract(state.chain, 'airdrop', ADDR.airdrop, signer);
+        const note = txNotice(state.chain, 'Sweep');
+        const tx = await store.sweep(id, { gasLimit: 300_000n });
+        note.sent(tx.hash);
+        await tx.wait();
+        note.ok('Remainder taken.');
+        setTimeout(() => location.reload(), 1200);
+        return;
+      } catch (e) {
+        const msg = humanizeTxError(e, state.chain);
+        toast(String(msg).slice(0, 140), 'bad');
+      }
+    };
+  }
+
+  /**
+   * ⚠ 监听器挂在 **document** 上（事件委托），不是在模块顶层去 `getElementById` ——
+   * 那两个元素是 `paintBody()` 之后才存在的，模块求值时拿到的是 null，
+   * 抛在顶层：页面照常画出来，但"选文件"永远没反应（第一次就是这么坏的，
+   * 而巡检只报一条 exception，页面看起来是好的）。
+   */
+  document.addEventListener('change', async (ev) => {
+    const el = ev.target;
+    if (!el || !el.id) return;
+    if (el.id === 'file') {
+      const f = el.files?.[0];
+      if (f) await loadText(await f.text());
+    } else if (el.id === 'paste' && el.value.trim()) {
+      await loadText(el.value);
+    }
+  });
+</script>
+</body>
+</html>

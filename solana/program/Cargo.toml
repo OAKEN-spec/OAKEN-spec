@@ -1,0 +1,32 @@
+[package]
+name = "oaken-lock"
+version = "0.1.0"
+edition = "2021"
+description = "Oaken Lock — token locks on Solana, no owner, no upgrade"
+
+# ⚠ 程序产物不是这个 crate 在宿主机上编出来的二进制（那是给单元测试用的），
+#   而是 `cargo build-sbf` 交给 SBF 工具链编的 —— 所以依赖只有 solana-program
+#   一个：SPL Token / ATA / System 的那几条指令我们自己手写字节（见 src/spl.rs），
+#   和 EVM 那边"不用 OpenZeppelin"是同一条理由：读者不该顺着 import 图去追信任链。
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "oaken_lock"
+
+[dependencies]
+# 只有这一个依赖：SPL Token / ATA / System 的指令字节我们自己拼（src/spl.rs）——
+# 和 EVM 那边不用 OpenZeppelin 同一条理由，也省掉一整套 crate 图。
+solana-program = "2"
+
+[features]
+default = []
+no-entrypoint = []
+
+# 测试用的依赖（不进程序产物）：`cargo test-sbf` 在进程内的 bank 里跑**真的 SBF 字节码**，
+# 不需要 solana-test-validator —— 而后者在这台 Windows 上起不来（它要建符号链接，
+# 那需要开发者模式或管理员权限，报的是 1314「客户端没有所需的特权」）。
+[dev-dependencies]
+solana-program-test = "2"
+solana-sdk = "2"
+solana-account = "2"
+spl-token = { version = "7", features = ["no-entrypoint"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

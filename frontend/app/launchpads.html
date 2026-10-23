@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launchpad · OAKEN</title>
+<meta name="description" content="Token sales on the chains we can see — what is live, what it has raised, and how it ends.">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/chest.webp"><source src="/app/media/chest.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Launchpad</div>
+    <h1 class="reveal">Every sale, one page each.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <p class="muted" style="max-width:64ch">What is open right now, what has been raised, and when it
+      closes. Every row links to a page that puts the whole raise in one place — target, cap, schedule, and where
+      the proceeds are supposed to go.</p>
+
+    <div class="stats reveal" style="margin-top:34px">
+      <div><div class="v" id="s-live">—</div><div class="k">Live now</div></div>
+      <div><div class="v" id="s-raised">—</div><div class="k">Raised · last 24h</div></div>
+      <div><div class="v" id="s-total">—</div><div class="k">Sales listed</div></div>
+      <div><div class="v" id="s-chains">—</div><div class="k">Chains</div></div>
+    </div>
+
+    <div class="controls">
+      <div class="tabs" id="tabs">
+        <a href="#" data-filter="" class="on">All</a>
+        <a href="#" data-filter="live">Live</a>
+        <a href="#" data-filter="upcoming">Upcoming</a>
+        <a href="#" data-filter="ended">Ended</a>
+      </div>
+      <span class="pill" id="count">—</span>
+      <input class="i" id="q" type="search" placeholder="Search name, symbol or address" aria-label="Search sales">
+      <select class="i" id="chain" aria-label="Chain"><option value="0">All chains</option></select>
+      <select class="i" id="sort" aria-label="Sort">
+        <option value="">Newest first</option>
+        <option value="raised">Most raised</option>
+        <option value="speed">Funding speed</option>
+        <option value="ending">Ending soon</option>
+      </select>
+    </div>
+
+    <div class="pad-grid" id="grid"><div class="card"><div class="skel-bar" style="width:58%;margin:4px 0 12px"></div><div class="skel-bar" style="width:76%;margin:4px 0"></div><div class="skel-bar" style="width:44%;margin:12px 0 0"></div></div></div>
+    <div class="pager hide" id="pager"></div>
+    <div class="hint" id="note" style="margin-top:18px"></div>
+  </section>
+</main>
+
+<script type="module">
+  import { shell, reveal, safeRead, showReadFail, emptyState , onChainSwitch} from '/app/oaken.js';
+  import {
+    allPools, selectPools, chainOf, CHAINS, HOME_CHAIN, details, esc, amount, usd,
+    hardCapOf, softCapOf, raisedOf, raisedUsd, pctOf, statusPill, statusOf, chainChip, monogram,
+    poolHref, when, day, prices, liveNow,
+  } from '/app/explore.js';
+
+  shell({ active: 'launchpad' });
+
+    /* 2026-10-16：这一页的数据**不是按钱包那条链渲染的**（跨链读 / 由 URL 决定）——
+       钱包换链不改变这里的任何一块。登记一个空的处理器 = 换链时不整页重载（不白闪），
+       结果和以前重载完一模一样。没登记的页面仍走整页重载，见 oaken.js 的 onChainSwitch。 */
+    onChainSwitch(() => { /* 见上 */ });
+  const PER_PAGE = 12;
+  const state = { filter: '', q: '', chain: 0, sort: '', page: 1, prices: null, rows: [] };
+
+  // 筛选条件写进 URL —— 一屏筛好的列表可以直接分享/后退（锁页那套也是这么做的）
+  const readUrl = () => {
+    const p = new URLSearchParams(location.search);
+    state.filter = p.get('filter') || '';
+    state.q = p.get('q') || '';
+    state.chain = Number(p.get('chain')) || 0;
+    state.sort = p.get('sort') || '';
+    state.page = Math.max(Number(p.get('page')) || 1, 1);
+  };
+  const writeUrl = () => {
+    const p = new URLSearchParams();
+    if (state.filter) p.set('filter', state.filter);
+    if (state.q) p.set('q', state.q);
+    if (state.chain) p.set('chain', String(state.chain));
+    if (state.sort) p.set('sort', state.sort);
+    if (state.page > 1) p.set('page', String(state.page));
+    const qs = p.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
+  };
+
+  function card(row) {
+    const meta = chainOf(row.chainId);
+    const d = details(row.pool);
+    const dp = Number(row.currency?.decimals ?? meta.dp);
+    const cap = hardCapOf(row.pool);
+    const soft = softCapOf(row.pool);
+    const pct = pctOf(row.pool);
+    const usdRaised = raisedUsd(row, state.prices);
+    const st = statusOf(row.pool);
+    const tail = st === 'upcoming' ? `opens ${when(row.pool.startTime)}`
+      : st === 'live' ? `ends ${when(row.pool.endTime)}`
+      : `ended ${day(row.pool.endTime)}`;
+    return `<a class="fcard reveal" href="${poolHref(row)}">
+      <div class="top">
+        <span class="tile">${esc(monogram(row.token?.symbol))}</span>
+        <div class="nm"><b>${esc(row.token?.name || row.token?.symbol || 'Token')}</b>
+          <span>${esc(row.token?.symbol || '')} · ${esc(meta.name)}</span></div>
+        ${statusPill(row.pool)}
+      </div>
+      <div class="desc">${esc(d.h || 'No description was published with this sale.')}</div>
+      <div>
+        ${cap ? `<div class="bar"><i class="${pct !== null && pct >= 100 ? 'ok' : ''}" style="width:${Math.max(0, Math.min(100, pct ?? 0)).toFixed(1)}%"></i></div>` : ''}
+        <div class="raise">
+          <span><b>${esc(amount(raisedOf(row.pool), dp))} ${esc(row.currency?.symbol || meta.native)}</b> raised${usdRaised !== null ? ` · ${usd(usdRaised)}` : ''}</span>
+          <span>${cap ? `${esc(amount(cap, dp))} hard cap · ${pct.toFixed(1)}%`
+            : soft ? `soft cap ${esc(amount(soft, dp))} · no hard cap` : 'no cap published'}</span>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="muted" style="font-size:12.5px">${esc(tail)}</span>
+        <span class="muted" style="font-size:12.5px">View →</span>
+      </div>
+    </a>`;
+  }
+
+  function paint() {
+    const rows = selectPools(state.rows, { filterBy: state.filter, chainId: state.chain, sortBy: state.sort, q: state.q, prices: state.prices });
+    const pages = Math.max(Math.ceil(rows.length / PER_PAGE), 1);
+    if (state.page > pages) state.page = pages;
+    const slice = rows.slice((state.page - 1) * PER_PAGE, state.page * PER_PAGE);
+
+    document.getElementById('count').textContent = `${rows.length} sale${rows.length === 1 ? '' : 's'}`;
+    /* 两种"空"是两件事，文案也一样要分开（清单第 7 条要的空状态带行动按钮）：
+       · 快照里本来就一条都没有 → 请你自己开一盘；
+       · 筛出来是空的 → 清掉筛选就有，别给人一个死胡同。 */
+    const noFilters = !state.filter && !state.q && !state.chain;
+    document.getElementById('grid').innerHTML = slice.length
+      ? slice.map(card).join('')
+      : (state.rows.length === 0
+        ? '<div class="card" style="grid-column:1/-1">' + emptyState({
+            title: 'No sales in this build’s listing.',
+            body: 'The launchpad listing ships as a build-time snapshot. Start one on our own factory and it shows up here once this build is rebuilt.',
+            actions: [{ label: 'Create a sale', href: '/tools/presale', primary: true },
+                      { label: 'Launch a token', href: '/launch' }],
+          }) + '</div>'
+        : '<div class="card" style="grid-column:1/-1"><h3>Nothing matches those filters.</h3>'
+          + '<p>Try another chain or clear the search box.</p>'
+          + (noFilters ? '' : '<p style="margin-top:12px"><button class="btn btn-s" type="button" id="clearfilters">Clear the filters</button></p>')
+          + '</div>');
+    const cf = document.getElementById('clearfilters');
+    if (cf) cf.onclick = () => {
+      state.filter = ''; state.q = ''; state.chain = 0; state.sort = ''; state.page = 1;
+      document.getElementById('q').value = '';
+      document.getElementById('chain').value = '0';
+      document.getElementById('sort').value = '';
+      for (const a of document.querySelectorAll('#tabs a')) a.classList.toggle('on', a.dataset.filter === '');
+      writeUrl(); paint();
+    };
+
+    const pager = document.getElementById('pager');
+    pager.classList.toggle('hide', pages <= 1);
+    pager.innerHTML = `<button data-page="${state.page - 1}" ${state.page <= 1 ? 'disabled' : ''}>← Prev</button>
+      <span>Page ${state.page} of ${pages}</span>
+      <button data-page="${state.page + 1}" ${state.page >= pages ? 'disabled' : ''}>Next →</button>`;
+    for (const b of pager.querySelectorAll('button')) {
+      b.onclick = () => { state.page = Number(b.dataset.page); writeUrl(); paint(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    }
+    // ⚠ 卡是**后插进来的**，shell() 那次 reveal() 扫不到它们 —— 不补这一下，
+    //   整页卡片永远停在 opacity:0（"看起来像站点坏了"的那种空白）。
+    reveal();
+  }
+
+  (async () => {
+    readUrl();
+
+    // 「24h 募集」用源站快照的计数器（口径包含我们不列的链，页脚注里写明）；
+    // 「live」**必须**和下面列表同一口径现算 —— 第一版直接显示源站的 presalesLive=15，
+    // 而同一页的 Live 标签是 12（差的三条在 Solana/TON 上，我们不列），同一屏两个数字打架。
+    liveNow().then((l) => {
+      if (!l) return;
+      document.getElementById('s-raised').textContent = l.raisedRecently ? usd(l.raisedRecently.totalUsd) : '—';
+    });
+
+    /**
+     * 读快照。**一次读、一次重试、一处失败 UI**（清单第 7 条：不许停在 "Reading the snapshot"）。
+     * 这是我们自己的接口（不是链），所以超时给短一点（8 秒）—— 它就在构建产物里。
+     */
+    const load = async () => {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '<div class="card"><div class="skel-bar" style="width:58%;margin:4px 0 12px"></div><div class="skel-bar" style="width:76%;margin:4px 0"></div></div>';
+      try {
+        const [rows, p] = await Promise.all([
+          safeRead(() => allPools(), { timeout: 8000, retries: 1, label: 'sale listing' }),
+          prices(),
+        ]);
+        state.rows = rows;
+        state.prices = p;
+        document.getElementById('s-total').textContent = String(rows.length);
+        document.getElementById('s-chains').textContent = String(new Set(rows.map((r) => r.chainId)).size);
+        document.getElementById('s-live').textContent = String(rows.filter((r) => statusOf(r.pool) === 'live').length);
+
+        const sel = document.getElementById('chain');
+        sel.innerHTML = '<option value="0">All chains</option>';   // 重试要能重来，别把选项叠两遍
+        for (const id of [...new Set(rows.map((r) => r.chainId))].sort((a, b) => a - b)) {
+          const m = CHAINS[id];
+          if (!m) continue;
+          const o = document.createElement('option');
+          o.value = String(id);
+          o.textContent = m.name + (id === HOME_CHAIN ? ' · ours' : '');
+          sel.appendChild(o);
+        }
+
+        // 控件 ↔ 状态
+        document.getElementById('q').value = state.q;
+        document.getElementById('chain').value = String(state.chain);
+        document.getElementById('sort').value = state.sort;
+        for (const a of document.querySelectorAll('#tabs a')) a.classList.toggle('on', a.dataset.filter === state.filter);
+        for (const a of document.querySelectorAll('#tabs a')) {
+          a.onclick = (e) => { e.preventDefault(); state.filter = a.dataset.filter; state.page = 1; writeUrl(); paint();
+            for (const o of document.querySelectorAll('#tabs a')) o.classList.toggle('on', o === a); };
+        }
+        let t = null;
+        document.getElementById('q').oninput = (e) => {
+          clearTimeout(t);
+          t = setTimeout(() => { state.q = e.target.value; state.page = 1; writeUrl(); paint(); }, 120);
+        };
+        document.getElementById('chain').onchange = (e) => { state.chain = Number(e.target.value); state.page = 1; writeUrl(); paint(); };
+        document.getElementById('sort').onchange = (e) => { state.sort = e.target.value; state.page = 1; writeUrl(); paint(); };
+
+        paint();
+        document.getElementById('note').textContent =
+          'The listing is the snapshot that ships with this build — it does not poll the source. '
+          + '"Live", "upcoming" and "ending" are computed against your clock every time the page loads, '
+          + 'so a sale that closed overnight reads as ended without anything being rebuilt. '
+          + '"Raised · last 24h" is the captured counter and covers every chain the source lists, including the ones this site does not.';
+      } catch (e) {
+        grid.innerHTML = '<div class="card" style="grid-column:1/-1" id="snapfail"></div>';
+        showReadFail(document.getElementById('snapfail'), {
+          what: 'the sale listing',
+          detail: (e && e.message) || '',
+          onRetry: () => load(),
+        });
+        document.getElementById('count').textContent = '—';
+      }
+    };
+    await load();
+  })();
+</script>
+</body>
+</html>

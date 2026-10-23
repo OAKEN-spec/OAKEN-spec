@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lock a position · OAKEN</title>
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below — '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead slim">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/chain.webp"><source src="/app/media/chain-head.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:44px" id="root">
+    <div class="muted">Reading the chain…</div>
+  </section>
+</main>
+<!-- defer：不让 514 KB 的 ethers 挡住首屏；顺序仍在我们自己的模块之前（模块默认 deferred） -->
+<script src="/app/vendor/ethers.umd.min.js" defer></script>
+<script type="module">
+  import { shell, wallet, chainBySlug, currentChain, positionLock, positionManagerOf, labelText, provider, chainNow,
+    fmtDate, short, explorerHref, toast, humanizeTxError, safeRead, txNotice, POSITION_MANAGERS, showReadFail, onWallet , onChainSwitch} from '/app/oaken.js';
+  import { icon } from '/app/icons.js';
+  shell();
+
+    /* 同记录页：链来自 URL（/locks/<链>/position[/<id>]），钱包换链不影响这一页。 */
+    onChainSwitch(() => { /* 什么都不用做（见上） */ });
+  const root = document.getElementById('root');
+  // 两种 URL：末段是 position 的建一把；末段带一个 id 的看那一把
+  // （写成 `/locks/…/position/<id>` 会被 _cjk-visible 当成 HTML 文本节点，见那个扫描器的正则）
+  const m = /^\/locks\/([^/]+)\/position(?:\/([^/]+))?\/?$/.exec(location.pathname);
+  const idFromUrl = m && m[2];
+  const $ = (x) => document.getElementById(x);
+
+  (async () => {
+    const chain = (await chainBySlug(m && m[1])) || (await currentChain());
+    if (!chain) { root.innerHTML = '<div class="eyebrow">Position</div><h2 class="sec">Could not load the chain list.</h2>'; return; }
+    if (idFromUrl) load(idFromUrl, chain); else form(chain);
+  })();
+
+  const kv = (rows) => '<dl class="kv">' + rows.map(([k, v]) => '<dt>' + k + '</dt><dd>' + v + '</dd>').join('') + '</dl>';
+  const addrLink = (a, chain) => {
+    const u = explorerHref('/address/' + a, chain);
+    return u ? '<a class="mono" style="font-size:12px" target="_blank" rel="noopener" href="' + u + '">' + short(a) + '</a>'
+             : '<span class="mono" style="font-size:12px">' + short(a) + '</span>';
+  };
+
+  /* ── 建一把：把一个已有的 V3/V4 仓位 NFT 锁进来 ────────────────────────── */
+  async function form(chain) {
+    document.title = 'Lock a position · OAKEN';
+    const known = positionManagerOf(chain);
+    let next = null;
+    try { next = Number(await positionLock(chain).nextLockId()); } catch { /* 读不到就不显示号 */ }
+    root.innerHTML = `
+      <div class="eyebrow">Position lock · ${chain.name}</div>
+      <h2 class="sec">Lock a liquidity position.</h2>
+      <p class="muted" style="margin-top:12px;max-width:68ch">Known position managers — Uniswap V3 and V4 on the chains we support, plus forks we have verified — are recognised by address; anything else can still be locked, but the page will say it is not a known manager, because the strength of that lock is the NFT's own transfer rules.</p>
+      <p class="muted" style="margin-top:12px;max-width:68ch">A Uniswap V3 or V4 position is an <b>NFT</b>, so it is locked here rather than in the token vault — the vault holds ERC-20s (a V2 pair is one, which is why it lives there). Same promise either way: once it is in, the liquidity cannot move before the date.</p>
+      <p class="muted" style="margin-top:12px;max-width:68ch"><b>Which protocols and chains we have verified:</b>
+        ${Object.keys(POSITION_MANAGERS).map((id) => '<b>' + ({ 4663: 'Robinhood Chain', 56: 'BNB Chain', 137: 'Polygon', 8453: 'Base' }[id] || ('chain ' + id))
+          + '</b> (Uniswap V4 position manager <span class="mono">' + short(POSITION_MANAGERS[id]) + '</span>)').join(' · ')}.
+        Any other ERC-721 position manager can still be used — paste its address and the page will say whether it is one we verified.</p>
+      <div class="warnbox"><b>A locked position cannot be withdrawn early.</b> Not by you, not by us, not by anyone — the NFT belongs to the lock contract until the date you set. That is the whole point of it, and it means the date has to be one you are sure about. There is no cancel button, on this site or anywhere else.</div>
+
+      <div class="flow" style="margin-top:26px">
+        <div class="panel">
+          <div class="head"><h3>Details</h3><span class="muted" style="margin-left:auto;font-size:12.5px">${next ? 'next lock #' + next : ''}</span></div>
+          <div class="body">
+            <label class="f" for="nft">Position manager (the ERC-721 contract)</label>
+            <input class="i" id="nft" value="${known || ''}" placeholder="0x… Uniswap V3/V4 position manager" autocomplete="off">
+            <div class="hint">${known ? 'Prefilled with the V4 position manager <b>we verified on this chain</b> (name, poolManager and permit2 all checked on chain).' : 'Paste the position manager address for this chain.'}</div>
+            <!-- The page promised to say whether this is a manager we verified, so check the registry rather than guessing. -->
+            <div class="hint" id="nfthint"></div>
+
+            <label class="f" for="tokenid">Position id</label>
+            <input class="i" id="tokenid" placeholder="e.g. 3739755" inputmode="numeric" autocomplete="off">
+            <div class="hint" id="poshint">The NFT id from the position manager.</div>
+            <!-- After a wallet connects, list the positions it holds on this chain; users should not have to copy an id from elsewhere. -->
+            <div id="mylist" class="hint" style="margin-top:6px"></div>
+
+            <label class="f" for="unlock">Unlocks</label>
+            <input class="i" id="unlock" type="datetime-local">
+            <div class="hint">Yours to release at or after this moment. Before it, nobody moves it — not us, not you.</div>
+
+            <div class="panel" style="margin-top:18px;background:transparent">
+              <div class="head" style="padding-left:0;padding-right:0"><h3 style="font-size:15px">Optional</h3></div>
+              <div class="body" style="padding-left:0;padding-right:0">
+                <label class="f" for="benef">Beneficiary</label>
+                <input class="i" id="benef" placeholder="0x… — defaults to your own address" autocomplete="off">
+                <label class="f" for="label">Label (31 bytes on chain)</label>
+                <input class="i" id="label" placeholder="Ex: V4 OAK/ETH" maxlength="31" autocomplete="off">
+              </div>
+            </div>
+            <div class="err hide" id="err"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="summary">
+            <div class="eyebrow" style="margin-bottom:12px">Before you sign</div>
+            <div id="sumtext" class="muted">Fill the form — the summary appears here.</div>
+            <div class="hint" id="sumline2" style="margin-top:12px"></div>
+          </div>
+          <div style="display:grid;gap:10px;margin-top:16px">
+            <button class="btn btn-p" id="go" style="width:100%">Lock the position</button>
+            <div class="hint" id="steps"></div>
+          </div>
+          <div class="hint" style="margin-top:12px">Locking is <b>two signatures</b>: an approval so the lock contract may hold the NFT, then the lock itself. After that the position belongs to the contract until the date.</div>
+        </div>
+      </div>`;
+
+    /* 日期校验按**链上的 now**：设备时钟慢几天时，一个"本地未来"的日期在链上可能已经是过去。 */
+    let nowSec = null;
+    chainNow(chain).then((t) => { nowSec = t; paint(); }).catch(() => { /* 读不到就退回设备时钟 */ });
+    const paint = () => {
+      const nft = $('nft').value.trim(), id = $('tokenid').value.trim();
+      const d = $('unlock').value ? new Date($('unlock').value) : null;
+      const ok = /^0x[0-9a-fA-F]{40}$/.test(nft) && /^\d+$/.test(id) && d && d.getTime() > (nowSec ? nowSec * 1000 : Date.now()) + 60_000;
+      $('go').disabled = !ok;
+      $('sumtext').className = ok ? '' : 'muted';
+      $('sumtext').innerHTML = ok
+        ? 'You are locking position <b>#' + id + '</b> until <b>' + d.toISOString().replace('T', ' ').slice(0, 16) + ' UTC</b>.'
+        : 'Fill the form — the summary appears here.';
+      $('sumline2').textContent = ok ? 'Two signatures: approve, then lock. Nobody can move it before the date.' : '';
+    };
+
+    let t = null;
+    $('tokenid').addEventListener('input', () => {
+      clearTimeout(t);
+      t = setTimeout(async () => {
+        const nft = $('nft').value.trim(), id = $('tokenid').value.trim();
+        paint();
+        if (!/^0x[0-9a-fA-F]{40}$/.test(nft) || !/^\d+$/.test(id)) { $('poshint').textContent = 'The NFT id from the position manager.'; return; }
+        $('poshint').textContent = 'Reading the position…';
+        try {
+          const c = new window.ethers.Contract(nft, ['function ownerOf(uint256) view returns (address)', 'function symbol() view returns (string)'], provider(chain));
+          const [owner, sym] = await Promise.all([c.ownerOf(id), c.symbol().catch(() => '')]);
+          $('poshint').innerHTML = 'Held by <span class="mono">' + short(owner) + '</span>' + (sym ? ' · ' + sym : '') + '.';
+        } catch {
+          $('poshint').innerHTML = '<span class="warnline">No such position on that contract.</span>';
+        }
+      }, 400);
+    });
+    for (const el of ['nft', 'unlock', 'benef', 'label']) $(el).addEventListener('input', paint);
+    /** 输入的管理器地址是不是**我们在这条链上验证过的**那个 —— 如实说，不吹也不吓。 */
+    const paintNftKnown = () => {
+      const el = $('nfthint');
+      if (!el) return;
+      const v = $('nft').value.trim();
+      const known = positionManagerOf(chain);
+      if (!/^0x[0-9a-fA-F]{40}$/.test(v)) { el.innerHTML = ''; return; }
+      el.innerHTML = (known && v.toLowerCase() === known.toLowerCase())
+        ? '<span class="pill ok">verified manager</span> — the manager we verified on ' + chain.name
+          + '. The lock will recognise it, and the record page can name the position.'
+        : "<span class='warnline'>Not a manager we have verified on this chain.</span> You can still lock it — the lock is only as strong as the NFT transfer rules, and the record page will say we cannot vouch for the collection."
+    };
+    $('nft').addEventListener('input', paintNftKnown);
+    paintNftKnown();
+    paint();
+
+    /**
+     * **自动找你手上的仓位**（清单第五节的第 1 条）。
+     *
+     * 判据用的是 ERC-721 Enumerable 的那一对标准函数（`balanceOf` + `tokenOfOwnerByIndex`）——
+     * Uniswap V3 的 NonfungiblePositionManager 是可枚举的，我们 4663 上验过的 V4 PositionManager 也是。
+     * 不支持枚举的管理器会在这里回 null，页面照常让人手填 id —— **不假装"你没有仓位"**
+     * （那正是 [[fallback-that-looks-like-real-data]] 那一族）。
+     */
+    const ERC721_ENUM = [
+      'function balanceOf(address) view returns (uint256)',
+      'function tokenOfOwnerByIndex(address,uint256) view returns (uint256)',
+    ];
+    async function refreshMine(addrFromEvent, fromEvent = false) {
+      const host = $('mylist');
+      if (!host) return;
+      const mgr = positionManagerOf(chain);
+      /* ⚠ 事件回调里**不回查** `wallet.accounts()`：真钱包授权那一刻、假钱包每次
+         `eth_accounts` 之后都会补发 accountsChanged，回查就是自己喂自己（一圈圈跑，
+         控制台一条错都没有）。事件给了地址就用它。 */
+      const acct = fromEvent ? (addrFromEvent || null) : ((await wallet.accounts())[0] || null);
+      if (!mgr || !acct) { host.textContent = ''; return; }
+      host.textContent = 'Looking for positions you hold…';
+      try {
+        const c = new window.ethers.Contract(mgr, ERC721_ENUM, provider(chain));
+        const n = Number(await safeRead(() => c.balanceOf(acct), { chain, timeout: 10_000, retries: 1 }));
+        if (!n) { host.textContent = 'You hold no position on the verified manager (' + short(mgr) + ') on ' + chain.name + '.'; return; }
+        const ids = [];
+        const upto = Math.min(n, 25);
+        for (let i = 0; i < upto; i++) {
+          try { ids.push(String(await c.tokenOfOwnerByIndex(acct, i))); } catch { break; }
+        }
+        host.innerHTML = 'You hold <b>' + n + '</b> position' + (n === 1 ? '' : 's') + ' on '
+          + short(mgr) + ': ' + ids.map((id) =>
+            '<button class="copybtn" type="button" data-pick="' + id + '" style="margin-right:8px">#' + id + ' — use this</button>').join('')
+          + (n > upto ? ' <span class="muted">(showing the first ' + upto + ')</span>' : '');
+        for (const b of host.querySelectorAll('[data-pick]')) {
+          b.onclick = () => { $('tokenid').value = b.dataset.pick; $('tokenid').dispatchEvent(new Event('input', { bubbles: true })); };
+        }
+      } catch {
+        /* 不可枚举的管理器 / 这次读不到 —— 说清楚，并告诉用户手填那条路仍然可用 */
+        host.innerHTML = '<span class="warnline">Could not list your positions automatically on this manager</span> '
+          + '(it may not enumerate its tokens, or the read did not answer). Paste the id above — it works the same way.';
+      }
+    }
+    refreshMine();
+    onWallet('accounts', (a) => refreshMine(a, true));
+
+    $('go').onclick = async () => {
+      const nft = $('nft').value.trim(), id = $('tokenid').value.trim();
+      const d = new Date($('unlock').value);
+      const benef = $('benef').value.trim();
+      const errs = [];
+      if (!/^0x[0-9a-fA-F]{40}$/.test(nft)) errs.push('That is not a position manager address.');
+      if (!/^\d+$/.test(id)) errs.push('That is not a position id.');
+      if (!(d.getTime() > (nowSec ? nowSec * 1000 : Date.now()) + 60_000)) errs.push('Pick an unlock time in the future.');
+      if (benef && !/^0x[0-9a-fA-F]{40}$/.test(benef)) errs.push('The beneficiary is not an address.');
+      if (errs.length) { $('err').classList.remove('hide'); $('err').textContent = errs[0]; toast(errs[0], 'bad'); return; }
+      let note = null;      // ⚠ 声明在 try **外面**：失败了要由它把那条通知收场
+      try {
+        $('steps').textContent = 'Confirm in your wallet…';
+        await wallet.connect(); await wallet.ensureChain(chain);
+        const me = (await wallet.accounts())[0];
+        const signer = await wallet.signer();
+        const pl = positionLock(chain, signer);
+        const plAddr = await pl.getAddress();
+
+        // ① 合约只认"它自己拥有"的仓位 —— 先授权，锁的时候它会 transferFrom 过去
+        const erc721 = new window.ethers.Contract(nft, ['function approve(address,uint256)', 'function getApproved(uint256) view returns (address)'], signer);
+        if (String(await erc721.getApproved(id)).toLowerCase() !== plAddr.toLowerCase()) {
+          $('steps').textContent = 'Step 1 of 2 — approving the position…';
+          note = txNotice(chain, 'Position approval');
+          const t1 = await erc721.approve(plAddr, id, { gasLimit: 200_000n });
+          note.sent(t1.hash);
+          await t1.wait();
+          note.ok('Approval confirmed — one more signature.');
+        }
+        $('steps').textContent = 'Step 2 of 2 — the lock itself…';
+        const lockNote = txNotice(chain, 'Position lock');
+        note = lockNote;
+        const tx = await pl.lockPosition({
+          nft, tokenId: id, beneficiary: benef || me,
+          unlockTime: Math.floor(d.getTime() / 1000), revocable: false,
+          label: window.ethers.encodeBytes32String(($('label').value.trim() || 'Position').slice(0, 31)),
+        }, { gasLimit: 1_000_000n });
+        lockNote.sent(tx.hash);
+        await tx.wait();
+        const n = String(Number(await positionLock(chain).nextLockId()) - 1);
+        lockNote.ok('Position locked as #' + n + '.', [{ label: 'Open it →', href: '/locks/' + chain.slug + '/position/' + n }]);
+        location.href = '/locks/' + chain.slug + '/position/' + n;
+      } catch (e) {
+        const msg = humanizeTxError(e, chain);
+        $('err').classList.remove('hide'); $('err').textContent = msg;
+        $('steps').textContent = '';
+        if (note) note.fail(msg); else toast(msg.slice(0, 120), 'bad');
+      }
+    };
+  }
+
+  /* ── 看一把 ─────────────────────────────────────────────────────────── */
+  async function load(id, chain) {
+    document.title = 'Position lock #' + id + ' · OAKEN';
+    const pl = positionLock(chain);
+    let l;
+    try { l = await safeRead(() => pl.getLock(id), { chain, timeout: 10_000, retries: 1, label: 'position lock' }); }
+    catch (e) {
+      /* 读不到 ≠ 不存在：给统一那句 + **重试**（清单通用第 1 条），别让用户以为这把锁没了。 */
+      root.innerHTML = '<div class="eyebrow">Position</div><h2 class="sec">Could not read position lock #' + id + '.</h2>'
+        + '<p class="muted" style="margin-top:12px">This page reads ' + chain.name + ' directly; it does not fall back to a cached copy.</p>'
+        + '<div id="posfail" style="margin-top:16px;max-width:52ch"></div>';
+      showReadFail(document.getElementById('posfail'), {
+        what: 'position lock #' + id,
+        detail: (e && e.message) || '',
+        chain,
+        onRetry: () => load(id, chain),
+      });
+      return;
+    }
+    if (String(l.nft) === window.ethers.ZeroAddress || Number(l.unlockTime) === 0) {
+      root.innerHTML = '<div class="eyebrow">Position</div><h2 class="sec">There is no position lock #' + id + ' on ' + chain.name + '.</h2>'
+        + '<p class="muted" style="margin-top:12px"><a href="/locks/' + chain.slug + '/position">Lock a position →</a></p>';
+      return;
+    }
+    /* 用链上的"现在"判断能不能释放 —— 设备时钟慢几天时 Release 会一直是灰的。 */
+    let now = Math.floor(Date.now() / 1000);
+    try { now = await chainNow(chain); } catch { /* 读不到就退回设备时钟 */ }
+    const released = l.released;
+    const due = Number(l.unlockTime) <= now;
+    const [acct] = await wallet.accounts();
+    const me = String(acct || '').toLowerCase();
+    const isBenef = me && me === String(l.beneficiary).toLowerCase();
+    let owner = null;
+    try { owner = await new window.ethers.Contract(l.nft, ['function ownerOf(uint256) view returns (address)'], provider(chain)).ownerOf(l.tokenId); } catch { /* 读不到就显示 — */ }
+    const label = labelText(l.label);
+
+    root.innerHTML = `
+      <div class="eyebrow">Position lock · read live from ${chain.name}</div>
+      <div class="head-grid">
+        <div class="ring"><svg viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(240,228,208,.10)" stroke-width="9"/>
+          <circle cx="60" cy="60" r="52" fill="none" stroke="#D9A343" stroke-width="9" stroke-linecap="round"
+                  stroke-dasharray="${(2 * Math.PI * 52).toFixed(1)}" stroke-dashoffset="0"
+                  style="opacity:${released || due ? 1 : 0.25}"/>
+        </svg><div class="mid"><b>${released ? '100%' : due ? 'due' : 'locked'}</b><span>${released ? 'released' : due ? 'can release' : fmtDate(l.unlockTime).slice(0, 10)}</span></div></div>
+        <div>
+          <h2 class="sec">Position <span class="mono">#${l.tokenId}</span>${label ? ' <span class="muted" style="font-size:16px">· ' + label + '</span>' : ''}</h2>
+          <p class="muted" style="margin-top:10px">${released
+            ? 'The position has been released back to the beneficiary — this lock is finished.'
+            : 'Liquidity held by the lock contract. It cannot move before ' + fmtDate(l.unlockTime) + '.'}</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+            <span class="pill ${released || due ? 'ok' : 'lock'}">${released ? 'released' : due ? 'unlockable now' : 'locked until ' + fmtDate(l.unlockTime)}</span>
+            <span class="pill">${chain.name}</span>
+            ${isBenef ? '<span class="pill ok">you are the beneficiary</span>' : ''}
+          </div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="panel">
+          <div class="head"><h3>The position</h3></div>
+          <div class="body">
+            ${kv([
+              ['Position manager', addrLink(l.nft, chain)],
+              ['Position id', '<span class="mono">' + String(l.tokenId) + '</span>'],
+              ['Held by', owner ? '<span class="mono" style="font-size:13px">' + owner + '</span>' : '—'],
+            ])}
+          </div>
+        </div>
+        <div class="panel">
+          <div class="head"><h3>The lock</h3></div>
+          <div class="body">
+            ${kv([
+              ['Beneficiary', '<span class="mono" style="font-size:13px">' + l.beneficiary + '</span>'],
+              ['Creator', '<span class="mono" style="font-size:13px">' + short(l.creator) + '</span>'],
+              ['Locked on', fmtDate(l.createdAt)],
+              ['Unlocks', fmtDate(l.unlockTime)],
+              ['Contract', addrLink(await pl.getAddress(), chain)],
+            ])}
+            <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+              <button class="btn btn-p" id="release" ${released || !due || !isBenef ? 'disabled' : ''}>${icon('unlock', 16)}Release</button>
+            </div>
+            <div class="hint" id="actnote">${released ? 'Already released.'
+              : due ? (isBenef ? 'Release sends the position back to you.' : 'Only the beneficiary can release — connect that wallet.')
+                    : 'Release opens at ' + fmtDate(l.unlockTime) + '.'}</div>
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('release').onclick = async () => {
+      try {
+        await wallet.connect(); await wallet.ensureChain(chain);
+        toast('Sending the release…');
+        const tx = await positionLock(chain, await wallet.signer()).release(id, { gasLimit: 400_000n });
+        await tx.wait();
+        toast('Released.');
+        load(id, chain);
+      } catch (e) { toast(humanizeTxError(e, chain).slice(0, 130), 'bad'); }
+    };
+  }
+</script>
+</body>
+</html>

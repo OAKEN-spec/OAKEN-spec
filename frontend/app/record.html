@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lock record · OAKEN</title>
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below — '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+<style>
+  .head-grid { display: grid; grid-template-columns: auto 1fr; gap: 34px; align-items: center; }
+  .sched td { font-variant-numeric: tabular-nums; }
+  .sched tr.now td { background: rgba(217,163,67,.07); }
+  .sched .mk { color: var(--gold); }
+  .sched .mk.out { color: rgba(240,228,208,.28); }
+  .warnline { color: #e0a85f; }
+  .okline { color: var(--ok, #6fbf73); }
+  #actstatus:empty { display: none; }
+  @media (max-width: 940px) { .head-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead slim">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/key.webp"><source src="/app/media/key.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:44px" id="root">
+    <div class="empty" style="padding:26px">
+      <div class="empty-ic"><img src="/oaken/ic-oaken.svg" alt=""></div>
+      <b>Reading from the chain…</b>
+      <p class="muted">Every number on this page is an eth_call, not a database row.</p>
+    </div>
+  </section>
+</main>
+<!-- defer：不让 514 KB 的 ethers 挡住首屏；顺序仍在我们自己的模块之前（模块默认 deferred） -->
+<script src="/app/vendor/ethers.umd.min.js" defer></script>
+<script type="module">
+  import { shell, readLock, countdown, fmtAmount, fmtDate, short, explorerHref, ADAPTER, wallet, adapter, toast, reveal,
+    chainBySlug, currentChain, onWallet, humanizeTxError, erc20, storedTitle, copyBtn, copy,
+    safeRead, showReadFail, txNotice , onChainSwitch} from '/app/oaken.js';
+  import { icon } from '/app/icons.js';
+  shell();
+
+    /* 这一页读哪条链是 **URL 说了算**（/locks/<链>/record/<id>），钱包在哪条链都不影响它。
+       空的处理器 = 换链时不重载、页面照旧 —— 和以前重载完的结果一模一样，只是不闪那一下。 */
+    onChainSwitch(() => { /* 什么都不用做（见上） */ });
+  const m = /^\/locks\/([^/]+)\/record\/([^/]+)\/?$/.exec(location.pathname);
+  const id = m && m[2];
+  const root = document.getElementById('root');
+  let activeChain = null;   // 解析出来的链；重画时用它，别把 null 传回 load()
+
+  /**
+   * 链从 URL 那一段来（`/locks/bsc/record/7`）；认不出来就**跟着钱包走** ——
+   * 这就是"自动识别"：钱包在 BSC 上，`/locks/whatever/record/7` 读的就是 BSC。
+   */
+  (async () => {
+    if (!id) {
+      root.innerHTML = '<div class="eyebrow">Record</div><h2 class="sec">No lock id in this URL.</h2>';
+      return;
+    }
+    const chain = (await chainBySlug(m[1])) || (await currentChain());
+    if (!chain) {
+      root.innerHTML = '<div class="eyebrow">Record</div><h2 class="sec">Could not load the chain list.</h2>'
+        + '<p class="muted" style="margin-top:12px">This page needs `/api/chains` to know which chain to read. Refresh once.</p>';
+      return;
+    }
+    activeChain = chain;
+    document.title = 'Lock #' + id + ' · OAKEN';
+    load(id, chain);
+  })();
+
+  const ring = (pct, big, small) => `
+    <div class="ring">
+      <svg viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(240,228,208,.10)" stroke-width="9"/>
+        <circle class="prog" cx="60" cy="60" r="52" fill="none" stroke="url(#g)" stroke-width="9" stroke-linecap="round"
+                stroke-dasharray="${(2 * Math.PI * 52).toFixed(1)}" stroke-dashoffset="${((1 - pct) * 2 * Math.PI * 52).toFixed(1)}"
+                style="--c:${(2 * Math.PI * 52).toFixed(1)};--off:${((1 - pct) * 2 * Math.PI * 52).toFixed(1)}"/>
+        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#e8b85c"/><stop offset="100%" stop-color="#a06a1f"/>
+        </linearGradient></defs>
+      </svg>
+      <div class="mid"><b>${big}</b><span>${small}</span></div>
+    </div>`;
+
+  /**
+   * A stepped lock drawn as one ring per release: gold = already released,
+   * dashed amber = the next one, grey = still locked. Each ring carries a
+   * native <title> so hovering tells you its date and slice without JS.
+   * Rings are capped at 24 for legibility; the table below still lists 48.
+   */
+  const ringCalendar = (l, now) => {
+    const rows = scheduleRows(l, now);
+    const shown = rows.slice(0, 24);
+    const released = rows.filter((r) => r.released).length;
+    const next = rows.find((r) => !r.released) || null;
+    const n = shown.length;
+    const outer = 56, inner = 9;
+    const step = n > 1 ? (outer - inner) / (n - 1) : 0;
+    const sw = Math.max(0.9, Math.min(2.0, 120 / (n * 2.4)));
+    const rings = shown.map((r, i) => {
+      const rad = n > 1 ? outer - i * step : outer;
+      const cls = r.released ? 'done' : (next && r.i === next.i ? 'next' : 'track');
+      const label = `${r.i === 0 ? 'TGE' : 'Step ' + r.i} · ${fmtDate(r.at)} · +${r.give.toFixed(2)}%`;
+      return `<circle class="${cls}" cx="60" cy="60" r="${rad.toFixed(2)}" stroke-width="${sw.toFixed(2)}"><title>${label}</title></circle>`;
+    }).join('');
+    const center = `${released}/${rows.length}`;
+    const sub = next ? 'next ' + fmtDate(next.at).slice(0, 10) : 'fully released';
+    return `<div class="ring-cal"><svg viewBox="0 0 120 120">
+      <defs><linearGradient id="ringGoldCal" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#e8b85c"/><stop offset="100%" stop-color="#a06a1f"/>
+      </linearGradient></defs>
+      <circle class="track" cx="60" cy="60" r="57" stroke-width=".6" opacity=".45"/>
+      ${rings}
+    </svg><div class="mid"><b>${center}</b><span>${sub}</span></div></div>`;
+  };
+
+  /**
+   * 一档一行：日期 / 这一档释放多少 / 累计释放多少。
+   *
+   * 数字**全部来自合约自己报的参数**：`tgeBps` 与 `steps` 来自金库的 `getLock`
+   * （精确），`cycleBps = floor((10000 - tgeBps) / steps)` 正是金库自己分档用的
+   * `stepSize` —— 两边同一个除式，所以在每一档的边界上完全一致，不是把 vesting
+   * 曲线在 JS 里重算一遍（重算出来的图和合约不一致，正是 vault 注释里点名要避免的）。
+   *
+   * 最后一档落在 `endTime` 上：金库在那里**整额**释放（`timestamp >= endTime` 直接
+   * 返回 amount），所以末尾那一行写 100%，即使前面几档Reload with bps 加起来差几个基点。
+   *
+   * 档位可能很多（上限 9999），所以超过 48 档只列前 48 档 + 一句"还有 N 档"。
+   */
+  function scheduleRows(l, now) {
+    const rows = [];
+    const stepSecs = l.cycleDays * 86400;
+    const cum = (i) => (i >= l.steps ? 100 : (l.tgeBps + i * l.cycleBps) / 100);
+    for (let i = 0; i <= l.steps; i++) {
+      const at = l.firstRelease + i * stepSecs;
+      // 第 0 档（TGE）从零算起 —— 拿 cum(-1) 当上一档会把它算成"减掉一档"
+      const prev = i === 0 ? 0 : cum(i - 1);
+      rows.push({ i, at, pct: cum(i), give: cum(i) - prev, released: at <= now });
+    }
+    return rows;
+  }
+
+  function schedulePanel(l, now) {
+    if (!l.steps) return '';
+    const rows = scheduleRows(l, now);
+    const shown = rows.slice(0, 48);
+    const nextIdx = rows.findIndex((r) => !r.released);
+    const body = shown.map((r) => {
+      const cur = r.i === nextIdx;
+      return '<tr class="' + (cur ? 'now' : '') + '">'
+        + '<td class="mono muted">' + (r.i === 0 ? 'TGE' : String(r.i).padStart(2, '0')) + '</td>'
+        + '<td>' + fmtDate(r.at) + (cur ? ' <span class="pill lock">next</span>' : '') + '</td>'
+        + '<td class="mono">' + (r.i === 0 ? '+' : '+') + r.give.toFixed(2) + '%</td>'
+        + '<td class="mono muted">' + r.pct.toFixed(2) + '% cumulative</td>'
+        + '<td style="text-align:right"><span class="mk' + (r.released ? '' : ' out') + '">' + (r.released ? '●' : '○') + '</span></td>'
+        + '</tr>';
+    }).join('');
+    const more = rows.length > shown.length
+      ? '<div class="hint">…and ' + (rows.length - shown.length) + ' more steps, up to ' + fmtDate(l.endTime) + '.</div>'
+      : '';
+    return '<div class="panel reveal" style="margin-top:22px">'
+      + '<div class="head"><h3>Schedule</h3><span class="hint" style="margin-left:auto">'
+      + l.steps + ' steps · every ' + l.cycleDays + ' day' + (l.cycleDays === 1 ? '' : 's')
+      + (l.exact ? ' · read from the vault' : ' · derived') + '</span></div>'
+      + '<div class="body" style="padding-top:6px">'
+      + '<table class="list sched"><thead><tr><th>Step</th><th>Date (UTC)</th><th>Releases</th><th>Cumulative</th><th></th></tr></thead>'
+      + '<tbody>' + body + '</tbody></table>'
+      + '<div class="hint" style="margin-top:12px">TGE is the first release; each later step lands exactly '
+      + l.cycleDays + ' day' + (l.cycleDays === 1 ? '' : 's') + ' after the one before it. '
+      + 'The contract releases a step on its date, never before it — the last one is '
+      + fmtDate(l.endTime) + ', and the record stops accruing there.</div>'
+      + more
+      + '</div></div>';
+  }
+
+  /**
+   * 每次 load() 领一个**世代号**，回来时号变了就把这次结果丢掉。
+   *
+   * 为什么需要：动作里 `wallet.connect()` 会触发 accountsChanged → 监听器又跑一次
+   * load()，那一次的重画**落在"Claimed so far"那句提示之后**，把它擦掉 —— 用户看到的是
+   * "点完领取，提示一闪就没了"，而链上其实已经领好。（2026-10-12 真链走一遍时发现。）
+   */
+  let loadGen = 0;
+  async function load(lockId, chain) {
+    const gen = ++loadGen;
+    let l;
+    try { l = await safeRead(() => readLock(lockId, chain), { chain, timeout: 12_000, retries: 1, label: 'Lock' }); }
+    catch (e) {
+      /* 读不到 ≠ 这把锁不存在（清单通用第 1 条）：给统一那句 + 重试，别让用户以为锁没了。 */
+      root.innerHTML = `<div class="eyebrow">Record</div><h2 class="sec">Could not read lock #${lockId} from the chain.</h2>
+        <p class="muted" style="margin-top:12px">This page reads ${chain.name} directly — it does not fall back to a cached copy, on purpose.</p>
+        <div id="recfail" style="margin-top:16px;max-width:52ch"></div>`;
+      showReadFail(document.getElementById('recfail'), {
+        what: `lock #${lockId} on ${chain.name}`,
+        detail: (e && e.message) || '',
+        chain,
+        onRetry: () => load(lockId, chain),
+      });
+      return;
+    }
+    const now = Math.floor(Date.now() / 1000);
+    /**
+     * 进度按**排期终点**算，不按第一次释放算。
+     *
+     * 适配器把 `startTime` / `cliffTime` 都写成 TGE 日（一次性解锁时三者相等），
+     * 所以拿 `unlock - lockDate` 当总长度，一次性锁得到 0、分档锁一过 TGE 就直接 100%。
+     * 长度只能是 `endTime - firstRelease`：分档是 `steps × cycle`，一次性是 0。
+     */
+    const total = Math.max(1, l.endTime - l.firstRelease);
+    const pct = Math.min(1, Math.max(0, (now - l.firstRelease) / total));
+    const claimable = l.withdrawable;
+
+    // 下一次释放：分档锁是"下一个还没到的档"，一次性锁就是那个日期
+    let nextAt = null;
+    if (l.steps) {
+      const stepSecs = l.cycleDays * 86400;
+      for (let i = 1; i <= l.steps; i++) {
+        const at = l.firstRelease + i * stepSecs;
+        if (at > now) { nextAt = at; break; }
+      }
+    } else if (l.firstRelease > now) nextAt = l.firstRelease;
+    const c = countdown(nextAt ?? l.firstRelease);
+    const done = l.endTime <= now;
+
+    /**
+     * 按钮下面那句话要说的是"**现在**能不能领、不能领的话什么时候能"——
+     * 一个灰着的 Claim 不解释原因，用户只能猜是不是页面坏了。
+     */
+    const claimLine = claimable > 0n
+      ? 'Claimable now: ' + fmtAmount(claimable, l.decimals) + ' ' + l.symbol + ' — Claim sends it to the owner.'
+      : l.renounced
+        ? 'Renounced: the tokens stay in the vault for good and nobody can ever claim them.'
+        : done
+          ? 'Everything has been released and claimed — nothing left in the vault.'
+          : 'Nothing is claimable yet: the next release is ' + fmtDate(nextAt) + ', and the contract pays nothing before that date.';
+    /**
+     * 「领过」这个标签要分清**领了一部分**和**领干净了**。
+     * 只判"claimed 非零"的话，一把已经全额领完的锁会一直挂着 "partly claimed"。
+     */
+    const claimedNote = (x) => {
+      try {
+        const c = BigInt(x.claimed), a = BigInt(x.amount);
+        if (c <= 0n) return '';
+        return c >= a ? '<span class="pill ok">fully claimed</span>' : '<span class="pill">partly claimed</span>';
+      } catch { return ''; }
+    };
+    const [acct] = await wallet.accounts();
+    const isOwner = !!acct && String(acct).toLowerCase() === String(l.owner).toLowerCase();
+    // 放弃过的锁合约会拒所有编辑（LockRenounced）—— 那两颗按钮就别摆出来了
+    const ownerEditable = isOwner && !l.renounced;
+    const ex = (p) => explorerHref(p, chain);
+
+    /**
+     * ⚠ 标签是「Schedule starts」不是「Locked on」：它读的是 vault 的 startTime，而
+     * 适配器把一次性解锁的锁建成 `start = cliff = end = 解锁日`（PinkLock 的原语义）——
+     * 那个字段是**排期起点**，不是上锁时刻。链上没有"上锁时间"这个字段，就别在页面上声称有。
+     *
+     * ⚠ 解释性文字**必须放在模板字符串外面**（2026-10-12）：它以前写在下面的
+     * `root.innerHTML = …` 里面、还用反引号包了字段名 —— 反引号就是模板字符串的
+     * 终止符，整个脚本解析到那里就断了：页面永远停在 "正在读取链上数据…"，
+     * 而 HTTP 还是 200。**HTML 注释里带反引号 = 炸掉整个内联脚本。**
+     */
+    if (gen !== loadGen) return;   // 已经有更新的一次 load 在跑，这次的结果作废
+    const readAt = new Date();
+    root.innerHTML = `
+      <div class="eyebrow">Lock record · read live from ${chain.name}</div>
+      <div class="head-grid ark-rings">
+        ${l.steps ? ringCalendar(l, now) : ring(pct, done ? '100%' : Math.round(pct * 100) + '%', done ? 'released' : c.text)}
+        <div>
+          <h2 class="sec">${l.symbol} lock <span class="mono">#${l.id}</span></h2>
+          <p class="muted" style="margin-top:10px">${l.description && l.description !== '{}' ? l.description : 'No title was set for this lock.'}</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
+            <button class="btn btn-s" id="sharelock" type="button">Share this lock</button>
+            <span class="pill ${c.done ? 'ok' : 'lock'}">${done ? 'Fully released ' + fmtDate(l.endTime)
+              : (l.steps ? 'Next release ' + fmtDate(nextAt) : 'Locked until ' + fmtDate(l.firstRelease))}</span>
+            ${l.steps ? `<span class="pill">${l.steps} steps · every ${l.cycleDays} day${l.cycleDays === 1 ? '' : 's'}</span>`
+                      : '<span class="pill">single unlock</span>'}
+            ${l.tgeBps ? `<span class="pill">${l.tgeBps / 100}% at TGE</span>` : ''}
+            ${l.lp ? '<span class="pill">LP token</span>' : ''}
+            ${l.revocable === false ? '<span class="pill">irrevocable</span>'
+              : l.revocable === true ? '<span class="pill warn" style="color:#e0a85f;border-color:rgba(224,168,95,.45)">revocable by its creator</span>' : ''}
+            ${claimedNote(l)}
+            <span class="pill" title="Last read from the chain">read ${readAt.toISOString().slice(11, 19)} UTC</span>
+            <a class="btn btn-s" href="/verify" target="_blank" rel="noopener">Anyone can verify ↗</a>
+            <button class="btn btn-s" id="reread" type="button">Re-read</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="panel reveal">
+          <div class="head"><h3>Token</h3></div>
+          <div class="body">
+            <dl class="kv">
+              <dt>Token</dt><dd>${l.symbol} <a class="mono muted" style="font-size:12px" href="/locks/${chain.slug}/${l.token}">${short(l.token)}</a> ${copyBtn(l.token, 'copy CA')}</dd>
+              <dt>Amount locked</dt><dd>${fmtAmount(l.amount, l.decimals)} ${l.symbol}</dd>
+              <dt>Claimed so far</dt><dd>${fmtAmount(l.claimed, l.decimals)} ${l.symbol}</dd>
+              <dt>Claimable now</dt><dd style="color:${claimable > 0n ? 'var(--ok)' : 'inherit'}">${claimable === null ? '—' : fmtAmount(claimable, l.decimals) + ' ' + l.symbol}</dd>
+            </dl>
+          </div>
+        </div>
+        <div class="panel reveal">
+          <div class="head"><h3>Lock</h3></div>
+          <div class="body">
+            <dl class="kv">
+              <dt>Owner</dt><dd class="mono" style="font-size:13px">${l.owner}${isOwner ? ' <span class="pill ok">you</span>' : ''}</dd>
+              <dt>Chain</dt><dd>${chain.name} · ${chain.id}</dd>
+              <dt>Schedule starts</dt><dd>${fmtDate(l.lockDate)}</dd>
+              ${l.steps ? `<dt>First release</dt><dd>${fmtDate(l.firstRelease)}</dd>
+                          <dt>Fully released</dt><dd>${fmtDate(l.endTime)}</dd>`
+                        : `<dt>Unlocks</dt><dd>${fmtDate(l.firstRelease)}</dd>`}
+              <dt>Contract</dt><dd>${ex('/address/' + ADAPTER)
+                 ? `<a class="mono" style="font-size:12px" target="_blank" rel="noopener" href="${ex('/address/' + ADAPTER)}">${short(ADAPTER)}</a>`
+                 : `<span class="mono" style="font-size:12px">${short(ADAPTER)}</span>`} ${copyBtn(ADAPTER, 'copy')}
+                 <a href="https://sourcify.dev/#/lookup/${ADAPTER}" target="_blank" rel="noopener"
+                    style="font-size:12px;margin-left:6px">verify ↗</a>
+                 <span class="pill ok" title="exact match on Sourcify">source verified</span></dd>
+            </dl>
+            <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+              <button class="btn btn-p" id="claim" ${!(claimable > 0n) ? 'disabled' : ''}>${icon('unlock', 16)}Claim</button>
+              <button class="btn btn-s" id="xfer" ${isOwner ? '' : 'style="display:none"'}>${icon('arrow', 16)}Transfer</button>
+              <button class="btn btn-g" id="ren" ${isOwner ? '' : 'style="display:none"'}>Renounce</button>
+              <button class="btn btn-s" id="editbtn" ${ownerEditable ? '' : 'style="display:none"'}>Update Lock</button>
+              <button class="btn btn-s" id="titlebtn" ${ownerEditable ? '' : 'style="display:none"'}>Edit Title</button>
+            </div>
+            ${ownerEditable ? `
+            <div id="editpanel" class="hide" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+              <label class="f" for="editamount">New amount</label>
+              <input class="i" id="editamount" inputmode="decimal" autocomplete="off">
+              <div class="hint" id="editamtline"></div>
+              <label class="f" for="editdate" style="margin-top:10px">New unlock date (your local time)</label>
+              <input class="i" id="editdate" type="datetime-local">
+              <div class="hint">${l.steps
+                ? 'A stepped lock only slides its end — the start and the first release stay put.'
+                : 'The whole schedule follows this date.'}
+                Every change is written on-chain together with the old values, so anyone reading the lock can see it was changed.</div>
+              <button class="btn btn-p" id="editsubmit" style="width:100%;margin-top:12px">Update the lock</button>
+              <div class="hint" id="editstatus"></div>
+            </div>
+            <div id="titlepanel" class="hide" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+              <label class="f" for="edittitle">Lock title</label>
+              <input class="i" id="edittitle" maxlength="64" autocomplete="off">
+              <div class="hint" id="titlehint2">Up to 31 bytes on chain.</div>
+              <button class="btn btn-p" id="titlesubmit" style="width:100%;margin-top:12px">Save title</button>
+              <div class="hint" id="titlestatus"></div>
+            </div>` : ''}
+            <div class="hint" id="actstatus" style="margin-top:10px"></div>
+            <div class="hint" id="actnote">${claimLine} ${isOwner
+              ? 'The vault pays the owner and nobody else; anyone may pay the gas.'
+              : (acct ? 'You are not the owner, so Transfer and Renounce are not offered — the vault only listens to the owner.'
+                       : 'Connect the owner wallet to transfer or renounce.')}</div>
+          </div>
+        </div>
+      </div>
+      ${schedulePanel(l, now)}`;
+
+    reveal();   // ⚠ 内容刚插进来，得**再跑一次** —— shell() 里那次跑在这两块面板存在之前
+
+    const shareBtn = document.getElementById('sharelock');
+    if (shareBtn) shareBtn.onclick = async () => {
+      const url = location.href.split('?')[0];
+      const title = `${l.symbol} lock #${l.id} · OAKEN`;
+      try {
+        if (navigator.share) { await navigator.share({ title, url }); return; }
+      } catch { /* the user cancelled, or share is unavailable */ }
+      const ok = await copy(url);
+      toast(ok ? 'Link copied' : 'Copy failed — the URL is ' + url, ok ? 'ok' : 'bad');
+    };
+    const reread = document.getElementById('reread');
+    if (reread) reread.onclick = () => load(lockId, chain);
+
+    /**
+     * 动作执行器：**每一步都写在按钮下面**，不是只在角落里飘一条会消失的 toast。
+     *
+     * 等钱包确认 → 已发出（**这一刻就有 tx 链接了**）→ 等上块 → 已确认。
+     * 失败就把那一步 + 人话留在原地（`humanizeTxError`），toast 只是顺带。
+     * 元素每次现查：load() 会把整块 DOM 重画一遍，攥着旧节点就是往空气里写字。
+     */
+    const act = (msg, kind, hash) => {
+      const el = document.getElementById('actstatus');
+      if (!el) return;
+      el.className = 'hint ' + (kind === 'bad' ? 'warnline' : kind === 'ok' ? 'okline' : '');
+      el.innerHTML = msg + (hash && ex('/tx/' + hash)
+        ? ' <a href="' + ex('/tx/' + hash) + '" target="_blank" rel="noopener">tx ↗</a>' : '');
+    };
+    let lastHash = null;
+    async function runAction(verb, call) {
+      let note = null;
+      try {
+        act('Confirm in your wallet…');
+        // 已经连着就不再 connect：那会多弹一次钱包，还会触发一次 accountsChanged 重画
+        if (!(await wallet.accounts())[0]) await wallet.connect();
+        await wallet.ensureChain(chain);
+        const a = adapter(chain, await wallet.signer());
+        /* 全局那条通知和这一行状态**同时存在**：用户切去钱包再回来时只看得到提示条。 */
+        note = txNotice(chain, verb);
+        const tx = await call(a);
+        lastHash = tx.hash;
+        note.sent(tx.hash);
+        act('Sent — waiting for the block…', null, tx.hash);
+        await tx.wait();
+        note.ok(verb + ' confirmed.');
+        act(verb + ' confirmed.', 'ok', tx.hash);
+        return true;
+      } catch (e) {
+        const msg = humanizeTxError(e, chain);
+        if (note) note.fail(msg);
+        act(msg, 'bad');
+        toast(msg.slice(0, 120), 'bad');
+        return false;
+      }
+    }
+
+    /* 领取 */
+    document.getElementById('claim').onclick = async () => {
+      if (!await runAction('Claim', (a) => a.unlock(l.id, { gasLimit: 600_000n }))) return;
+      await load(lockId, chain);
+      act('Claimed — the numbers above were just re-read from ' + chain.name + '.', 'ok', lastHash);
+    };
+
+    /* 转移所有权 */
+    document.getElementById('xfer').onclick = async () => {
+      const to = prompt('New owner address (the lock moves to them; the schedule does not change):');
+      if (!to) return;
+      if (!/^0x[0-9a-fA-F]{40}$/.test(to.trim())) { toast('That is not an address', 'bad'); return; }
+      if (!await runAction('Transfer', (a) => a.transferLockOwnership(l.id, to.trim(), { gasLimit: 300_000n }))) return;
+      await load(lockId, chain);
+      act('Ownership transferred to ' + short(to.trim()) + '.', 'ok', lastHash);
+    };
+
+    /** `datetime-local` 的值 = 本地时间的 YYYY-MM-DDTHH:mm。 */
+    const localDT = (sec) => {
+      const d = new Date(sec * 1000);
+      const p2 = (n) => String(n).padStart(2, '0');
+      return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + 'T' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+    };
+
+    /* 更新锁（PinkSale 的 Update Lock：改金额 + 改解锁日期 —— 合约两个方向都允许） */
+    const editbtn = document.getElementById('editbtn');
+    function amtLine() {
+      const el = document.getElementById('editamtline');
+      if (!el) return;
+      let n = null;
+      try { n = window.ethers.parseUnits(document.getElementById('editamount').value.trim() || '0', l.decimals); } catch { n = null; }
+      if (n === null || n <= 0n) { el.textContent = 'That is not an amount.'; el.className = 'hint warnline'; return; }
+      if (n > l.amount) {
+        el.textContent = 'You will send an extra ' + fmtAmount(n - l.amount, l.decimals) + ' ' + l.symbol
+          + ' from your wallet to the vault (approve first if the allowance is short).';
+        el.className = 'hint';
+      } else if (n < l.amount) {
+        if (n < l.claimed) {
+          el.textContent = 'Below what was already claimed (' + fmtAmount(l.claimed, l.decimals) + ' ' + l.symbol + ') — the vault will refuse.';
+          el.className = 'hint warnline';
+        } else {
+          el.textContent = fmtAmount(l.amount - n, l.decimals) + ' ' + l.symbol + ' goes back to the owner (' + short(l.owner) + '), not to this page.';
+          el.className = 'hint';
+        }
+      } else {
+        el.textContent = 'The amount stays as it is.';
+        el.className = 'hint';
+      }
+    }
+    if (editbtn) {
+      editbtn.onclick = () => {
+        const panel = document.getElementById('editpanel');
+        if (!panel) return;                      // 非 owner 时不渲染面板（按钮也是藏着的）
+        panel.classList.toggle('hide');
+        if (!panel.classList.contains('hide')) {
+          // ⚠ 预填要**纯小数串**：`fmtAmount()` 带千分位（1,000.0），那是给人看的，
+          //    喂回 parseUnits 会抛 —— 大额锁一打开就是 "That is not an amount"。
+          document.getElementById('editamount').value = window.ethers.formatUnits(l.amount, l.decimals);
+          document.getElementById('editdate').value = localDT(l.endTime);
+          document.getElementById('editstatus').textContent = '';
+          amtLine();
+        }
+      };
+      // ⚠ 面板只在 owner 且未放弃时才渲染 —— 这两处拿不到元素是**正常**的，
+      //    不加闸就是一条 "Cannot read properties of null" 的页面异常（每次加载都抛）。
+      const eaEl = document.getElementById('editamount');
+      if (eaEl) eaEl.addEventListener('input', amtLine);
+      const esEl = document.getElementById('editsubmit');
+      if (esEl) esEl.onclick = async () => {
+        const st = document.getElementById('editstatus');
+        let n = null;
+        try { n = window.ethers.parseUnits(document.getElementById('editamount').value.trim(), l.decimals); } catch { n = null; }
+        if (n === null || n <= 0n) { toast('The amount has to be a number above zero.', 'bad'); return; }
+        if (n < l.claimed) { toast('The amount cannot go below what was already claimed.', 'bad'); return; }
+        const dEl = document.getElementById('editdate');
+        if (!dEl.value) { toast('Pick the new unlock date.', 'bad'); return; }
+        const secs = Math.floor(new Date(dEl.value).getTime() / 1000);
+        if (!Number.isFinite(secs)) { toast('That date is not readable.', 'bad'); return; }
+        if (secs <= Math.floor(Date.now() / 1000)
+            && !confirm('That date is in the past — the whole lock becomes claimable right away. Continue?')) return;
+        // 金额变大时先批"差额"（精确额度），再更新 —— 两笔钱包确认，与创建页同一套规矩
+        if (n > l.amount) {
+          const delta = n - l.amount;
+          try {
+            const cur = await erc20(chain, l.token).allowance(l.owner, ADAPTER);
+            if (cur < delta) {
+              if (!(await wallet.accounts())[0]) await wallet.connect();
+              await wallet.ensureChain(chain);
+              st.textContent = 'Allowance is short — approving exactly the extra ' + fmtAmount(delta, l.decimals) + ' ' + l.symbol + '…';
+              const t = await erc20(chain, l.token, await wallet.signer()).approve(ADAPTER, delta, { gasLimit: 1_000_000n });
+              await t.wait();
+              st.textContent = 'Approved — now the update itself…';
+            }
+          } catch (e) {
+            const msg = humanizeTxError(e, chain);
+            st.textContent = msg; toast(msg.slice(0, 120), 'bad'); return;
+          }
+        }
+        if (!await runAction('Update', (a) => a.editLock(l.id, n, secs, { gasLimit: 1_500_000n }))) return;
+        await load(lockId, chain);
+        act('Updated — the page just re-read the lock from ' + chain.name + '.', 'ok', lastHash);
+        st.textContent = 'Updated.';
+      };
+    }
+
+    /* 改标题（PinkSale 的 Edit Lock Title）—— 链上只存 31 字节，超了如实说 */
+    const titlebtn = document.getElementById('titlebtn');
+    function titleLine() {
+      const el = document.getElementById('titlehint2');
+      if (!el) return;
+      const t = storedTitle(document.getElementById('edittitle').value);
+      el.className = t.truncated ? 'hint warnline' : 'hint';
+      el.textContent = t.truncated
+        ? 'On chain a title is 31 bytes — this one will be stored as "' + t.text + '".'
+        : 'Up to 31 bytes on chain; shown on this page and in listings.';
+    }
+    if (titlebtn) {
+      titlebtn.onclick = () => {
+        const panel = document.getElementById('titlepanel');
+        if (!panel) return;
+        panel.classList.toggle('hide');
+        if (!panel.classList.contains('hide')) {
+          document.getElementById('edittitle').value = (l.description && l.description !== '{}') ? l.description : '';
+          document.getElementById('titlestatus').textContent = '';
+          titleLine();
+        }
+      };
+      const etEl = document.getElementById('edittitle');
+      if (etEl) etEl.addEventListener('input', titleLine);
+      const tsEl = document.getElementById('titlesubmit');
+      if (tsEl) tsEl.onclick = async () => {
+        const st = document.getElementById('titlestatus');
+        const v = document.getElementById('edittitle').value.trim();
+        if (!await runAction('Edit Title', (a) => a.editLockDescription(l.id, v, { gasLimit: 300_000n }))) return;
+        await load(lockId, chain);
+        act('Title saved.', 'ok', lastHash);
+        st.textContent = 'Saved.';
+      };
+    }
+
+    /* 放弃（不可逆，二次确认） */
+    document.getElementById('ren').onclick = async () => {
+      if (!confirm('Renounce ownership? This is permanent: nobody will ever be able to claim or move this lock again.')) return;
+      if (!await runAction('Renounce', (a) => a.renounceLockOwnership(l.id, { gasLimit: 300_000n }))) return;
+      await load(lockId, chain);
+      act('Renounced — the tokens stay in the vault and nobody can ever claim them.', 'ok', lastHash);
+    };
+  }
+
+  /* 连上/换钱包之后，Owner 那一行和两个按钮要跟着变（"you" 标记、Transfer/Renounce 的可见性） */
+  let lastAcct = undefined;
+  if (id) onWallet('accounts', (a) => {
+    if (a === lastAcct) return;          // 同一个地址的重复广播（钱包常发）不必整页重来
+    lastAcct = a;
+    if (activeChain) load(id, activeChain);
+  });
+</script>
+</body>
+</html>

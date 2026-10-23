@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launches · OAKEN</title>
+<meta name="description" content="Every token launched through OAKEN — our own factory and every third-party route, on every chain.">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/chain.webp"><source src="/app/media/chain-head.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Launches</div>
+    <h1 class="reveal">Every token, every chain.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <p class="muted" style="max-width:66ch">Every token launched through OAKEN — our own factory or any of the
+      third-party routes — on every chain we support. This is OAKEN's own launch record, not a chain-wide
+      explorer. Each row links to the token page, where the balances and locks are read live from the chain.</p>
+
+    <div class="stats reveal" style="margin-top:34px">
+      <div><div class="v" id="s-total">—</div><div class="k">Launches recorded</div></div>
+      <div><div class="v" id="s-chains">—</div><div class="k">Chains</div></div>
+      <div><div class="v" id="s-routes">—</div><div class="k">Routes</div></div>
+      <div><div class="v" id="s-latest" style="font-size:20px">—</div><div class="k">Latest launch</div></div>
+    </div>
+
+    <div class="controls">
+      <div class="tabs" id="chaintabs"><a href="#" data-chain="all" class="on">All chains</a></div>
+      <select class="i" id="route" aria-label="Route"><option value="">All routes</option></select>
+      <span class="pill" id="count">—</span>
+      <button class="btn btn-s" type="button" id="refresh">Refresh</button>
+    </div>
+
+    <div class="panel reveal" style="margin-top:18px">
+      <div class="tablewrap">
+        <table class="list">
+          <thead><tr><th>Token</th><th>Chain</th><th>Route</th><th>Contract</th><th>Creator</th><th>Launched</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="errbox"></div>
+    <div class="pager" id="pager"></div>
+    <div class="hint" id="note" style="margin-top:16px">Third-party routes run their own market. The route column
+      says where a token was launched; it does not claim OAKEN runs that market. A launch can be recorded here
+      without a lock — locking is always a separate transaction. New launches can take a moment to appear;
+      the token page itself is live as soon as the transaction confirms.</div>
+  </section>
+</main>
+
+<script type="module">
+  import {
+    shell, chainIcon, copyBtn, short, emptyState, skeletonRows, showReadFail, onChainSwitch,
+  } from '/app/oaken.js';
+
+  shell({ active: 'launches' });
+
+  /* 这一页是跨链数据，钱包换链不改变任何一块 —— 登记空处理器，换链不整页重载。 */
+  onChainSwitch(() => {});
+
+  const META = {
+    4663: { name: 'Robinhood Chain', slug: 'robinhood', explorer: 'https://robinhoodchain.blockscout.com' },
+    56:   { name: 'BNB Chain',       slug: 'bsc',      explorer: 'https://bscscan.com' },
+    8453: { name: 'Base',            slug: 'base',     explorer: 'https://basescan.org' },
+    137:  { name: 'Polygon',         slug: 'polygon',  explorer: 'https://polygonscan.com' },
+    0:    { name: 'Solana',          slug: 'solana',   explorer: 'https://solscan.io' },
+  };
+  const CHAINS = [['all', 'All chains'], [4663, 'Robinhood'], [56, 'BNB'], [8453, 'Base'], [137, 'Polygon'], [0, 'Solana']];
+  const ROUTE_LIST = ['OAKEN factory', 'Pons', 'Genius', 'Flap', 'Clanker', 'four.meme', 'pump.fun', 'OAKEN Solana factory'];
+
+  const state = { rows: [], chain: 'all', route: '', page: 1, per: 20 };
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+  const dt = (ms) => {
+    const t = Number(ms);
+    if (!t || !Number.isFinite(t)) return '—';
+    return new Date(t).toLocaleString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short',
+    });
+  };
+  const chainOf = (id) => META[Number(id)] || { name: 'Chain ' + id, slug: '', explorer: '' };
+  const isSol = (r) => Number(r.chainId) === 0;
+
+  const readUrl = () => {
+    const p = new URLSearchParams(location.search);
+    const c = p.get('chain');
+    state.chain = c && (c === 'all' || c in META) ? c : 'all';
+    state.route = ROUTE_LIST.includes(p.get('route') || '') ? p.get('route') : '';
+    state.page = Math.max(1, Number(p.get('page')) || 1);
+  };
+  const writeUrl = () => {
+    const p = new URLSearchParams();
+    if (state.chain !== 'all') p.set('chain', state.chain);
+    if (state.route) p.set('route', state.route);
+    if (state.page > 1) p.set('page', String(state.page));
+    const qs = p.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
+  };
+
+  /* 筛选项 */
+  $('chaintabs').innerHTML = CHAINS.map(([id, label]) => {
+    const ico = id === 'all' ? '' : '<span class="chain-ico">' + chainIcon(id === 0 || id === '0' ? 'solana' : Number(id), 13) + '</span>';
+    return '<a href="#" data-chain="' + id + '" class="' + (String(state.chain) === String(id) ? 'on' : '') + '">' + ico + label + '</a>';
+  }).join('');
+  $('route').innerHTML = '<option value="">All routes</option>'
+    + ROUTE_LIST.map((r) => '<option value="' + esc(r) + '"' + (state.route === r ? ' selected' : '') + '>' + esc(r) + '</option>').join('');
+
+  const filtered = () => state.rows
+    .filter((r) => (state.chain === 'all' || String(r.chainId) === String(state.chain))
+      && (!state.route || r.route === state.route))
+    .sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0));
+
+  function paintStats() {
+    const all = state.rows;
+    $('s-total').textContent = all.length ? all.length.toLocaleString('en-US') : '0';
+    $('s-chains').textContent = all.length ? new Set(all.map((r) => Number(r.chainId))).size : '0';
+    $('s-routes').textContent = all.length ? new Set(all.map((r) => r.route)).size : '0';
+    const latest = all.slice().sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0))[0];
+    $('s-latest').textContent = latest ? dt(latest.at) : '—';
+  }
+
+  function rowHtml(r) {
+    const m = chainOf(r.chainId);
+    const sol = isSol(r);
+    const href = sol ? 'https://solscan.io/token/' + encodeURIComponent(r.token) : '/locks/' + m.slug + '/' + r.token;
+    const tx = r.txHash
+      ? (sol ? 'https://solscan.io/tx/' + encodeURIComponent(r.txHash) : m.explorer + '/tx/' + r.txHash)
+      : null;
+    const symbol = r.symbol || r.name || short(r.token, 4);
+    const name = r.name && r.name !== symbol ? '<div class="muted" style="font-size:12.5px">' + esc(r.name) + '</div>' : '';
+    const art = r.image
+      ? '<img src="' + esc(r.image) + '" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">'
+      : '<img src="/oaken/ic-oaken.svg" alt="" style="width:20px;height:20px">';
+    const artAttr = r.image ? '' : ' data-art="1" data-chain="' + Number(r.chainId) + '" data-token="' + esc(r.token) + '"';
+    return '<tr>'
+      + '<td><div style="display:flex;gap:11px;align-items:center;min-width:190px">'
+      +   '<span' + artAttr + ' style="display:inline-flex;width:36px;height:36px;flex:none;border-radius:10px;overflow:hidden;'
+      +   'border:1px solid var(--line-gold);background:rgba(217,163,67,.08);align-items:center;justify-content:center">' + art + '</span>'
+      +   '<div><a href="' + href + '"' + (sol ? ' target="_blank" rel="noopener"' : '') + '><b>' + esc(symbol) + '</b></a>' + name + '</div>'
+      + '</div></td>'
+      + '<td><span class="pill">' + chainIcon(sol ? 'solana' : Number(r.chainId), 13) + ' ' + esc(m.name) + '</span></td>'
+      + '<td><span class="pill">' + esc(r.route) + '</span></td>'
+      + '<td class="mono" style="font-size:13px">' + short(r.token, 5) + ' ' + copyBtn(r.token) + '</td>'
+      + '<td class="mono muted" style="font-size:12.5px">' + (r.creator ? short(r.creator) : '—') + '</td>'
+      + '<td style="font-size:13px;white-space:nowrap">' + dt(r.at) + '</td>'
+      + '<td style="text-align:right;white-space:nowrap">'
+      +   (sol ? '<a href="' + href + '" target="_blank" rel="noopener">Solscan ↗</a>' : '<a href="' + href + '">token →</a>')
+      +   (tx ? ' <a class="mono" style="font-size:12px" href="' + tx + '" target="_blank" rel="noopener">tx ↗</a>' : '')
+      + '</td></tr>';
+  }
+
+  function paint() {
+    paintStats();
+    const list = filtered();
+    $('count').textContent = list.length + (list.length === 1 ? ' launch' : ' launches');
+
+    if (!state.rows.length) {
+      $('rows').innerHTML = '<tr><td colspan="7" style="padding:22px 16px">' + emptyState({
+        title: 'No launches recorded yet.',
+        body: 'Launch a token through OAKEN — on any chain — and it will appear here.',
+        actions: [{ label: 'Launch a token', href: '/launch', primary: true }],
+      }) + '</td></tr>';
+      $('pager').innerHTML = '';
+      return;
+    }
+    if (!list.length) {
+      $('rows').innerHTML = '<tr><td colspan="7" style="padding:22px 16px">' + emptyState({
+        title: 'No launches match this filter.',
+        body: 'Try another chain or route.',
+        actions: [{ label: 'Clear filters', href: '/launches' }],
+      }) + '</td></tr>';
+      $('pager').innerHTML = '';
+      return;
+    }
+
+    const pages = Math.max(1, Math.ceil(list.length / state.per));
+    if (state.page > pages) state.page = pages;
+    const start = (state.page - 1) * state.per;
+    const pageRows = list.slice(start, start + state.per);
+    $('rows').innerHTML = pageRows.map(rowHtml).join('');
+    $('pager').innerHTML = '<button type="button" data-page="' + (state.page - 1) + '"' + (state.page <= 1 ? ' disabled' : '') + '>← Prev</button>'
+      + '<span>Page ' + state.page + ' of ' + pages + '</span>'
+      + '<button type="button" data-page="' + (state.page + 1) + '"' + (state.page >= pages ? ' disabled' : '') + '>Next →</button>';
+
+    /* 没带图的记录：再问一次「链+代币 → 图」那张表（自有工厂/第三方上传的图会在这里）。 */
+    for (const el of $('rows').querySelectorAll('[data-art]')) {
+      const chain = el.dataset.chain;
+      const token = el.dataset.token;
+      if (Number(chain) === 0) continue;
+      fetch('/api/token-image/' + chain + '/' + token)
+        .then((r) => r.json())
+        .then((j) => {
+          if (!j || !j.url) return;
+          const img = el.querySelector('img');
+          if (!img) return;
+          img.src = j.url;
+          img.style.width = '100%';
+          img.style.height = '100%';
+          img.style.objectFit = 'cover';
+        })
+        .catch(() => {});
+    }
+  }
+
+  async function load() {
+    $('refresh').disabled = true;
+    $('rows').innerHTML = skeletonRows(7, 5);
+    $('pager').innerHTML = '';
+    $('errbox').innerHTML = '';
+    $('count').textContent = '—';
+    try {
+      const r = await fetch('/api/launches', { signal: AbortSignal.timeout(10000) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      state.rows = Array.isArray(j.launches) ? j.launches : [];
+      paint();
+    } catch (e) {
+      $('rows').innerHTML = '';
+      $('count').textContent = '—';
+      showReadFail($('errbox'), {
+        what: 'the launch record',
+        detail: String((e && e.message) || e),
+        onRetry: () => load(),
+      });
+    } finally {
+      $('refresh').disabled = false;
+    }
+  }
+
+  $('refresh').addEventListener('click', () => load());
+
+  $('chaintabs').addEventListener('click', (ev) => {
+    const a = ev.target.closest('[data-chain]');
+    if (!a) return;
+    ev.preventDefault();
+    state.chain = a.dataset.chain;
+    state.page = 1;
+    $('chaintabs').querySelectorAll('a').forEach((x) => x.classList.toggle('on', x === a));
+    writeUrl();
+    paint();
+  });
+  $('route').addEventListener('change', () => {
+    state.route = $('route').value;
+    state.page = 1;
+    writeUrl();
+    paint();
+  });
+  $('pager').addEventListener('click', (ev) => {
+    const b = ev.target.closest('button[data-page]');
+    if (!b || b.disabled) return;
+    state.page = Math.max(1, Number(b.dataset.page) || 1);
+    writeUrl();
+    paint();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  readUrl();
+  $('chaintabs').querySelectorAll('a').forEach((x) => x.classList.toggle('on', String(state.chain) === String(x.dataset.chain)));
+  $('route').value = state.route;
+  load();
+</script>
+</body>
+</html>

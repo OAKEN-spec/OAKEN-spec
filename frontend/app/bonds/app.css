@@ -1,0 +1,303 @@
+@font-face{font-family:'Bonds Sans';src:url('/bonds/fonts/manrope.ttf') format('truetype');font-display:swap}
+@font-face{font-family:'Bonds Mono';src:url('/bonds/fonts/jetbrains-mono.ttf') format('truetype');font-display:swap}
+/* /app/ —— 申赎界面。
+ *
+ * ⚠️ 这一页**不引站上的 Next CSS**（它的哈希每次抓站都变，而且那是给营销页写的
+ * 全局样式）。字体由构建那一步从站上现取 @font-face 注进来（见 build.js），
+ * 颜色令牌是**从站点自己的字节里量出来的**（#EAB93E 出现 57 次、#070707 17 次…），
+ * 不是目测的。
+ */
+
+:root {
+  --accent: #EAB93E;
+  --ink: #070707;
+  --ink-soft: #141414;
+  --muted: #4A4A4A;
+  --line: #D1D1D1;
+  --panel: #F2F2F2;
+  --white: #FFFFFF;
+  --mono: 'Bonds Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+
+/* ⚠️ **这一行是必需的，不是洁癖。**
+ * `hidden` 属性靠的是 UA 样式表里的 `[hidden]{display:none}`，而**作者样式表里
+ * 任何一条 `display`（比如下面 `.grid{display:grid}`、`.stats{display:grid}`）
+ * 都压得过它** —— 于是 `el.hidden = true` 在这些块上**完全没有视觉效果**。
+ *
+ * 症状（2026-10-11 抓到，而且从第一版起就存在）:没钱包的访客看到的是
+ * **满满一页"所有按钮都在、所有数字都是 —"** 的界面 —— 看起来像坏了，
+ * 而 JS 那边的 `hidden` 属性**设得完全正确**。
+ * 所以 `app-e2e.js` 里那些 `!document.getElementById('panels').hidden` 一直是绿的:
+ * 它们读的是**属性**，不是渲染出来的样子。
+ * 教训和 [[precondition-is-not-effect]] 同族:判据要看**效果**（`getComputedStyle`），
+ * 别看你设置的那个状态变量。 */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--white);
+  color: var(--ink);
+  font-family: 'Bonds Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono { font-family: var(--mono); letter-spacing: .12em; }
+
+/* ── 顶栏 ────────────────────────────────────────────────────────────── */
+.bar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 18px 32px;
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  font-weight: 500; letter-spacing: .18em; font-size: 15px;
+  color: var(--ink); text-decoration: none;
+}
+.tag {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+  color: var(--muted); text-transform: uppercase;
+}
+.spacer { flex: 1; }
+.net {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .12em; color: var(--muted);
+}
+.net.bad { color: #B42318; }
+
+/* 手机上的顶栏（2026-10-14 加）:原先一行挤四样东西 ——
+ * 实测 390px 下 "no wallet found" 被压成 **43px 宽、折三行**（no / wallet / found），
+ * "Connect wallet" 也折两行，既不美观也不像有意为之。
+ * 现在:状态挪到**单独一行**（order:1 + basis 100%），按钮留在第一行、不折行。
+ * ⚠️ 只动 CSS，不动 DOM —— 这页的 DOM 是手写的，但水合判据（app-e2e 那群）
+ * 读的是结构和文案，改结构会连带一串。 */
+@media (max-width: 600px) {
+  .bar { flex-wrap: wrap; padding: 14px 16px; gap: 10px; }
+  .tag { display: none; }
+  .net { order: 1; flex-basis: 100%; font-size: 9px; white-space: nowrap; }
+  .btn { white-space: nowrap; }
+}
+
+/* ── 按钮 ────────────────────────────────────────────────────────────── */
+.btn {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
+  padding: 10px 18px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--ink); background: var(--ink); color: var(--white);
+  transition: background .2s ease, border-color .2s ease, opacity .2s ease;
+}
+.btn:hover:not(:disabled) { background: var(--ink-soft); }
+.btn:disabled { opacity: .38; cursor: not-allowed; }
+.btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn.ghost:hover:not(:disabled) { border-color: var(--ink); background: transparent; }
+.btn.wide { width: 100%; margin-top: 18px; }
+
+/* ── 主体 ────────────────────────────────────────────────────────────── */
+main { max-width: 920px; margin: 0 auto; padding: 48px 32px 96px; }
+
+.lede { font-size: 17px; line-height: 1.6; color: var(--muted); margin: 0 0 32px; max-width: 620px; }
+.lede b { color: var(--ink); font-weight: 500; }
+
+.notice {
+  border: 1px solid var(--accent); background: rgba(234,185,62,.10);
+  border-radius: 12px; padding: 14px 18px; margin-bottom: 24px;
+  font-size: 14px; line-height: 1.55;
+}
+.notice b { font-weight: 500; }
+
+/* ── 债券选择 ────────────────────────────────────────────────────────── */
+.pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
+.pill {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+  padding: 9px 16px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line); background: transparent; color: var(--muted);
+}
+.pill[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--white); }
+
+/* ── 两张卡 ──────────────────────────────────────────────────────────── */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+
+.card {
+  border: 1px solid var(--line); border-radius: 16px; padding: 26px 24px 24px;
+  /* 切角 —— 站点自己的语言（AeonPad 那套），用 clip-path 而不是图片 */
+  clip-path: polygon(0 14px, 14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+}
+.card h2 { font-size: 11px; font-weight: 400; color: var(--muted); margin: 0 0 20px; }
+.lbl { display: block; font-size: 10px; color: var(--muted); margin-bottom: 8px; }
+
+.row { display: flex; gap: 8px; align-items: center; }
+input {
+  flex: 1; width: 100%; min-width: 0;
+  font-family: var(--mono); font-size: 20px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+  color: var(--ink); outline: none;
+}
+input:focus { border-color: var(--ink); background: var(--white); }
+
+.out { font-size: 15px; color: var(--muted); margin: 16px 0 0; min-height: 22px; }
+.out b { color: var(--ink); font-weight: 500; font-family: var(--mono); }
+.muted { color: var(--muted); font-size: 13px; }
+
+/* ── 状态条 ──────────────────────────────────────────────────────────── */
+/* ⚠️ 这里的线**不能**再用"gap:1px + 容器底色"那个画法（2026-10-14 改）:
+ * 格子数排不满最后一行时，空出来的格子露出的是**容器底色**——
+ * 一条灰块，看起来像"少了一个数"。实测 390px 下第 6 格、800px 下第 2 行 3 格都是灰的。
+ * 现在:容器底色 = 白（空槽就是白的，看不出来），线由**格子自己的 1px 投影**画 ——
+ * 相邻两格的投影落在同一个像素上，内部仍是 1px 线，外圈被 overflow:hidden 裁掉、
+ * 只剩容器自己那条边框。 */
+.stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px; background: var(--white); border: 1px solid var(--line);
+  border-radius: 12px; overflow: hidden; margin-top: 28px;
+}
+.stats > div { background: var(--white); padding: 16px 18px; box-shadow: 0 0 0 1px var(--line); }
+
+/* ── 治理（v1.2）─────────────────────────────────────────────────────── */
+/* 下拉框和输入框同一套皮肤（原生 select 在深色/浅色下长得都不一样，
+   不显式写的话它会是系统控件的样子 —— 和这一页其余部分不像一家人）。 */
+.sel {
+  width: 100%; font-family: var(--mono); font-size: 12px; letter-spacing: .04em;
+  padding: 12px 14px; margin-bottom: 14px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+  color: var(--ink); outline: none; appearance: none;
+}
+.sel:focus { border-color: var(--ink); background: var(--white); }
+#propTarget, #propData { font-size: 13px; margin-bottom: 14px; }
+#propDesc { font-size: 14px; margin-bottom: 18px; }
+
+/* 提案卡:一条一张，倒序。 */
+.prop {
+  border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px 18px; margin-bottom: 12px; background: var(--white);
+}
+.propTop { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.propId { font-size: 11px; color: var(--muted); }
+.propState { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.propState.good { color: #1F7A3D; }
+.propState.bad { color: #B42318; }
+.propState.done { color: var(--ink); }
+.propDesc { font-size: 15px; margin: 0 0 6px; line-height: 1.5; }
+.propMeta { font-size: 11px; word-break: break-all; }
+.propActions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.propActions .btn { padding: 8px 14px; font-size: 10.5px; }
+.stats .k { display: block; font-size: 9px; color: var(--muted); margin-bottom: 8px; }
+.stats b { font-family: var(--mono); font-size: 15px; font-weight: 400; }
+
+.fine { font-size: 13px; line-height: 1.6; color: var(--muted); margin: 28px 0 0; max-width: 620px; }
+.fine b { color: var(--ink); font-weight: 500; }
+#status { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; word-break: break-all; }
+#status a { color: var(--ink); }
+#status.err { color: #B42318; }
+
+/* ── 质押那一段 ──────────────────────────────────────────────────────────
+   和申赎用同一套卡片/统计样式（同一个页面里两套视觉语言会像两个产品）。
+   新增的只有:小节标题、更小的说明文字、和内联的小按钮（Sync）。 */
+.sect { font-size: 11px; font-weight: 400; color: var(--muted); margin: 56px 0 14px; }
+.lede.small { font-size: 14px; margin-bottom: 24px; max-width: 680px; }
+.fine .btn.tiny { margin-left: 10px; padding: 4px 12px; font-size: 11px; }
+
+.back { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; color: var(--muted); text-decoration: none; }
+.back:hover { color: var(--ink); }
+
+/* ── 链上历史表 ─────────────────────────────────────────────────────── */
+.hist { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+.hist th { text-align: left; font-weight: 400; color: var(--muted); padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.hist td { padding: 7px 8px; border-bottom: 1px solid var(--line); color: var(--ink); }
+.hist tr:last-child td { border-bottom: 0; }
+.hist a { color: var(--accent); text-decoration: none; }
+.hist a:hover { text-decoration: underline; }
+.hist .num { text-align: right; }
+#riskNotice { border-left: 3px solid var(--accent); }
+
+
+/* ── OAKEN brand layer ────────────────────────────────────────────────────
+   The bond app came from a light product page; OAKEN's own language is
+   near-black bark, parchment, honey gold and squared cuts. This layer only
+   re-skins the existing DOM — no markup/selector contract changes. */
+@font-face{font-family:'Oaken Display';src:url('/oaken/bevan.ttf') format('truetype');font-display:swap}
+:root{
+  --accent:#d9a343;
+  --gold-2:#e8b85c;
+  --line-gold:rgba(217,163,67,.30);
+  --ink:#f3eadb;
+  --ink-soft:#221b15;
+  --muted:#a08f78;
+  --line:rgba(240,228,208,.12);
+  --panel:#1c1712;
+  --white:#14110d;
+}
+html{color-scheme:dark}
+body{background:var(--white);color:var(--ink);position:relative}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.035;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E")}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(120% 80% at 50% 0%,transparent 40%,rgba(0,0,0,.32) 100%)}
+.bar,main,.foot{position:relative;z-index:1}
+.bar{position:sticky;top:0;z-index:50;background:rgba(20,17,13,.92);backdrop-filter:blur(10px);border-bottom-color:var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font-family:'Oaken Display',Georgia,serif;font-weight:400;font-size:20px;letter-spacing:.16em;color:var(--ink)}
+.brand:hover{text-decoration:none;color:var(--gold-2)}
+.brand-mark{width:28px;height:28px;display:block;flex:none}
+.tag{color:var(--accent)}
+.btn{border-radius:4px;clip-path:polygon(0 0,calc(100% - 9px) 0,100% 9px,100% 100%,0 100%);
+  border-color:var(--accent);background:var(--accent);color:#14110d;font-weight:600}
+.btn:hover:not(:disabled){background:var(--gold-2);border-color:var(--gold-2)}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover:not(:disabled){border-color:var(--accent);background:rgba(217,163,67,.08)}
+.pill[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:#14110d}
+.notice{background:rgba(217,163,67,.08);border-color:var(--line-gold);border-radius:4px;color:var(--ink)}
+.notice b{color:var(--accent)}
+.card,.prop{background:radial-gradient(120% 90% at 50% -10%,rgba(217,163,67,.06),rgba(217,163,67,0) 52%),var(--panel);
+  border-color:var(--line);border-radius:4px;box-shadow:inset 0 1px 0 rgba(240,228,208,.05),0 22px 48px -34px #000}
+.card h2,.sect{color:var(--accent)}
+.stats{background:var(--white);border-color:var(--line);border-radius:4px}
+.stats>div{background:var(--panel);box-shadow:0 0 0 1px var(--line)}
+input,.sel{background:var(--panel);border-color:var(--line);color:var(--ink);border-radius:4px}
+input:focus,.sel:focus{border-color:var(--accent);background:var(--ink-soft)}
+.net.bad,#status.err,.propState.bad{color:#e0785f}
+.propState.good{color:#9dbf7a}
+.propState.done{color:var(--ink)}
+#riskNotice{border-left-color:var(--accent)}
+.back:hover{color:var(--accent)}
+.foot{max-width:920px;margin:0 auto;padding:26px 32px 40px;border-top:1px solid var(--line);
+  display:flex;gap:22px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted)}
+.foot .mono{color:var(--accent);letter-spacing:.14em}
+.foot a{color:var(--muted);text-decoration:none}
+.foot a:hover{color:var(--ink)}
+@media (max-width:600px){.foot{padding:22px 16px 32px;gap:14px}.brand{font-size:18px}.brand-mark{width:24px;height:24px}}
+
+main a:not(.btn):not(.brand):not(.back) { color: var(--accent); text-decoration: none; }
+main a:not(.btn):not(.brand):not(.back):hover { text-decoration: underline; text-underline-offset: 3px; }
+#status a { color: var(--accent); }
+
+/* ── Spec v2: reserve coverage, pending rewards, timelock queue ─────────── */
+.linkbtn { background:none; border:0; color:var(--accent); cursor:pointer; padding:0; font:inherit;
+  text-decoration:underline; text-underline-offset:3px; }
+.coverage { margin-top:14px; padding:14px 16px; border:1px solid var(--line); border-radius:4px; background:var(--panel); }
+.coverageTop { display:flex; justify-content:space-between; gap:12px; font-size:10px; letter-spacing:.12em;
+  color:var(--muted); text-transform:uppercase; }
+.coverageTop b { color:var(--ink); font-family:var(--mono); font-size:14px; letter-spacing:0; text-transform:none; }
+.coverageTrack { height:6px; background:rgba(240,228,208,.08); border-radius:999px; overflow:hidden; margin-top:10px; }
+.coverageTrack i { display:block; height:100%; width:0; background:linear-gradient(90deg,#a06a1f,#e8b85c); transition:width .8s ease; }
+.coverageTrack i.warn { background:linear-gradient(90deg,#8a5a1f,#d9a343); }
+.coverageTrack i.bad { background:linear-gradient(90deg,#7a2f22,#e0785f); }
+.spark { display:block; width:100%; height:48px; margin:0 0 10px; }
+.spark polyline { fill:none; stroke:var(--accent); stroke-width:1.5; vector-effect:non-scaling-stroke; }
+.card.span2 { grid-column:1/-1; }
+#riskNotice { position:sticky; top:64px; z-index:20; backdrop-filter:blur(8px);
+  background:rgba(217,163,67,.10); border-color:var(--line-gold); box-shadow:0 12px 30px -20px #000; }
+#riskNotice b { color:var(--accent); }
+.tlItem { border:1px solid var(--line); border-radius:4px; padding:12px 14px; margin-top:10px; background:rgba(20,17,13,.35); }
+.tlItem .t { display:flex; justify-content:space-between; gap:12px; align-items:baseline; flex-wrap:wrap; }
+.tlItem .t b { color:var(--ink); font-size:13px; }
+.tlItem .t span { font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:.06em; }
+.tlItem .meta { font-family:var(--mono); font-size:11px; color:var(--muted); margin-top:6px; word-break:break-all; }
+.tlItem .count { color:var(--accent); }
+.tlItem .btn { margin-top:10px; padding:6px 12px; font-size:10.5px; }
+#tlStatus.ok { color:var(--ok); }
+#tlStatus.warn { color:#e0a85f; }
+@media (max-width:600px) { #riskNotice { position:relative; top:auto; } }
+
+/* The risk box is the first thing a visitor should read; give it a strong edge. */
+#riskNotice { border: 1px solid rgba(224,168,95,.55); border-left: 3px solid #e0a85f;
+  background: rgba(224,168,95,.10); }

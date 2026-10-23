@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Activity · OAKEN</title>
+<meta name="description" content="What opened, what closes next — derived from each sale's own published schedule.">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/embers.webp"><source src="/app/media/embers-head.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Activity</div>
+    <h1 class="reveal">What the calendar says.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <p class="muted" style="max-width:64ch">Sale openings and closings, in order, with the two numbers
+      that matter on each row: how much of the target is filled, and how long is left. Everything on this page is
+      derived from the sales' own published start and end times — it is a schedule, not a transaction log.</p>
+
+    <div class="stats reveal" style="margin-top:34px">
+      <div><div class="v" id="s-live">—</div><div class="k">Open right now</div></div>
+      <div><div class="v" id="s-closing">—</div><div class="k">Closing within 48h</div></div>
+      <div><div class="v" id="s-opened">—</div><div class="k">Opened · last 7 days</div></div>
+      <div><div class="v" id="s-filled">—</div><div class="k">At or over hard cap</div></div>
+    </div>
+
+    <div class="controls">
+      <div class="tabs" id="tabs">
+        <a href="#" data-filter="" class="on">Everything</a>
+        <a href="#" data-filter="opened">Openings</a>
+        <a href="#" data-filter="closing">Closings</a>
+      </div>
+      <span class="pill" id="count">—</span>
+      <select class="i" id="chain" aria-label="Chain"><option value="0">All chains</option></select>
+    </div>
+
+    <div class="panel reveal" style="margin-top:18px">
+      <div class="feed" id="feed"><div class="row"><div class="skel-bar" style="width:54%;margin:2px 0 8px"></div><div class="skel-bar" style="width:32%;margin:2px 0"></div></div></div>
+    </div>
+    <div class="hint" id="note" style="margin-top:16px"></div>
+  </section>
+</main>
+
+<script type="module">
+  import { shell, showReadFail, safeRead , onChainSwitch} from '/app/oaken.js';
+  import {
+    allPools, chainOf, CHAINS, details, esc, amount, day, when, pctOf, statusOf, chainChip, poolHref,
+  } from '/app/explore.js';
+
+  shell({ active: 'activity' });
+
+    /* 2026-10-16：这一页的数据**不是按钱包那条链渲染的**（跨链读 / 由 URL 决定）——
+       钱包换链不改变这里的任何一块。登记一个空的处理器 = 换链时不整页重载（不白闪），
+       结果和以前重载完一模一样。没登记的页面仍走整页重载，见 oaken.js 的 onChainSwitch。 */
+    onChainSwitch(() => { /* 见上 */ });
+  const DAY = 86400;
+  const state = { rows: [], chain: 0, filter: '', now: Math.floor(Date.now() / 1000) };
+
+  const readUrl = () => {
+    const p = new URLSearchParams(location.search);
+    state.chain = Number(p.get('chain')) || 0;
+    state.filter = p.get('filter') || '';
+  };
+  const writeUrl = () => {
+    const p = new URLSearchParams();
+    if (state.chain) p.set('chain', String(state.chain));
+    if (state.filter) p.set('filter', state.filter);
+    const qs = p.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
+  };
+
+  /**
+   * 事件 = 开/关两个时刻，都取自池子自己公布的字段。
+   * 只有这两件事有真实时间戳 —— "什么时候达标"快照里没有，就不编一个出来。
+   */
+  function events() {
+    const out = [];
+    for (const r of state.rows) {
+      if (state.chain && r.chainId !== state.chain) continue;
+      const start = Number(r.pool?.startTime) || 0;
+      const end = Number(r.pool?.endTime) || 0;
+      if (start && Math.abs(start - state.now) < 14 * DAY) out.push({ at: start, kind: 'opened', row: r });
+      if (end && Math.abs(end - state.now) < 14 * DAY) out.push({ at: end, kind: 'closes', row: r });
+    }
+    out.sort((a, b) => a.at - b.at);
+    return out;
+  }
+
+  function row(e) {
+    const r = e.row;
+    const meta = chainOf(r.chainId);
+    const pct = pctOf(r.pool);
+    const st = statusOf(r.pool, state.now);
+    const name = r.token?.name || r.token?.symbol || 'Sale';
+    const tag = e.kind === 'opened'
+      ? (e.at > state.now ? '<span class="tag q">opens</span>' : '<span class="tag">opened</span>')
+      : (e.at > state.now ? '<span class="tag">closes</span>' : '<span class="tag q">closed</span>');
+    return `<div class="row">
+      <span class="t">${esc(day(e.at))}</span>
+      ${tag}
+      <span style="min-width:0;flex:1 1 auto">
+        <a href="${poolHref(r)}">${esc(name)}</a>
+        <span class="muted" style="font-size:12.5px"> · ${esc(r.token?.symbol || '')}</span>
+      </span>
+      ${chainChip(r.chainId)}
+      <span class="muted" style="font-size:12.5px;white-space:nowrap">${st === 'live' ? 'open · ' : ''}${esc(when(e.at, state.now))}</span>
+      <span style="width:96px;text-align:right"><b>${pct === null ? '<span class="muted">—</span>' : pct.toFixed(1) + '%'}</b></span>
+    </div>`;
+  }
+
+  function paint() {
+    let list = events();
+    if (state.filter === 'opened') list = list.filter((e) => e.kind === 'opened');
+    if (state.filter === 'closing') list = list.filter((e) => e.kind === 'closes');
+    list.reverse();   // 最近的 / 最近的未来在上
+
+    document.getElementById('count').textContent = `${list.length} event${list.length === 1 ? '' : 's'}`;
+    document.getElementById('feed').innerHTML = list.length
+      ? list.map(row).join('')
+      : '<div class="row"><span class="muted">Nothing on the calendar for this filter — the corpus covers a two-week window around today.</span></div>';
+  }
+
+  async function load() {
+    readUrl();
+
+    try {
+      state.rows = await allPools();
+      const now = state.now;
+      const live = state.rows.filter((r) => statusOf(r.pool, now) === 'live');
+      document.getElementById('s-live').textContent = String(live.length);
+      document.getElementById('s-closing').textContent = String(live.filter((r) => Number(r.pool?.endTime) - now < 2 * DAY).length);
+      document.getElementById('s-opened').textContent = String(state.rows.filter((r) => { const s = Number(r.pool?.startTime) || 0; return s && now - s < 7 * DAY && now - s >= 0 }).length);
+      document.getElementById('s-filled').textContent = String(state.rows.filter((r) => (pctOf(r.pool) ?? 0) >= 100).length);
+
+      const sel = document.getElementById('chain');
+      for (const id of [...new Set(state.rows.map((r) => r.chainId))].sort((a, b) => a - b)) {
+        const m = CHAINS[id];
+        if (!m) continue;
+        const o = document.createElement('option');
+        o.value = String(id);
+        o.textContent = m.name;
+        sel.appendChild(o);
+      }
+      sel.value = String(state.chain);
+      for (const a of document.querySelectorAll('#tabs a')) a.classList.toggle('on', a.dataset.filter === state.filter);
+      for (const a of document.querySelectorAll('#tabs a')) {
+        a.onclick = (ev) => { ev.preventDefault(); state.filter = a.dataset.filter; writeUrl(); paint();
+          for (const o of document.querySelectorAll('#tabs a')) o.classList.toggle('on', o === a); };
+      }
+      sel.onchange = (ev) => { state.chain = Number(ev.target.value); writeUrl(); paint(); };
+
+      paint();
+      document.getElementById('note').textContent =
+        'Window: two weeks either side of today. "At or over hard cap" and the percentages in the last column are measured '
+        + 'against each sale\'s own hard cap — the sales that never published one show a dash rather than a denominator we invented.';
+    } catch (e) {
+      /* 读不到 ≠ 没有活动（清单通用第 1 条）：统一那句 + 重试按钮 */
+      document.getElementById('feed').innerHTML = '';
+      showReadFail(document.getElementById('feed'), {
+        what: 'the activity feed', detail: (e && e.message) || '', onRetry: () => load(),
+      });
+    }
+  }
+  load();
+</script>
+</body>
+</html>

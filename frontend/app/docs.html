@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docs · OAKEN</title>
+<meta name="description" content="Supported chains, contract addresses, how to verify a lock yourself, known limitations and answers.">
+<meta property="og:title" content="Docs · OAKEN">
+<meta property="og:description" content="Supported chains, contract addresses, how to verify a lock yourself, known limitations and answers.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://oaken.one/docs">
+<meta property="og:image" content="https://oaken.one/logo512.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;          // 模块起来了 —— 剩下的是数据慢，页面自己会说
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/key.webp"><source src="/app/media/key.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Docs</div>
+    <h1 class="reveal">The short version, in one page.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <p class="muted reveal" style="max-width:70ch">OAKEN is a lock service and a small launchpad. On the EVM
+      chains we deploy to, tokens and liquidity go into contracts that have <b>no owner, no upgrade path and no
+      admin key</b> — nothing to renounce, because nothing was kept. Solana locks are different: they currently use
+      <b>Jupiter Lock</b>, a third-party, upgradeable program — the Solana section below says exactly what is live.
+      Everything this site shows is read from the chain it sits on; the site is a window, not the vault.</p>
+
+    <div class="grid2" data-stagger style="margin-top:34px">
+      <div class="panel">
+        <div class="head"><h3>Chains we are on</h3></div>
+        <div class="body">
+          <table class="list">
+            <thead><tr><th>Chain</th><th>ID</th><th>Native</th><th>Explorer</th></tr></thead>
+            <tbody>
+              <tr><td>Robinhood Chain</td><td class="mono">4663</td><td>ETH</td>
+                <td><a href="https://robinhoodchain.blockscout.com" target="_blank" rel="noopener">Blockscout</a></td></tr>
+              <tr><td>BNB Chain</td><td class="mono">56</td><td>BNB</td>
+                <td><a href="https://bscscan.com" target="_blank" rel="noopener">BscScan</a></td></tr>
+              <tr><td>Base</td><td class="mono">8453</td><td>ETH</td>
+                <td><a href="https://basescan.org" target="_blank" rel="noopener">BaseScan</a></td></tr>
+              <tr><td>Polygon</td><td class="mono">137</td><td>POL</td>
+                <td><a href="https://polygonscan.com" target="_blank" rel="noopener">PolygonScan</a></td></tr>
+            </tbody>
+          </table>
+          <div class="hint" style="margin-top:14px">The header picker lists exactly the chains our contracts are
+            deployed to — a chain we are not on would take your signature and do nothing with it. Adding one to
+            your wallet is offered by the site itself (<span class="mono">wallet_addEthereumChain</span>, with
+            these parameters) the first time you switch to it.</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="head"><h3>Contracts — same address on every chain</h3></div>
+        <div class="body">
+          <dl class="kv">
+            <dt>Oaken Lock (adapter)</dt><dd class="mono">0x16e02A106fE6E978fB98F76756B3a06b4995a7A6</dd>
+            <dt>Vault</dt><dd class="mono">0xe410d0a21C1376992874a9bEEeE0d623A50D4a34</dd>
+            <dt>Position lock</dt><dd class="mono">0xfC9A43c90e0E0d548D95cEf3C77fce802806CbA9</dd>
+            <dt>MultiSender</dt><dd class="mono">0x1f380ef5eFF9113314Ee175dCE4F226DFd75A50C</dd>
+            <dt>Token factory</dt><dd class="mono">0xc0A3AD1428EeB70cAF88bb89c3B17D0191E1Bd34</dd>
+            <dt>Airdrop</dt><dd class="mono">0x17E9910cDC37BdA5531414012aeA5b0862C22066</dd>
+            <dt>Presale factory</dt><dd class="mono">0xAC070cf2ed45aEcb9f5299d4C670fFfCE6387724</dd>
+            <dt>Launcher</dt><dd class="mono">0x1d7561fC331594820382E8dd64582645EbafD873</dd>
+          </dl>
+          <div class="hint" style="margin-top:14px"><span class="pill ok">source verified</span>
+            <b>All eight contracts, on all four chains</b> are exact matches on
+            <a href="https://sourcify.dev/#/lookup/0xe410d0a21C1376992874a9bEEeE0d623A50D4a34" target="_blank" rel="noopener">Sourcify</a>
+            (the three lock contracts are also published on
+            <a href="https://robinhoodchain.blockscout.com/address/0xe410d0a21C1376992874a9bEEeE0d623A50D4a34#code" target="_blank" rel="noopener">Blockscout</a>).
+            Paste any address above into Sourcify to compare it byte for byte.
+            Verification is not an audit — we claim none.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band ambient">
+    <div class="wrap">
+      <div class="panel">
+        <div class="head"><h3>Solana — two launch routes, one lock route</h3></div>
+        <div class="body">
+          <p class="muted" style="font-size:14px"><b>OAKEN Factory (own launch)</b> creates a classic SPL mint with
+            a fixed supply, writes Metaplex metadata, and then revokes the mint authority. There is no OAKEN
+            program in this path: the token is governed by the SPL Token and Metaplex programs, both live on
+            Solana. You pay rent and network fees only.</p>
+          <p class="muted" style="font-size:14px"><b>pump.fun</b> is a third-party route: its program creates the
+            coin on its bonding curve. pump.fun's market, graduation and fee rules apply, and its program is
+            upgradeable by pump.fun.</p>
+          <p class="muted" style="font-size:14px"><b>Locks on Solana</b> currently use <b>Jupiter Lock</b>
+            (<span class="mono">LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn</span>), a third-party vesting program.
+            It is upgradeable by Jupiter's team. OAKEN's own Solana lock program
+            (<span class="mono">Co9ZnAVxX2siGThhjTpPgXPHYrCev1nrXFyGB1VcZcQW</span>) is built and tested but not
+            deployed to mainnet; the <a href="/locks/solana">Solana locks page</a> says so before it asks for a
+            signature. EVM locks on Robinhood Chain and BNB Chain are live and unchanged.</p>
+          <p class="hint" style="margin-top:10px">Solana wallets are separate from the EVM wallet in the top bar.
+            The Solana pages detect Phantom, Solflare, Backpack and Glow in the browser; nothing is signed until
+            you approve it in that wallet.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="reveal">
+        <div class="eyebrow">HOW TO CHECK A LOCK YOURSELF</div>
+        <h2 class="sec">Three ways, none of them through us.</h2>
+        <div class="sec-rule"></div>
+      </div>
+      <div class="grid3" data-stagger>
+        <div class="card"><span class="n">01</span><h3>Open its record page</h3>
+          <p>Every number there is an <span class="mono">eth_call</span> from your browser to a public node —
+            not a value we stored. If the page and a block explorer ever disagree, believe the explorer.</p></div>
+        <div class="card"><span class="n">02</span><h3>Call the vault directly</h3>
+          <p>Paste <span class="mono">0xe410d0a2…</span> into a block explorer, open
+            <span class="mono">getLock(id)</span> and hit read. It returns the same amounts, dates and steps
+            this site shows.</p></div>
+        <div class="card"><span class="n">03</span><h3>Run your own node</h3>
+          <p>Nothing here is required for a lock to release on time. The schedule lives in the contract;
+            when it is due, the vault pays the beneficiary and nobody else.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="reveal">
+        <div class="eyebrow">KNOWN LIMITATIONS</div>
+        <h2 class="sec">What this does not do.</h2>
+        <div class="sec-rule"></div>
+      </div>
+      <div class="panel reveal" style="margin-top:26px"><div class="body">
+        <ul style="list-style:none;display:grid;gap:13px;color:var(--muted);font-size:14.5px">
+          <li><b style="color:var(--parch)">No rebase tokens.</b> A balance that changes on its own breaks the
+            arithmetic of "how much is in there" — the lock would be wrong the moment it lands.</li>
+          <li><b style="color:var(--parch)">Fee-on-transfer and max-tx tokens need care.</b> Exclude the adapter
+            <span class="mono">0x16e02A10…</span> and the vault <span class="mono">0xe410d0a2…</span> from fees,
+            limits and blacklists first. The vault measures what actually arrived, so a taxed transfer locks
+            less than you sent — the record page will say so.</li>
+          <li><b style="color:var(--parch)">A renounced lock is permanent.</b> There is no un-renounce —
+            that is the point — so it is offered only when the schedule is already what you want.</li>
+          <li><b style="color:var(--parch)">Position locks hold ERC-721s.</b> Their strength is the NFT's own:
+            a collection with a back door can move the position anyway. The collection address is part of every
+            record, and "this LP is locked" is only ever said about known position managers.</li>
+          <li><b style="color:var(--parch)">Token images are off-chain.</b> For our own factory the chain has no
+            image field; the artwork is stored on our image host. If that host is unavailable, the token still
+            exists and trades — only the picture is missing. Third-party launches use their own metadata.</li>
+          <li><b style="color:var(--parch)">We cannot recover mistakes.</b> Tokens sent to the wrong address,
+            or locked with no beneficiary, are gone. Nobody — including us — has a rescue function, because
+            nothing was kept.</li>
+          <li><b style="color:var(--parch)">This is new.</b> The contracts are short and public, but young.
+            Start with an amount you are comfortable testing.</li>
+        </ul>
+      </div></div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="reveal">
+        <div class="eyebrow">FAQ</div>
+        <h2 class="sec">The questions the form does not answer.</h2>
+        <div class="sec-rule"></div>
+      </div>
+      <div class="grid2" data-stagger style="margin-top:26px">
+        <div class="card"><h3>Which wallets work?</h3>
+          <p>EVM: any browser wallet that injects a standard provider (EIP-1193 / EIP-6963) — MetaMask, OKX,
+            Rabby, Coinbase Wallet, Rainbow and friends — or WalletConnect from the connect panel. Solana pages
+            detect Phantom, Solflare, Backpack and Glow separately; the EVM wallet in the top bar is not used
+            there. The site never asks for a seed phrase.</p></div>
+        <div class="card"><h3>What does it cost?</h3>
+          <p>Locks cost nothing. You pay gas, that is all. Third-party launchpads (Pons, Flap, Clanker,
+            four.meme) charge their own fees — shown before you sign — and those go to them, not to us.</p></div>
+        <div class="card"><h3>Where does the money go?</h3>
+          <p>Nowhere. The vault holds tokens and pays the beneficiary, and there is no other function to call.
+            OAKEN has no treasury in any of these contracts.</p></div>
+        <div class="card"><h3>Who can claim a lock?</h3>
+          <p>Only the beneficiary. Anyone may pay the gas to send it to them — the vault checks who is being
+            paid, not who is paying.</p></div>
+        <div class="card"><h3>What if this website disappears?</h3>
+          <p>Locks still release. The schedule is in the contract, and the contract is on four chains.
+            This site is a reader; it is not required for any of it.</p></div>
+        <div class="card"><h3>Why is the launchpad listing sometimes empty?</h3>
+          <p>Sales come from a listing snapshot plus live clocks. When nothing is inside its window the list
+            says so, and when the listing itself cannot be reached the page says <i>that</i> instead of
+            pretending there are no sales.</p></div>
+        <div class="card"><h3>Can I lock on Solana?</h3>
+          <p>Yes — with <b>Jupiter Lock</b>, a third-party vesting program, while OAKEN's own Solana lock program
+            is not yet deployed to mainnet. The <a href="/locks/solana">Solana locks page</a> states which program
+            will be used and that Jupiter's program is upgradeable before it asks for a signature. EVM locks on
+            Robinhood Chain and BNB Chain are our own contracts.</p></div>
+        <div class="card"><h3>Something is stuck on “Reading…”</h3>
+          <p>Chain reads go straight from your browser to public nodes. If a node stalls, the page now gives up
+            after a few seconds and offers <b>Retry</b> — which also rotates to the chain's second RPC.
+            Nothing you sign is affected by a read failing.</p></div>
+        <div class="card"><h3>A transaction failed. What now?</h3>
+          <p>Nothing was sent, unless the wallet says otherwise — a revert costs only the gas of the attempt, and
+            your tokens stay where they were. The page shows the reason in plain words: a rejection in the wallet,
+            not enough native currency for gas, a token that refuses transfers, or a number the contract will not
+            take. The usual fixes are “approve first”, “top up the gas balance”, or “raise the release % per cycle”.</p></div>
+        <div class="card"><h3>My wallet is on another chain.</h3>
+          <p>Pick the chain you want in the header — the site asks your wallet to switch, and offers to add the
+            chain if the wallet does not have it yet. If your wallet sits on a chain we have not deployed to, the
+            header says <b>Wrong network</b> and asks once per session; nothing is ever sent there.</p></div>
+        <div class="card"><h3>What is “amount” on a record page?</h3>
+          <p>What the vault is actually holding for that lock — measured when the transfer landed, not what the
+            sender typed. For a fee-on-transfer token the two differ, and the record page says so.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap reveal">
+      <div class="panel"><div class="body" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <b>Still stuck?</b>
+        <span class="muted">Ask on X — that is the only channel we have.</span>
+        <a class="btn btn-s" href="https://x.com/oakenhood" target="_blank" rel="noopener">@oakenhood</a>
+        <a class="btn btn-p" style="margin-left:auto" href="/locks/create">Lock tokens</a>
+      </div></div>
+    </div>
+  </section>
+</main>
+
+<script src="/app/vendor/ethers.umd.min.js" defer></script>
+<script type="module">
+  import { shell, reveal, copyBtn , onChainSwitch} from '/app/oaken.js';
+  shell({ active: 'docs' });
+    /* 2026-10-16：这一页的数据**不是按钱包那条链渲染的**（跨链读 / 由 URL 决定）——
+       钱包换链不改变这里的任何一块。登记一个空的处理器 = 换链时不整页重载（不白闪），
+       结果和以前重载完一模一样。没登记的页面仍走整页重载，见 oaken.js 的 onChainSwitch。 */
+    onChainSwitch(() => { /* 见上 */ });
+  /**
+   * 八个合约地址：每个后面挂一个**复制**按钮和一个 **Sourcify 验证**链接
+   * （清单第九节：合约地址要能复制、要有验证的去处）。
+   */
+  for (const dd of document.querySelectorAll('.kv dd.mono')) {
+    const text = dd.textContent.trim();
+    if (!/^0x[0-9a-fA-F]{40}$/.test(text)) continue;
+    dd.insertAdjacentHTML('beforeend', ' ' + copyBtn(text, 'copy')
+      + ' <a href="https://sourcify.dev/#/lookup/' + text + '" target="_blank" rel="noopener"'
+      + ' style="font-size:12px;margin-left:6px">verify ↗</a>');
+  }
+  reveal();
+</script>
+</body>
+</html>
