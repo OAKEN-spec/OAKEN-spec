@@ -91,19 +91,25 @@
         <div class="head"><h3>Contracts — same address on every chain</h3></div>
         <div class="body">
           <dl class="kv">
-            <dt>Oaken Lock (adapter)</dt><dd class="mono">0x16e02A106fE6E978fB98F76756B3a06b4995a7A6</dd>
-            <dt>Vault</dt><dd class="mono">0xe410d0a21C1376992874a9bEEeE0d623A50D4a34</dd>
+            <dt>Oaken Lock (adapter) · v2</dt><dd class="mono">0xDBE1f3dc1d6E6759355E1B164231748f0589cb41</dd>
+            <dt>Vault · v2</dt><dd class="mono">0xbC511F31967D9EBF775d203661a2BEfF6AA42615</dd>
+            <dt>Launcher · v2</dt><dd class="mono">0x0d7cCEA7BabC5e3b4849267740D8fBBe6C4FDa58</dd>
+            <dt>Oaken Lock (adapter) · v1</dt><dd class="mono">0x16e02A106fE6E978fB98F76756B3a06b4995a7A6</dd>
+            <dt>Vault · v1</dt><dd class="mono">0xe410d0a21C1376992874a9bEEeE0d623A50D4a34</dd>
+            <dt>Launcher · v1</dt><dd class="mono">0x1d7561fC331594820382E8dd64582645EbafD873</dd>
             <dt>Position lock</dt><dd class="mono">0xfC9A43c90e0E0d548D95cEf3C77fce802806CbA9</dd>
             <dt>MultiSender</dt><dd class="mono">0x1f380ef5eFF9113314Ee175dCE4F226DFd75A50C</dd>
             <dt>Token factory</dt><dd class="mono">0xc0A3AD1428EeB70cAF88bb89c3B17D0191E1Bd34</dd>
             <dt>Airdrop</dt><dd class="mono">0x17E9910cDC37BdA5531414012aeA5b0862C22066</dd>
             <dt>Presale factory</dt><dd class="mono">0xAC070cf2ed45aEcb9f5299d4C670fFfCE6387724</dd>
-            <dt>Launcher</dt><dd class="mono">0x1d7561fC331594820382E8dd64582645EbafD873</dd>
           </dl>
+          <div class="hint" style="margin-top:14px">v2 is what new locks and new launches use (the reentrancy guard
+            and the ETH refund); v1 stays live for everything created before 2026-10-23, and the site reads both.
+            Same addresses on every chain we deploy to.</div>
           <div class="hint" style="margin-top:14px"><span class="pill ok">source verified</span>
-            <b>All eight contracts, on all four chains</b> are exact matches on
-            <a href="https://sourcify.dev/#/lookup/0xe410d0a21C1376992874a9bEEeE0d623A50D4a34" target="_blank" rel="noopener">Sourcify</a>
-            (the three lock contracts are also published on
+            <b>All eleven contracts, on all four chains</b> are exact matches on
+            <a href="https://sourcify.dev/#/lookup/0xbC511F31967D9EBF775d203661a2BEfF6AA42615" target="_blank" rel="noopener">Sourcify</a>
+            (the lock contracts are also published on
             <a href="https://robinhoodchain.blockscout.com/address/0xe410d0a21C1376992874a9bEEeE0d623A50D4a34#code" target="_blank" rel="noopener">Blockscout</a>).
             Paste any address above into Sourcify to compare it byte for byte.
             Verification is not an audit — we claim none.</div>

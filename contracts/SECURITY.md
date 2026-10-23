@@ -24,6 +24,20 @@ on every chain where they are deployed.
 | PresaleFactory / Presale | `contracts/PresaleFactory.sol`, `Presale.sol` | `0xAC070cf2ed45aEcb9f5299d4C670fFfCE6387724` | Sale terms are public; soft/hard caps and refunds |
 | OakenTimelock | `contracts/OakenTimelock.sol` | `0x2f848dBdD8b0384AcB1102d959B63E71Ecf44845` | Admin delay for Bonds/parameters — **not** part of Locks |
 
+**v2 (deployed 2026-10-23):** the reentrancy fix from `SELF-REVIEW.md` (SR-01) and
+the ETH-refund fix (SR-02) live in a fork, at new deterministic addresses on all
+four chains. New locks and new launches use v2; v1 stays live for everything
+created before that date.
+
+| Contract | File | Address (same on every chain) | Change from v1 |
+|---|---|---|---|
+| LockVaultV2 | `contracts/v2/LockVaultV2.sol` | `0xbC511F31967D9EBF775d203661a2BEfF6AA42615` | `nonReentrant` on `createLock` / `claim` / `revoke` / `editLock` |
+| PinkLockAdapterV2 | `contracts/v2/PinkLockAdapterV2.sol` | `0xDBE1f3dc1d6E6759355E1B164231748f0589cb41` | same guard; returns attached ETH to the caller |
+| OakenLauncherV2 | `contracts/OakenLauncher.sol` (same source) | `0x0d7cCEA7BabC5e3b4849267740D8fBBe6C4FDa58` | constructor points at PinkLockAdapterV2 |
+
+See `contracts/V2.md` for regression tests, deployment blocks and the dual-read
+migration. Both v1 and v2 are Sourcify exact matches on all four chains.
+
 The Safe that proposes through the Timelock is a 2-of-3 at
 `0x5E8C4c241a29ff7E60c648f378A4AA70053Ee92e`. It is a different trust boundary
 from the ownerless lock contracts. Bonds have an admin path; Locks do not.
@@ -31,7 +45,7 @@ from the ownerless lock contracts. Bonds have an admin path; Locks do not.
 **Out of scope for this repository's audit:** the static frontend and indexer,
 third-party launchpad contracts (Pons, Genius, Flap, Clanker, four.meme, Jupiter
 Lock), HD Protocol `.hood` registry contracts, and the Solana program (its own
-repo/audit target, currently not deployed). Those are documented separately and
+repo/audit target; deployed on mainnet and **not** covered by the EVM audit). Those are documented separately and
 must not be presented as covered by an EVM audit.
 
 ## What the tests pin
@@ -122,9 +136,14 @@ auditor rather than hidden in a test.
 - **Bonds are a different product** with admin/Timelock/NAV risk. Locks are
   ownerless. Reading one as the other is a user-interface bug, not a contract
   bug.
-- **Solana locks currently use Jupiter Lock**, which is upgradeable. The OAKEN
-  Solana program is not deployed and has not completed an on-chain E2E run; the
-  Solana page states this.
+- **SR-01 / SR-02 are fixed in v2 only.** v1 is immutable and still holds
+  pre-2026-10-23 locks; a token with a transfer callback can re-enter it. The
+  creation form warns against transfer-hook (ERC-777-style) tokens. v2 makes the
+  re-entrant path revert and returns attached ETH; see `V2.md`.
+- **Solana:** the OAKEN Solana lock program is deployed on mainnet
+  (`Co9ZnAVxX2siGThhjTpPgXPHYrCev1nrXFyGB1VcZcQW`, upgrade authority revoked) and
+  passed a 25-check E2E on a local validator. Jupiter Lock remains available as
+  a third-party option. The Solana program is outside the EVM audit scope.
 - **No formal verification** (Certora or equivalent) has been performed. The
   invariant suite is not a formal proof.
 

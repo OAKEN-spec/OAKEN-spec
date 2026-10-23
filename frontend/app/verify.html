@@ -74,19 +74,26 @@
         <table class="list">
           <thead><tr><th>Contract</th><th>Address (same on all four chains)</th><th></th></tr></thead>
           <tbody id="addr-table">
-            <tr><td>Oaken Lock (adapter)</td><td class="mono addr">0x16e02A106fE6E978fB98F76756B3a06b4995a7A6</td><td></td></tr>
-            <tr><td>Vault</td><td class="mono addr">0xe410d0a21C1376992874a9bEEeE0d623A50D4a34</td><td></td></tr>
+            <tr><td>Oaken Lock adapter · v1</td><td class="mono addr">0x16e02A106fE6E978fB98F76756B3a06b4995a7A6</td><td>legacy vault entry</td></tr>
+            <tr><td>Vault · v1</td><td class="mono addr">0xe410d0a21C1376992874a9bEEeE0d623A50D4a34</td><td>locks created before 2026-10-23</td></tr>
             <tr><td>Position lock</td><td class="mono addr">0xfC9A43c90e0E0d548D95cEf3C77fce802806CbA9</td><td></td></tr>
             <tr><td>MultiSender</td><td class="mono addr">0x1f380ef5eFF9113314Ee175dCE4F226DFd75A50C</td><td></td></tr>
             <tr><td>Token factory</td><td class="mono addr">0xc0A3AD1428EeB70cAF88bb89c3B17D0191E1Bd34</td><td></td></tr>
             <tr><td>Airdrop</td><td class="mono addr">0x17E9910cDC37BdA5531414012aeA5b0862C22066</td><td></td></tr>
             <tr><td>Presale factory</td><td class="mono addr">0xAC070cf2ed45aEcb9f5299d4C670fFfCE6387724</td><td></td></tr>
-            <tr><td>Launcher</td><td class="mono addr">0x1d7561fC331594820382E8dd64582645EbafD873</td><td></td></tr>
+            <tr><td>Launcher · v1</td><td class="mono addr">0x1d7561fC331594820382E8dd64582645EbafD873</td><td>legacy launches</td></tr>
+            <tr><td><b>Oaken Lock adapter · v2</b></td><td class="mono addr">0xDBE1f3dc1d6E6759355E1B164231748f0589cb41</td><td><b>new locks</b></td></tr>
+            <tr><td><b>Vault · v2</b></td><td class="mono addr">0xbC511F31967D9EBF775d203661a2BEfF6AA42615</td><td><b>new locks</b></td></tr>
+            <tr><td><b>Launcher · v2</b></td><td class="mono addr">0x0d7cCEA7BabC5e3b4849267740D8fBBe6C4FDa58</td><td><b>new launches</b></td></tr>
           </tbody>
         </table>
         <div class="hint" style="margin-top:14px">Chains: Robinhood Chain (4663), BNB Chain (56), Base (8453),
           Polygon (137). The deterministic salt derives the address from the bytecode, so the same address is
-          the same contract on each chain — not a copy with different rules.</div>
+          the same contract on each chain — not a copy with different rules.
+          <b>v1 and v2 are both live.</b> v1 holds every lock created before 2026-10-23; v2 is used for new
+          locks and adds the reentrancy guard and ETH refund described in
+          <a href="https://github.com/OAKEN-spec/OAKEN-spec/blob/master/contracts/SELF-REVIEW.md" target="_blank" rel="noopener">the self-review</a>.
+          The site reads both; old record URLs stay on v1 and new ones carry <span class="mono">?vault=v2</span>.</div>
       </div>
     </div>
 
@@ -160,7 +167,7 @@
         <table class="list">
           <thead><tr><th>Contract</th><th>4663</th><th>56</th><th>8453</th><th>137</th><th>Source</th></tr></thead>
           <tbody>
-            <tr><td>All eight above</td><td class="ok">exact</td><td class="ok">exact</td><td class="ok">exact</td><td class="ok">exact</td>
+            <tr><td>All contracts above (v1 and v2)</td><td class="ok">exact</td><td class="ok">exact</td><td class="ok">exact</td><td class="ok">exact</td>
               <td><a href="https://sourcify.dev" target="_blank" rel="noopener">Sourcify</a> · <a href="https://robinhoodchain.blockscout.com/address/0xe410d0a21C1376992874a9bEEeE0d623A50D4a34#code" target="_blank" rel="noopener">Blockscout</a></td></tr>
           </tbody>
         </table>

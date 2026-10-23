@@ -188,14 +188,15 @@
         <td style="text-align:right"><a href="/locks/${d.chain.slug}/position/${d.lockId}">View →</a>${exArrow('/address/' + d.nft, d.chain, 'The NFT contract on the explorer')}</td>
       </tr>`;
     }
-    return `<tr data-chain="${d.chain.id}" data-key="${[d.lockId, d.address, d.owner, symbol, d.name, d.chain.name].join(' ').toLowerCase()}">
-      <td class="mono">#${d.lockId}${d.live ? ' <span class="pill ok" title="read from the chain just now">live</span>' : ''}</td>
+    const vault = d.vault || 'v1';
+    return `<tr data-chain="${d.chain.id}" data-vault="${vault}" data-key="${[d.lockId, d.address, d.owner, symbol, d.name, d.chain.name, vault].join(' ').toLowerCase()}">
+      <td class="mono">#${d.lockId}${vault === 'v2' ? ' <span class="pill" title="read from the v2 vault">v2</span>' : ''}${d.live ? ' <span class="pill ok" title="read from the chain just now">live</span>' : ''}</td>
       <td>${symbol}${d.name ? ` <span class="muted" style="font-size:13px">${d.name}</span>` : ''}</td>
       <td><span class="chip">${d.chain.name}</span></td>
       <td>${amountText}</td>
       <td class="mono muted" style="font-size:13px">${short(d.owner)}</td>
       <td>${state}<div class="muted" style="font-size:12px;margin-top:4px">${d.unlock ? fmtDate(d.unlock) : ''}</div></td>
-      <td style="text-align:right"><a href="/locks/${d.chain.slug}/record/${d.lockId}">View →</a>${exArrow('/token/' + d.address, d.chain, 'The token contract on the explorer')}</td>
+      <td style="text-align:right"><a href="/locks/${d.chain.slug}/record/${d.lockId}${vault === 'v2' ? '?vault=v2' : ''}">View →</a>${exArrow('/token/' + d.address, d.chain, 'The token contract on the explorer')}</td>
     </tr>`;
   }
 
@@ -205,8 +206,8 @@
     if (q) shown = shown.filter((d) => [d.lockId, d.address, d.owner, d.symbol, d.name, d.chain.name].join(' ').toLowerCase().includes(q));
     // 现场找锁的结果**并进同一张表**（按 链+锁号 去重，不另起一张表 —— 数据只有一份）
     if (lookup && lookup.rows.length) {
-      const seen = new Set(shown.map((d) => d.chain.id + ':' + d.lockId));
-      for (const r of lookup.rows) if (!seen.has(r.chain.id + ':' + r.lockId)) shown.push(r);
+      const seen = new Set(shown.map((d) => d.chain.id + ':' + (d.vault || 'v1') + ':' + d.lockId));
+      for (const r of lookup.rows) if (!seen.has(r.chain.id + ':' + (r.vault || 'v1') + ':' + r.lockId)) shown.push(r);
       shown.sort((a, b) => Number(b.lockId) - Number(a.lockId));
     }
     const hint = document.getElementById('scopehint');
@@ -296,15 +297,20 @@
     paint();
     const rows = [];
     await Promise.all(targets.map(async (c) => {
-      let ids = [];
-      try { ids = await locksForToken(addr, c); } catch { return; }
+      const idSets = [];
+      for (const v of ['v1', 'v2']) {
+        try { idSets.push({ v, ids: await locksForToken(addr, c, v) }); } catch { /* skip this vault */ }
+      }
       let i = 0;
+      const flat = idSets.flatMap((x) => x.ids.map((id) => ({ id, v: x.v })));
       const worker = async () => {
-        while (i < ids.length) {
+        while (i < flat.length) {
           const k = i++;                      // ⚠ 索引当场取走（同 liveTail）
+          const { id, v } = flat[k];
           try {
-            const l = await readLock(ids[k], c);
+            const l = await readLock(id, c, v);
             rows.push({
+              vault: v,
               // ⚠ 行必须带上 **chain 对象**（row()/去重都读 d.chain.id）——
               //   liveTail 那份是调用方 `{...d, chain: c}` 补的，这里漏过就整页 paint 抛异常。
               chain: c,
@@ -365,9 +371,9 @@
   const LIVE_TAIL_MAX = 20;
   /** 读不到的哨兵：和"真的没有新锁"（返回 []）分开 —— 前者页面上要说出来。 */
   const tailFail = () => { const a = []; a.failed = true; return a; };
-  async function liveTail(c, seenIds) {
+  async function liveTail(c, seenIds, version = 'v1') {
     let n = null;
-    try { n = await totalLocks(c); } catch { return tailFail(); }
+    try { n = await totalLocks(c, version); } catch { return tailFail(); }
     /* ⚠ `totalLocks` 自己把错误吞成 **null** —— `!n` 会把"读不到（null）"和"0 把锁（0）"
        一起当"没有新锁"静默掉。分开了才看得见（这条是被掐网测试逼出来的）。 */
     if (n === null) return tailFail();
@@ -387,9 +393,9 @@
         const k = i++;                      // ⚠ 索引当场取走
         tried++;
         try {
-          const l = await readLock(ids[k], c);
+          const l = await readLock(ids[k], c, version);
           out.push({
-          lockId: l.id, chain_id: c.id, address: l.token, owner: l.owner,
+          lockId: l.id, vault: version, chain_id: c.id, address: l.token, owner: l.owner,
           symbol: l.symbol, name: '', decimals: l.decimals,
           raw_current_locked_amount: BigInt(l.amount) - BigInt(l.claimed || 0),
           unlock: l.endTime, claimed: String(l.claimed), steps: l.steps, label: l.description,
@@ -530,12 +536,17 @@
        已经回来的照常显示。原来逐链串行，四条链最坏 4×(6+6) 秒。 */
     const tailWork = Promise.all(snaps.filter((r) => !r.failed).map(async (r) => {
       const c = r.c;
-      const seenIds = r.list.map((x) => Number(x.lockId) || 0);
-      const [tail, pos] = await Promise.all([
-        withTimeout(liveTail(c, seenIds)),
+      const seenV1 = r.list.filter((x) => (x.vault || 'v1') === 'v1').map((x) => Number(x.lockId) || 0);
+      const seenV2 = r.list.filter((x) => x.vault === 'v2').map((x) => Number(x.lockId) || 0);
+      const [tailV1, tailV2, pos] = await Promise.all([
+        withTimeout(liveTail(c, seenV1, 'v1')),
+        withTimeout(liveTail(c, seenV2, 'v2')),
         withTimeout(positionRows(c)),
       ]);
-      if (tail === TIMEOUT || tail.failed) tailsFailed.push(c); else for (const d of tail) docs.push({ ...d, chain: c });
+      for (const tail of [tailV1, tailV2]) {
+        if (tail === TIMEOUT || tail.failed) tailsFailed.push(c);
+        else for (const d of tail) docs.push({ ...d, chain: c });
+      }
       if (pos === TIMEOUT) tailsFailed.push(c); else for (const d of pos) docs.push({ ...d, chain: c });
       paintSafe();   // 每读完一条链就重画一次
     }));

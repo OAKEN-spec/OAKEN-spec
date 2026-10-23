@@ -20,6 +20,16 @@ import { icon } from './icons.js';
  */
 export const ADAPTER = '0x16e02A106fE6E978fB98F76756B3a06b4995a7A6';
 export const VAULT = '0xe410d0a21C1376992874a9bEEeE0d623A50D4a34';
+/** v2 (2026-10-23). Same addresses on every deployed chain. */
+export const ADAPTER_V2 = '0xDBE1f3dc1d6E6759355E1B164231748f0589cb41';
+export const VAULT_V2 = '0xbC511F31967D9EBF775d203661a2BEfF6AA42615';
+export const OAKEN_LAUNCHER_V2 = '0x0d7cCEA7BabC5e3b4849267740D8fBBe6C4FDa58';
+/** Resolve the v1/v2 contract set. v1 is the default so old URLs keep working. */
+export function contractSet(version = 'v1') {
+  return version === 'v2'
+    ? { adapter: ADAPTER_V2, vault: VAULT_V2, launcher: OAKEN_LAUNCHER_V2 }
+    : { adapter: ADAPTER, vault: VAULT, launcher: OAKEN_LAUNCHER };
+}
 
 /** 没连钱包、URL 里也没写链时的落点。 */
 export const DEFAULT_CHAIN_ID = 4663;
@@ -50,6 +60,8 @@ export async function chains() {
       explorer: c.explorer,
       native: c.nativeCurrency?.symbol || 'ETH',
       launcherBlock: c.launcherBlock ?? null,
+      v2DeployBlock: c.v2DeployBlock ?? null,
+      v2LauncherBlock: c.v2LauncherBlock ?? null,
     }))
     /**
      * 排序：**我们的主链（4663）排最前**，其余按链 id。
@@ -178,8 +190,8 @@ export const VAULT_ABI = [
   'function getLock(uint256 lockId) view returns (tuple(address token,uint64 startTime,uint16 initialUnlockBps,bool revocable,bool transferable,address beneficiary,uint64 cliffTime,bool revoked,bool renounced,address creator,uint64 endTime,uint16 steps,uint128 amount,uint128 claimed,bytes32 label,address agent))',
   'function claimable(uint256 lockId) view returns (uint256)',
 ];
-export function vault(chain = CHAIN, signerOrProvider) {
-  return new window.ethers.Contract(VAULT, VAULT_ABI, signerOrProvider || provider(chain));
+export function vault(chain = CHAIN, signerOrProvider, version = 'v1') {
+  return new window.ethers.Contract(contractSet(version).vault, VAULT_ABI, signerOrProvider || provider(chain));
 }
 
 
@@ -197,15 +209,16 @@ export const LAUNCHER_ABI = [
   'event Launched(address indexed token,address indexed creator,address indexed beneficiary,uint256 supply,uint256 locked,uint256 lockId,uint64 unlockDate,string name,string symbol)',
 ]
 
-export function launcher(chain, signerOrProvider) {
-  return new window.ethers.Contract(OAKEN_LAUNCHER, LAUNCHER_ABI, signerOrProvider || provider(chain))
+export function launcher(chain, signerOrProvider, version = 'v1') {
+  return new window.ethers.Contract(contractSet(version).launcher, LAUNCHER_ABI, signerOrProvider || provider(chain))
 }
 
 /** 一笔发射交易的收据 → `Launched` 的参数。没有它说明这笔不是发射（或日志没解析出来）。 */
-export function launchedFromReceipt(receipt, chain = CHAIN) {
-  const iface = launcher(chain).interface
+export function launchedFromReceipt(receipt, chain = CHAIN, version = 'v1') {
+  const set = contractSet(version);
+  const iface = launcher(chain, null, version).interface
   for (const log of receipt?.logs || []) {
-    if (log.address && log.address.toLowerCase() !== OAKEN_LAUNCHER.toLowerCase()) continue
+    if (log.address && log.address.toLowerCase() !== set.launcher.toLowerCase()) continue
     try {
       const p = iface.parseLog({ topics: [...log.topics], data: log.data })
       if (p && p.name === 'Launched') return p.args
@@ -225,7 +238,7 @@ export function launchedFromReceipt(receipt, chain = CHAIN) {
  * 每块区间失败就**对半分再试一次**（公共 RPC 对 range 的脾气各不相同），
  * 仍然失败就如实返回 `complete: false` —— **不把"没扫到"说成"没有"**。
  */
-export async function launchesByCreator(chain, address, { lookback = 1_000_000, chunk = 90_000, maxChunks = 8, budgetMs = 7_000 } = {}) {
+export async function launchesByCreator(chain, address, { lookback = 1_000_000, chunk = 90_000, maxChunks = 8, budgetMs = 7_000, version = 'v1' } = {}) {
   const p = provider(chain)
   const head = await p.getBlockNumber()
   /**
@@ -233,10 +246,12 @@ export async function launchesByCreator(chain, address, { lookback = 1_000_000, 
    * 早于它的区间不可能有 `Launched` —— 从创世或"一年前"扫，纯属白烧 RPC。
    * 注册表没给（老接口）才退回固定回看窗口。
    */
-  const floor = chain && chain.launcherBlock ? Math.max(0, chain.launcherBlock) : Math.max(0, head - lookback)
+  const floor = chain && (version === 'v2' ? chain.v2LauncherBlock : chain.launcherBlock)
+    ? Math.max(0, version === 'v2' ? chain.v2LauncherBlock : chain.launcherBlock)
+    : Math.max(0, head - lookback)
   const topic = window.ethers.id('Launched(address,address,address,uint256,uint256,uint256,uint64,string,string)')
   const who = window.ethers.zeroPadValue(String(address).toLowerCase(), 32)
-  const iface = launcher(chain).interface
+  const iface = launcher(chain, null, version).interface
   const out = []
   let oldest = head
   let complete = true
@@ -298,7 +313,7 @@ export async function launchesByCreator(chain, address, { lookback = 1_000_000, 
           const e = iface.parseLog({ topics: [...l.topics], data: l.data })
           if (!e) continue
           out.push({
-            chainId: chain.id, token: e.args.token, creator: e.args.creator, beneficiary: e.args.beneficiary,
+            chainId: chain.id, vault: version, token: e.args.token, creator: e.args.creator, beneficiary: e.args.beneficiary,
             supply: e.args.supply, locked: e.args.locked, lockId: String(e.args.lockId),
             unlockDate: Number(e.args.unlockDate), name: e.args.name, symbol: e.args.symbol,
             block: l.blockNumber, tx: l.transactionHash,
@@ -1413,8 +1428,8 @@ export function provider(chain = CHAIN) {
   if (!_probed.has(key)) { _probed.add(key); probeChain(chain).catch(() => { /* 探测挂了不影响读 */ }); }
   return p;
 }
-export function adapter(chain, signerOrProvider) {
-  return new window.ethers.Contract(ADAPTER, ABI, signerOrProvider || provider(chain));
+export function adapter(chain, signerOrProvider, version = 'v1') {
+  return new window.ethers.Contract(contractSet(version).adapter, ABI, signerOrProvider || provider(chain));
 }
 export function erc20(chain, address, signerOrProvider) {
   /**
@@ -3332,16 +3347,16 @@ export function emberField(canvas) {
 /* ── 读链 ────────────────────────────────────────────────────────────────
  * 每个读函数都收一个链（不传就是默认链）—— 多链之后"读哪个合约"必须先知道
  * "读哪条链"，两件事分开传就会拿 A 链的 RPC 去问 B 链。 */
-export async function readLock(id, chain = CHAIN) {
+export async function readLock(id, chain = CHAIN, version = 'v1') {
   /**
    * 四组读**并发**发出去，不排队。代币页要按顺序读 11 把锁，一把锁 5 个来回
    * 就是 55 次串行往返 —— 页面上表现为"一直在读"。适配器那份和金库那份互不依赖，
    * 先一起发，拿到 token 再并发读代币元数据 / 可领额度 / LP 标记。
    */
-  const a = adapter(chain);
+  const a = adapter(chain, null, version);
   const [l, v] = await Promise.all([
     a.getLockById(id),
-    vault(chain).getLock(id).catch(() => null),
+    vault(chain, null, version).getLock(id).catch(() => null),
   ]);
   const schedOk = !!(v && v.token && v.token !== window.ethers.ZeroAddress);
   const [meta, withdrawable, lp] = await Promise.all([
@@ -3395,7 +3410,7 @@ export async function readLock(id, chain = CHAIN) {
     steps, cycleDays, cycleBps, tgeBps, exact: !!sched,
     claimed: sched ? sched.claimed : l.unlockedAmount, withdrawable, description: l.description, lp,
     renounced: sched ? sched.renounced : null, revocable: sched ? sched.revocable : null,
-    symbol, decimals,
+    symbol, decimals, version,
   };
 }
 
@@ -3427,7 +3442,7 @@ async function aggregate(chain, calls) {
 }
 
 /** 把一把锁的三份读（适配器 view / 金库排期 / 两个标记）拼成页面用的行。 */
-function buildLockRow(id, l, x, symbol, decimals) {
+function buildLockRow(id, l, x, symbol, decimals, version = 'v1') {
   const hasVault = !!(x.v && x.v.token && x.v.token !== window.ethers.ZeroAddress);
   const sched = hasVault ? {
     startTime: Number(x.v.startTime),
@@ -3455,7 +3470,7 @@ function buildLockRow(id, l, x, symbol, decimals) {
     claimed: sched ? sched.claimed : l.unlockedAmount,
     withdrawable: x.wd ?? null, description: l.description, lp: x.lp ?? null,
     renounced: sched ? sched.renounced : null, revocable: sched ? sched.revocable : null,
-    symbol, decimals,
+    symbol, decimals, version,
   };
 }
 
@@ -3464,17 +3479,18 @@ function buildLockRow(id, l, x, symbol, decimals) {
  * 外加 `failed`：第一轮就没读出来的把数。`null` = 这条链没法用 Multicall3
  * （调用方退回逐把读）。
  */
-export async function readLocks(ids, chain = CHAIN) {
+export async function readLocks(ids, chain = CHAIN, version = 'v1') {
   if (!Array.isArray(ids) || !ids.length) return { rows: [], failed: 0 };
   if (!window.ethers) return null;
-  const a = adapter(chain);
-  const v = vault(chain);
+  const set = contractSet(version);
+  const a = adapter(chain, null, version);
+  const v = vault(chain, null, version);
   const ercIface = new window.ethers.Interface(ERC20);
 
   let r1;
   try {
     r1 = await aggregate(chain, ids.map((id) => ({
-      target: ADAPTER, allowFailure: true,
+      target: set.adapter, allowFailure: true,
       callData: a.interface.encodeFunctionData('getLockById', [id]),
     })));
   } catch { return null; }
@@ -3492,9 +3508,9 @@ export async function readLocks(ids, chain = CHAIN) {
   const plan = [];
   const calls = [];
   for (const { id } of views) {
-    plan.push({ k: 'vault', id }); calls.push({ target: VAULT, allowFailure: true, callData: v.interface.encodeFunctionData('getLock', [id]) });
-    plan.push({ k: 'wd', id }); calls.push({ target: ADAPTER, allowFailure: true, callData: a.interface.encodeFunctionData('withdrawableTokens', [id]) });
-    plan.push({ k: 'lp', id }); calls.push({ target: ADAPTER, allowFailure: true, callData: a.interface.encodeFunctionData('isLpToken', [id]) });
+    plan.push({ k: 'vault', id }); calls.push({ target: set.vault, allowFailure: true, callData: v.interface.encodeFunctionData('getLock', [id]) });
+    plan.push({ k: 'wd', id }); calls.push({ target: set.adapter, allowFailure: true, callData: a.interface.encodeFunctionData('withdrawableTokens', [id]) });
+    plan.push({ k: 'lp', id }); calls.push({ target: set.adapter, allowFailure: true, callData: a.interface.encodeFunctionData('isLpToken', [id]) });
   }
   for (const t of tokens) {
     plan.push({ k: 'symbol', t }); calls.push({ target: t, allowFailure: true, callData: ercIface.encodeFunctionData('symbol') });
@@ -3522,7 +3538,7 @@ export async function readLocks(ids, chain = CHAIN) {
     const m = meta.get(String(l.token).toLowerCase()) || { symbol: 'TOKEN', decimals: 18 };
     const symbol = m.symbol == null ? 'TOKEN' : m.symbol;
     const decimals = m.symbol == null || m.decimals == null ? 18 : m.decimals;
-    return buildLockRow(id, l, extra.get(id) || {}, symbol, decimals);
+    return buildLockRow(id, l, extra.get(id) || {}, symbol, decimals, version);
   });
   return { rows, failed };
 }
@@ -3538,15 +3554,16 @@ export async function readLocks(ids, chain = CHAIN) {
  * 页面上所有锁都属于同一个代币，symbol/decimals 只问一次。
  * 返回 `null` 表示这条链没有可用的 Multicall3 —— 调用方退回老路径。
  */
-export async function tokenLocksPage(token, chain = CHAIN) {
+export async function tokenLocksPage(token, chain = CHAIN, version = 'v1') {
   if (!window.ethers) return null;
-  const a = adapter(chain);
-  const v = vault(chain);
+  const set = contractSet(version);
+  const a = adapter(chain, null, version);
+  const v = vault(chain, null, version);
   const ercIface = new window.ethers.Interface(ERC20);
   let ra;
   try {
     ra = await aggregate(chain, [
-      { target: ADAPTER, allowFailure: true, callData: a.interface.encodeFunctionData('getLocksForToken', [token, 0, 1000]) },
+      { target: set.adapter, allowFailure: true, callData: a.interface.encodeFunctionData('getLocksForToken', [token, 0, 1000]) },
       { target: token, allowFailure: true, callData: ercIface.encodeFunctionData('symbol') },
       { target: token, allowFailure: true, callData: ercIface.encodeFunctionData('decimals') },
     ]);
@@ -3562,14 +3579,14 @@ export async function tokenLocksPage(token, chain = CHAIN) {
     decimals = Number(ercIface.decodeFunctionResult('decimals', ra[2].returnData)[0]);
   } catch { symbol = 'TOKEN'; decimals = 18; }
   const ids = views.map((x) => String(x.id));
-  if (!ids.length) return { ids, rows: [], failed: 0, symbol, decimals };
+  if (!ids.length) return { ids, rows: [], failed: 0, symbol, decimals, version };
 
   const plan = [];
   const calls = [];
   for (const id of ids) {
-    plan.push({ k: 'vault', id }); calls.push({ target: VAULT, allowFailure: true, callData: v.interface.encodeFunctionData('getLock', [id]) });
-    plan.push({ k: 'wd', id }); calls.push({ target: ADAPTER, allowFailure: true, callData: a.interface.encodeFunctionData('withdrawableTokens', [id]) });
-    plan.push({ k: 'lp', id }); calls.push({ target: ADAPTER, allowFailure: true, callData: a.interface.encodeFunctionData('isLpToken', [id]) });
+    plan.push({ k: 'vault', id }); calls.push({ target: set.vault, allowFailure: true, callData: v.interface.encodeFunctionData('getLock', [id]) });
+    plan.push({ k: 'wd', id }); calls.push({ target: set.adapter, allowFailure: true, callData: a.interface.encodeFunctionData('withdrawableTokens', [id]) });
+    plan.push({ k: 'lp', id }); calls.push({ target: set.adapter, allowFailure: true, callData: a.interface.encodeFunctionData('isLpToken', [id]) });
   }
   let r2;
   try { r2 = await aggregate(chain, calls); }
@@ -3586,18 +3603,19 @@ export async function tokenLocksPage(token, chain = CHAIN) {
       extra.set(p.id, slot);
     } catch { /* 这一条读不到 —— 保持 null */ }
   });
-  const rows = views.map((l, i) => buildLockRow(ids[i], l, extra.get(ids[i]) || {}, symbol, decimals));
-  return { ids, rows, failed: 0, symbol, decimals };
+  const rows = views.map((l, i) => buildLockRow(ids[i], l, extra.get(ids[i]) || {}, symbol, decimals, version));
+  return { ids, rows, failed: 0, symbol, decimals, version };
 }
 
 /**
  * 一笔交易的收据 → 金库那条 `LockCreated` 的参数（`lockId` / `amount` 实收 / 排期字段）。
  * 不是我们的交易、或日志里没有它，回 null —— 调用方据此说"没读到"，而不是编一个锁号。
  */
-export function lockCreatedFromReceipt(receipt, chain = CHAIN) {
-  const iface = adapter(chain).interface;
+export function lockCreatedFromReceipt(receipt, chain = CHAIN, version = 'v1') {
+  const set = contractSet(version);
+  const iface = adapter(chain, null, version).interface;
   for (const log of receipt?.logs || []) {
-    if (log.address && log.address.toLowerCase() !== ADAPTER.toLowerCase()) continue;
+    if (log.address && log.address.toLowerCase() !== set.adapter.toLowerCase()) continue;
     try {
       const p = iface.parseLog({ topics: [...log.topics], data: log.data });
       if (p && p.name === 'LockCreated') return p.args;
@@ -3711,8 +3729,8 @@ export async function tokenMeta(address, chain = CHAIN) {
     return [symbol, Number(decimals)];
   } catch { return ['TOKEN', 18]; }
 }
-export async function locksForToken(token, chain = CHAIN) {
-  const a = adapter(chain);
+export async function locksForToken(token, chain = CHAIN, version = 'v1') {
+  const a = adapter(chain, null, version);
   const count = Number(await a.totalLockCountForToken(token));
   if (!count) return [];
   const rows = await a.getLocksForToken(token, 0, count - 1);   // ⚠ 闭区间
@@ -3729,18 +3747,18 @@ export async function locksForToken(token, chain = CHAIN) {
  *
  * 读不到的锁**跳过**，不编 —— 调用方看到的条数就是读到的条数。
  */
-export async function locksForOwner(chain, address) {
-  const a = adapter(chain);
+export async function locksForOwner(chain, address, version = 'v1') {
+  const a = adapter(chain, null, version);
   const views = await a.normalLocksForUser(address);
   /**
    * 快路径：一条 Multicall 把每把锁的金库排期 + 代币的 symbol/decimals 一起读回来
    * （25 把锁从 17 个 RPC 请求 / 3.7 秒降到 ~2 个请求）。失败就退回下面逐把读。
    */
   try {
-    const batched = await ownerLocksBatched(views, chain);
+    const batched = await ownerLocksBatched(views, chain, version);
     if (batched) { batched.sort((p, q) => Number(q.id) - Number(p.id)); return batched; }
   } catch { /* 退回逐把读 */ }
-  const v = vault(chain);
+  const v = vault(chain, null, version);
   const meta = new Map();
   const out = [];
   let i = 0;
@@ -3763,6 +3781,7 @@ export async function locksForOwner(chain, address) {
           unlock: l ? Number(l.endTime) : Number(x.tgeDate),
           steps: l ? Number(l.steps) : 0,
           description: x.description,
+          version,
         });
       } catch { /* 这一把读不到就跳过 */ }
     }
@@ -3773,16 +3792,17 @@ export async function locksForOwner(chain, address) {
 }
 
 /** `locksForOwner` 的 Multicall 快路径；不可用时回 null。 */
-async function ownerLocksBatched(views, chain) {
+async function ownerLocksBatched(views, chain, version = 'v1') {
   if (!views.length || !window.ethers) return null;
-  const v = vault(chain);
+  const set = contractSet(version);
+  const v = vault(chain, null, version);
   const ercIface = new window.ethers.Interface(ERC20);
   const tokens = [...new Set(views.map((x) => String(x.token).toLowerCase()))];
   const plan = [];
   const calls = [];
   for (const x of views) {
     plan.push({ k: 'vault', id: String(x.id) });
-    calls.push({ target: VAULT, allowFailure: true, callData: v.interface.encodeFunctionData('getLock', [String(x.id)]) });
+    calls.push({ target: set.vault, allowFailure: true, callData: v.interface.encodeFunctionData('getLock', [String(x.id)]) });
   }
   for (const t of tokens) {
     plan.push({ k: 'symbol', t }); calls.push({ target: t, allowFailure: true, callData: ercIface.encodeFunctionData('symbol') });
@@ -3806,15 +3826,15 @@ async function ownerLocksBatched(views, chain) {
     const good = m.symbol != null && m.decimals != null;
     return {
       id: String(x.id), token: x.token, symbol: good ? m.symbol : 'TOKEN', decimals: good ? m.decimals : 18,
-      amount: x.amount, claimed: x.unlockedAmount,
+      amount: x.amount, claimed: x.unlockedAmount, version,
       unlock: l ? Number(l.endTime) : Number(x.tgeDate),
       steps: l ? Number(l.steps) : 0,
       description: x.description,
     };
   });
 }
-export async function totalLocks(chain = CHAIN) {
-  try { return Number(await adapter(chain).getTotalLockCount()); } catch { return null; }
+export async function totalLocks(chain = CHAIN, version = 'v1') {
+  try { return Number(await adapter(chain, null, version).getTotalLockCount()); } catch { return null; }
 }
 
 /**
@@ -3827,11 +3847,12 @@ export async function totalLocks(chain = CHAIN) {
  * 代价是每把锁一次调用，所以**有上限**：`cap` 之上只数前 cap 把，并回 `complete:false`
  * —— 调用方据此把来源写清楚，而不是假装数全了（[[fallback-that-looks-like-real-data]]）。
  */
-export async function lockedTokenAddresses(chain = CHAIN, cap = 150) {
-  const n = await totalLocks(chain);
+export async function lockedTokenAddresses(chain = CHAIN, cap = 150, version = 'v1') {
+  const n = await totalLocks(chain, version);
   if (!n) return { tokens: new Set(), complete: true, scanned: 0, total: 0 };
   const upto = Math.min(n, cap);
-  const a = adapter(chain);
+  const set = contractSet(version);
+  const a = adapter(chain, null, version);
   /**
    * 快路径：一笔 Multicall 把所有 `getLockById` 读回来（首页的"distinct tokens"
    * 原先 33 把锁要 6 个 worker 跑好几轮；现在一个请求）。失败退回逐把读。
@@ -3839,7 +3860,7 @@ export async function lockedTokenAddresses(chain = CHAIN, cap = 150) {
   if (window.ethers) {
     try {
       const out = await aggregate(chain, Array.from({ length: upto }, (_, i) => ({
-        target: ADAPTER, allowFailure: true,
+        target: set.adapter, allowFailure: true,
         callData: a.interface.encodeFunctionData('getLockById', [i + 1]),
       })));
       const tokens = new Set();

@@ -219,9 +219,9 @@
     $('rows').innerHTML = list.map((u) => {
       const c = live.find((x) => Number(x.id) === Number(u.chain_id));
       const slug = c ? c.slug : '';
-      const href = slug && u.lockId ? `/locks/${esc(slug)}/record/${esc(u.lockId)}` : '/locks';
+      const href = slug && u.lockId ? `/locks/${esc(slug)}/record/${esc(u.lockId)}${u.vault === 'v2' ? '?vault=v2' : ''}` : '/locks';
       return `<tr>
-        <td class="mono">#${esc(u.lockId)}</td>
+        <td class="mono">#${esc(u.lockId)}${u.vault === 'v2' ? ' <span class="pill">v2</span>' : ''}</td>
         <td>${esc(c ? c.name : u.chain_id)}</td>
         <td>${esc(u.symbol || '—')}</td>
         <td>${esc(num(u.current))} <span class="muted" style="font-size:11px">${esc(u.symbol || '')}</span></td>
@@ -265,7 +265,7 @@
           const unlock = Number(d.unlock);
           if (!unlock || unlock * 1000 <= Date.now()) continue;
           upcoming.push({
-            lockId: d.lockId, chain_id: c.id, symbol: d.symbol || '',
+            lockId: d.lockId, vault: d.vault || 'v1', chain_id: c.id, symbol: d.symbol || '',
             current: d.formatted_current_locked_amount ?? d.raw_current_locked_amount ?? '—',
             unlock, owner: d.owner || '', address: d.address || '',
           });

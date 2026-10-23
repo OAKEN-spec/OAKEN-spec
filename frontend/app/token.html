@@ -52,7 +52,7 @@
 <script src="/app/vendor/ethers.umd.min.js" defer></script>
 <script type="module">
   import { shell, locksForToken, readLock, readLocks, tokenLocksPage, tokenMeta, fmtAmount, fmtDate, short, countdown, explorer,
-    chainBySlug, currentChain, copyBtn, safeRead, showReadFail, ADAPTER , onChainSwitch} from '/app/oaken.js';
+    chainBySlug, currentChain, copyBtn, safeRead, showReadFail, ADAPTER, ADAPTER_V2, onChainSwitch} from '/app/oaken.js';
   shell();
 
     /* 同记录页：链来自 URL（/locks/<链>/<代币>），钱包换链不影响这一页。 */
@@ -79,58 +79,63 @@
      * 快路径：**两轮 Multicall** 把整页读完（枚举+元数据一轮，金库/标记一轮）。
      * 这条链没有 Multicall3 或批读失败时，退回 `tokenMeta` + 逐把读。
      */
-    let pageData = null;
-    try { pageData = await tokenLocksPage(token, chain); } catch { pageData = null; }
+    /* v1 and v2 have separate id spaces and separate adapters. Read both; each
+       row carries its version so the record link can select the right vault. */
+    const pages = [];
+    for (const v of ['v1', 'v2']) {
+      try { const p = await tokenLocksPage(token, chain, v); if (p) pages.push(p); } catch { /* try the other vault */ }
+    }
     let symbol = 'TOKEN', decimals = 18;
-    let ids = [];
-    if (pageData) {
-      symbol = pageData.symbol; decimals = pageData.decimals; ids = pageData.ids;
+    let ids = [];                 // fallback: [{ id, v }]
+    if (pages.length) {
+      symbol = pages[0].symbol; decimals = pages[0].decimals;
       document.title = `${symbol} locks · OAKEN`;
+      ids = pages.flatMap((p) => p.ids.map((id) => ({ id, v: p.version })));
     } else {
       try { [symbol, decimals] = await tokenMeta(token, chain); } catch { /* 保持 TOKEN/18 */ }
       document.title = `${symbol} locks · OAKEN`;
-      try { ids = await safeRead(() => locksForToken(token, chain), { chain, timeout: 12_000, retries: 1, label: 'token locks' }); }
-      catch (e) {
-        /* 读不到 ≠ 这个代币没有锁（清单通用第 1 条）：统一那句 + 重试。 */
+      let ok = 0;
+      for (const v of ['v1', 'v2']) {
+        try {
+          const got = await safeRead(() => locksForToken(token, chain, v), { chain, timeout: 12_000, retries: 1, label: 'token locks' });
+          ok++;
+          ids.push(...got.map((id) => ({ id, v })));
+        } catch { /* this vault did not answer */ }
+      }
+      if (!ok) {
         root.innerHTML = `<div class="eyebrow">Token</div><h2 class="sec">Could not read ${short(token)} from the chain.</h2>
           <p class="muted" style="margin-top:12px">This page reads ${chain.name} directly; it does not fall back to a cached copy.</p>
           <div id="tokfail" style="margin-top:16px;max-width:52ch"></div>`;
         showReadFail(document.getElementById('tokfail'), {
-          what: short(token) + ' on ' + chain.name, detail: (e && e.message) || '', chain, onRetry: () => run(token, chain),
+          what: short(token) + ' on ' + chain.name, detail: 'both vaults failed', chain, onRetry: () => run(token, chain),
         });
         return;
       }
     }
-    /**
-     * 先试 **Multicall3 两轮批读**（12 把锁从 ~4.0s 降到 ~1s）；这条链没有
-     * Multicall3、或批读整体失败时，退回一把一把读 —— 批量只是快路径，
-     * 不能因为快路径坏了就让整页读不出来。
-     */
     const rows = [];
     let lockFails = 0;      // ⚠ 单把读不到要**数出来**，见下面那行"Nothing locked"
-    if (pageData) {
-      rows.push(...pageData.rows);
-      lockFails = pageData.failed;
+    if (pages.length) {
+      for (const p of pages) { rows.push(...p.rows); lockFails += p.failed; }
     } else {
-      let batched = null;
-      try { batched = await readLocks(ids, chain); } catch { batched = null; }
-      if (batched) {
-        rows.push(...batched.rows);
-        lockFails = batched.failed;
-      } else {
-        /**
-         * 并发读，但**限流**：每把锁是 5 个 RPC 调用，11 lock${rows.length === 1 ? '' : 's'}一次性全发出去，
-         * 公共端点会开始 429 —— 那比慢更难查。4 把在飞，够快也不冒犯端点。
-         * 索引用 `const k = i++` 取，别让两个 worker 拿到同一个 id（那会读出重复行）。
-         */
-        let i = 0;
-        const worker = async () => {
-          while (i < ids.length) {
-            const k = i++;
-            try { rows.push(await readLock(ids[k], chain)); } catch (e) { lockFails++; }
-          }
-        };
-        await Promise.all(Array.from({ length: Math.min(4, ids.length) }, worker));
+      for (const v of ['v1', 'v2']) {
+        const vids = ids.filter((x) => x.v === v).map((x) => x.id);
+        if (!vids.length) continue;
+        let batched = null;
+        try { batched = await readLocks(vids, chain, v); } catch { batched = null; }
+        if (batched) {
+          rows.push(...batched.rows);
+          lockFails += batched.failed;
+        } else {
+          /* 并发读，但限流：每把锁是 5 个 RPC 调用，公共端点会 429。 */
+          let i = 0;
+          const worker = async () => {
+            while (i < vids.length) {
+              const k = i++;
+              try { rows.push(await readLock(vids[k], chain, v)); } catch (e) { lockFails++; }
+            }
+          };
+          await Promise.all(Array.from({ length: Math.min(4, vids.length) }, worker));
+        }
       }
     }
     /**
@@ -172,7 +177,7 @@
         <span class="pill lock">${fmtAmount(held, decimals)} ${symbol} still in the vault</span>
         <a class="pill" target="_blank" rel="noopener" href="${explorer('/token/' + token, chain)}">explorer ↗</a>
         <a class="pill ok" target="_blank" rel="noopener" title="the lock contracts are exact matches on Sourcify"
-           href="https://sourcify.dev/#/lookup/${ADAPTER}">source verified ↗</a>
+           href="https://sourcify.dev/#/lookup/${rows.some((r) => r.version === 'v2') ? ADAPTER_V2 : ADAPTER}">source verified ↗</a>
       </div>
       <div class="panel" style="margin-top:26px">
         <table class="list">
@@ -182,14 +187,15 @@
               /* 用 endTime 而不是第一次释放：分档锁的第一次释放（TGE）不是"Unlocks"，
                  拿它当这一列的日期会把一把还在按天释放的锁写成"已解锁"。 */
               const c = countdown(l.endTime);
+              const ver = l.version || 'v1';
               return `<tr>
-                <td class="mono">#${l.id}</td>
+                <td class="mono">#${l.id}${ver === 'v2' ? ' <span class="pill" title="read from the v2 vault">v2</span>' : ''}</td>
                 <td>${fmtAmount(l.amount, l.decimals)}</td>
                 <td class="mono muted" style="font-size:13px">${short(l.owner)}</td>
                 <td>${c.done ? '<span class="pill ok">released</span>' : `<span class="pill lock">${c.text}</span>`}
                     ${l.steps ? `<span class="muted" style="font-size:12px"> · ${l.steps} steps</span>` : ''}
                     <div class="muted" style="font-size:12px;margin-top:4px">${fmtDate(l.endTime)}</div></td>
-                <td style="text-align:right"><a href="/locks/${chain.slug}/record/${l.id}">View →</a></td>
+                <td style="text-align:right"><a href="/locks/${chain.slug}/record/${l.id}${ver === 'v2' ? '?vault=v2' : ''}">View →</a></td>
               </tr>`;
             }).join('') : '<tr><td colspan="5" class="muted" style="padding:26px 14px">Nothing locked for this token yet.</td></tr>'}
           </tbody>

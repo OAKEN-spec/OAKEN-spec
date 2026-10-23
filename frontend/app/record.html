@@ -66,7 +66,7 @@
 <!-- defer：不让 514 KB 的 ethers 挡住首屏；顺序仍在我们自己的模块之前（模块默认 deferred） -->
 <script src="/app/vendor/ethers.umd.min.js" defer></script>
 <script type="module">
-  import { shell, readLock, countdown, fmtAmount, fmtDate, short, explorerHref, ADAPTER, VAULT, wallet, adapter, vault, provider,
+  import { shell, readLock, countdown, fmtAmount, fmtDate, short, explorerHref, contractSet, wallet, adapter, vault, provider,
     toast, reveal, chainBySlug, currentChain, onWallet, humanizeTxError, erc20, storedTitle, copyBtn, copy,
     safeRead, showReadFail, txNotice, cachedRead, cacheDrop, onChainSwitch} from '/app/oaken.js';
   import { icon } from '/app/icons.js';
@@ -77,6 +77,10 @@
     onChainSwitch(() => { /* 什么都不用做（见上） */ });
   const m = /^\/locks\/([^/]+)\/record\/([^/]+)\/?$/.exec(location.pathname);
   const id = m && m[2];
+  /* `?vault=v2` selects the v2 contracts. Without it the page stays on v1 so
+     every old record URL keeps reading the vault that actually holds the lock. */
+  const VAULT_VER = new URLSearchParams(location.search).get('vault') === 'v2' ? 'v2' : 'v1';
+  const SET = contractSet(VAULT_VER);
   const root = document.getElementById('root');
   let activeChain = null;   // 解析出来的链；重画时用它，别把 null 传回 load()
 
@@ -232,14 +236,14 @@
           <div class="grid2" style="margin-top:18px;gap:26px">
             <div>
               <dl class="kv">
-                <dt>Adapter</dt><dd>${addr(ADAPTER)} ${copyBtn(ADAPTER, 'copy')}</dd>
-                <dt>Vault</dt><dd>${addr(VAULT)} ${copyBtn(VAULT, 'copy')}</dd>
+                <dt>Adapter</dt><dd>${addr(SET.adapter)} ${copyBtn(SET.adapter, 'copy')}</dd>
+                <dt>Vault</dt><dd>${addr(SET.vault)} ${copyBtn(SET.vault, 'copy')}</dd>
                 <dt>Vault bytecode</dt><dd id="vcode"><span class="muted">reading eth_getCode…</span></dd>
                 <dt>Adapter bytecode</dt><dd id="acode"><span class="muted">reading eth_getCode…</span></dd>
               </dl>
               <div class="hint">Same address on Robinhood, BNB, Base and Polygon — the salt derives it from the bytecode.
-                Sourcify: <a href="https://sourcify.dev/#/lookup/${VAULT}" target="_blank" rel="noopener">vault</a>
-                · <a href="https://sourcify.dev/#/lookup/${ADAPTER}" target="_blank" rel="noopener">adapter</a>.</div>
+                Sourcify: <a href="https://sourcify.dev/#/lookup/${SET.vault}" target="_blank" rel="noopener">vault</a>
+                · <a href="https://sourcify.dev/#/lookup/${SET.adapter}" target="_blank" rel="noopener">adapter</a>.</div>
             </div>
             <div>
               <label class="f" for="livecallid">Live call · <span class="mono">vault.getLock(id)</span></label>
@@ -301,8 +305,8 @@
   }
 
   function wireVerifyPanel(l, chain) {
-    readCodeHash(chain, VAULT, 'vcode');
-    readCodeHash(chain, ADAPTER, 'acode');
+    readCodeHash(chain, SET.vault, 'vcode');
+    readCodeHash(chain, SET.adapter, 'acode');
     const btn = document.getElementById('livecallbtn');
     const inp = document.getElementById('livecallid');
     const out = document.getElementById('livecallout');
@@ -317,7 +321,7 @@
         + escText(chain.name) + '…</span>';
       btn.disabled = true;
       try {
-        const v = await safeRead(() => vault(chain).getLock(raw), { chain, timeout: 9_000, label: 'getLock' });
+        const v = await safeRead(() => vault(chain, null, VAULT_VER).getLock(raw), { chain, timeout: 9_000, label: 'getLock' });
         if (!v || !v.token || v.token === window.ethers.ZeroAddress) {
           out.innerHTML = '<b>The vault has no lock #' + raw + ' on ' + escText(chain.name) + '.</b> '
             + '<span class="muted">getLock returned an empty record — that id was never created on this chain.</span>';
@@ -374,7 +378,7 @@
   async function load(lockId, chain) {
     const gen = ++loadGen;
     let l;
-    try { l = await safeRead(() => readLock(lockId, chain), { chain, timeout: 12_000, retries: 1, label: 'Lock' }); }
+    try { l = await safeRead(() => readLock(lockId, chain, VAULT_VER), { chain, timeout: 12_000, retries: 1, label: 'Lock' }); }
     catch (e) {
       /* 读不到 ≠ 这把锁不存在（清单通用第 1 条）：给统一那句 + 重试，别让用户以为锁没了。 */
       root.innerHTML = `<div class="eyebrow">Record</div><h2 class="sec">Could not read lock #${lockId} from the chain.</h2>
@@ -457,7 +461,7 @@
       <div class="head-grid ark-rings">
         ${l.steps ? ringCalendar(l, now) : ring(pct, done ? '100%' : Math.round(pct * 100) + '%', done ? 'released' : c.text)}
         <div>
-          <h2 class="sec">${l.symbol} lock <span class="mono">#${l.id}</span></h2>
+          <h2 class="sec">${l.symbol} lock <span class="mono">#${l.id}</span>${VAULT_VER === 'v2' ? ' <span class="pill" title="read from the v2 vault">v2</span>' : ''}</h2>
           <p class="muted" style="margin-top:10px">${l.description && l.description !== '{}' ? l.description : 'No title was set for this lock.'}</p>
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
             <button class="btn btn-s" id="sharelock" type="button">Share this lock</button>
@@ -499,10 +503,10 @@
               ${l.steps ? `<dt>First release</dt><dd>${fmtDate(l.firstRelease)}</dd>
                           <dt>Fully released</dt><dd>${fmtDate(l.endTime)}</dd>`
                         : `<dt>Unlocks</dt><dd>${fmtDate(l.firstRelease)}</dd>`}
-              <dt>Contract</dt><dd>${ex('/address/' + ADAPTER)
-                 ? `<a class="mono" style="font-size:12px" target="_blank" rel="noopener" href="${ex('/address/' + ADAPTER)}">${short(ADAPTER)}</a>`
-                 : `<span class="mono" style="font-size:12px">${short(ADAPTER)}</span>`} ${copyBtn(ADAPTER, 'copy')}
-                 <a href="https://sourcify.dev/#/lookup/${ADAPTER}" target="_blank" rel="noopener"
+              <dt>Contract</dt><dd>${ex('/address/' + SET.adapter)
+                 ? `<a class="mono" style="font-size:12px" target="_blank" rel="noopener" href="${ex('/address/' + SET.adapter)}">${short(SET.adapter)}</a>`
+                 : `<span class="mono" style="font-size:12px">${short(SET.adapter)}</span>`} ${copyBtn(SET.adapter, 'copy')}
+                 <a href="https://sourcify.dev/#/lookup/${SET.adapter}" target="_blank" rel="noopener"
                     style="font-size:12px;margin-left:6px">verify ↗</a>
                  <span class="pill ok" title="exact match on Sourcify">source verified</span></dd>
             </dl>
@@ -550,7 +554,7 @@
 
     const shareBtn = document.getElementById('sharelock');
     if (shareBtn) shareBtn.onclick = async () => {
-      const url = location.href.split('?')[0];
+      const url = location.origin + location.pathname + (VAULT_VER === 'v2' ? '?vault=v2' : '');
       const title = `${l.symbol} lock #${l.id} · OAKEN`;
       try {
         if (navigator.share) { await navigator.share({ title, url }); return; }
@@ -583,7 +587,7 @@
         // 已经连着就不再 connect：那会多弹一次钱包，还会触发一次 accountsChanged 重画
         if (!(await wallet.accounts())[0]) await wallet.connect();
         await wallet.ensureChain(chain);
-        const a = adapter(chain, await wallet.signer());
+        const a = adapter(chain, await wallet.signer(), VAULT_VER);
         /* 全局那条通知和这一行状态**同时存在**：用户切去钱包再回来时只看得到提示条。 */
         note = txNotice(chain, verb);
         const tx = await call(a);
@@ -687,12 +691,12 @@
         if (n > l.amount) {
           const delta = n - l.amount;
           try {
-            const cur = await erc20(chain, l.token).allowance(l.owner, ADAPTER);
+            const cur = await erc20(chain, l.token).allowance(l.owner, SET.adapter);
             if (cur < delta) {
               if (!(await wallet.accounts())[0]) await wallet.connect();
               await wallet.ensureChain(chain);
               st.textContent = 'Allowance is short — approving exactly the extra ' + fmtAmount(delta, l.decimals) + ' ' + l.symbol + '…';
-              const t = await erc20(chain, l.token, await wallet.signer()).approve(ADAPTER, delta, { gasLimit: 1_000_000n });
+              const t = await erc20(chain, l.token, await wallet.signer()).approve(SET.adapter, delta, { gasLimit: 1_000_000n });
               await t.wait();
               st.textContent = 'Approved — now the update itself…';
             }

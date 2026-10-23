@@ -203,10 +203,10 @@
 
           <div class="warnbox">
             <b>Fee or limit tokens?</b> Exclude our lock contracts —
-            adapter <span class="mono">0x16e02A106fE6E978fB98F76756B3a06b4995a7A6</span>
-            <button class="copybtn" type="button" data-copy="0x16e02A106fE6E978fB98F76756B3a06b4995a7A6">copy</button>,
-            vault <span class="mono">0xe410d0a21C1376992874a9bEEeE0d623A50D4a34</span>
-            <button class="copybtn" type="button" data-copy="0xe410d0a21C1376992874a9bEEeE0d623A50D4a34">copy</button>
+            adapter <span class="mono">0xDBE1f3dc1d6E6759355E1B164231748f0589cb41</span>
+            <button class="copybtn" type="button" data-copy="0xDBE1f3dc1d6E6759355E1B164231748f0589cb41">copy</button>,
+            vault <span class="mono">0xbC511F31967D9EBF775d203661a2BEfF6AA42615</span>
+            <button class="copybtn" type="button" data-copy="0xbC511F31967D9EBF775d203661a2BEfF6AA42615">copy</button>
             — from fees, rewards and max-transaction limits <b>before</b> locking, or the transfer can be taxed or
             blocked and the lock will hold less than you asked. The same addresses exist on every chain we deploy to.
             <b>We don't support rebase tokens.</b> <b>Tokens with transfer hooks/callbacks (ERC-777-style) are not
@@ -262,11 +262,14 @@
 <!-- defer：不让 514 KB 的 ethers 挡住首屏；顺序仍在我们自己的模块之前（模块默认 deferred） -->
 <script src="/app/vendor/ethers.umd.min.js" defer></script>
 <script type="module">
-  import { shell, wallet, erc20, adapter, ADAPTER, tokenMeta, fmtAmount, fmtDate, toast, explorerHref, short,
+  import { shell, wallet, erc20, adapter, ADAPTER_V2, VAULT_V2, tokenMeta, fmtAmount, fmtDate, toast, explorerHref, short,
     chains, currentChain, provider, nativeBalance, isV2Pair, lockCreatedFromReceipt, storedTitle,
     humanizeTxError, safeRead, showReadFail, txNotice, onWallet, showChainSegFailed , mountDatePicker,
     onChainSwitch, setSiteChain, sealMoment, chainNow, chainIcon } from '/app/oaken.js';
   shell({ active: 'create' });
+  /* New locks go to the v2 adapter (reentrancy guard + refund). The v1 vault stays
+     readable for old locks; the record link carries ?vault=v2 for the new ones. */
+  const LOCK_ADAPTER = ADAPTER_V2;
   // 英文 / 美式的时间选择器（原生 datetime-local 跟浏览器语言走，改不动）
   mountDatePicker(document.getElementById('date'));
   mountDatePicker(document.getElementById('tge'));
@@ -550,7 +553,7 @@
     // 授权额度够不够 —— 决定这次是一笔还是两笔
     let need = true;
     if (state.token && state.amountWei != null) {
-      try { need = (await erc20(state.chain, state.token).allowance(state.addr, ADAPTER)) < state.amountWei; }
+      try { need = (await erc20(state.chain, state.token).allowance(state.addr, LOCK_ADAPTER)) < state.amountWei; }
       catch { need = true; }
     }
     state.needApprove = need;
@@ -880,7 +883,7 @@
       note = txNotice(state.chain, 'Approval');
       track.set('approve', 'wallet', 'Confirm the approval in your wallet — one approval for your whole ' +
         fmtAmount(approveFor, state.decimals) + ' ' + (state.symbol || '') + ' balance, covering later locks too.');
-      const t = await token.approve(ADAPTER, approveFor, { gasLimit: 1_000_000n });
+      const t = await token.approve(LOCK_ADAPTER, approveFor, { gasLimit: 1_000_000n });
       note.sent(t.hash);
       track.set('approve', 'sent', 'Approval sent — waiting for the block…', t.hash);
       await t.wait();
@@ -952,13 +955,13 @@
       const description = f.label || '';
 
       // ① 授权（够了就不发）。批的是**精确额度**，不是无限授权 —— 页面上也是这么写的。
-      const cur = await safeRead(() => erc20(state.chain, tokenAddr).allowance(me, ADAPTER),
+      const cur = await safeRead(() => erc20(state.chain, tokenAddr).allowance(me, LOCK_ADAPTER),
         { chain: state.chain, label: 'allowance' });
       if (cur < amount) {
         note = txNotice(state.chain, 'Approval');
         track.set('approve', 'wallet', 'Confirm the approval in your wallet — exactly ' +
           fmtAmount(amount, state.decimals) + ' ' + (state.symbol || '') + ', not unlimited.');
-        const t = await token.approve(ADAPTER, amount, { gasLimit: 1_000_000n });
+        const t = await token.approve(LOCK_ADAPTER, amount, { gasLimit: 1_000_000n });
         note.sent(t.hash);
         track.set('approve', 'sent', 'Approval sent — waiting for the block…', t.hash);
         await t.wait();
@@ -972,14 +975,14 @@
       const lockNote = txNotice(state.chain, 'Lock');
       note = lockNote;
       track.set('lock', 'wallet', 'Confirm the lock in your wallet…');
-      const a = adapter(state.chain, signer);
+      const a = adapter(state.chain, signer, 'v2');
       /**
        * 兜底用的计数，**不是主判据**：主判据是收据里金库的 LockCreated。
        * 写后读在节点滞后时会读到锁之前的数（→ "Lock #?"），只在拿不到日志时才用它，
        * 而且要"恰好 +1"才敢认。
        */
       let before = null;
-      try { before = Number(await adapter(state.chain).getTotalLockCount()); } catch { before = null; }
+      try { before = Number(await adapter(state.chain, null, 'v2').getTotalLockCount()); } catch { before = null; }
       const secs = Math.floor(f.date.getTime() / 1000);
       let tx;
       if (f.vest) {
@@ -997,11 +1000,11 @@
       const receipt = await tx.wait();
 
       // 锁号与**实收**数量：金库那条事件说了算
-      const created = lockCreatedFromReceipt(receipt, state.chain);
+      const created = lockCreatedFromReceipt(receipt, state.chain, 'v2');
       let id = created ? String(created.lockId) : null;
       if (!id && before !== null) {
         try {
-          const after = Number(await adapter(state.chain).getTotalLockCount());
+          const after = Number(await adapter(state.chain, null, 'v2').getTotalLockCount());
           if (after === before + 1) id = String(after);
         } catch { /* 读不到就是读不到，下面如实说 */ }
       }
@@ -1026,19 +1029,19 @@
         + (st.truncated ? '<div class="muted">Title stored as "' + st.text + '" (31 bytes on chain).</div>' : '')
         + '<div class="mono muted" style="font-size:12px;word-break:break-all">tx ' + tx.hash + '</div>'
         + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">'
-        + (id ? '<a class="btn btn-p" href="/locks/' + state.chain.slug + '/record/' + id + '">Open the record →</a>' : '')
+        + (id ? '<a class="btn btn-p" href="/locks/' + state.chain.slug + '/record/' + id + '?vault=v2">Open the record →</a>' : '')
         + (exTx ? '<a class="btn btn-s" href="' + exTx + '" target="_blank" rel="noopener">See it on the explorer</a>' : '')
         + '<a class="btn btn-s" href="/locks/create">Lock another</a>'
         + '</div></div>';
       state.trackMode = 'done';
       /* 成功那条通知带两个去处：记录页 + 浏览器（记录页链接是清单点名要的"明显按钮"）。 */
       lockNote.ok(id ? ('Locked as #' + id + ' on ' + state.chain.name) : ('Locked on ' + state.chain.name),
-        id ? [{ label: 'Open the record →', href: '/locks/' + state.chain.slug + '/record/' + id }] : []);
+        id ? [{ label: 'Open the record →', href: '/locks/' + state.chain.slug + '/record/' + id + '?vault=v2' }] : []);
       /* 成功仪式：交易日真的落地了才播；reduced-motion / 起播失败时它自己跳过 */
       sealMoment({
         chain: state.chain.name,
         id,
-        href: id ? '/locks/' + state.chain.slug + '/record/' + id : null,
+        href: id ? '/locks/' + state.chain.slug + '/record/' + id + '?vault=v2' : null,
         title: 'Locked and sealed.',
       });
       refreshCosts();   // 授权额度变了，确认次数跟着变（多半已经降到 1）

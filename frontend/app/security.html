@@ -93,9 +93,10 @@
       reviewed by the same person who wrote it, with public tools and a reproducible command list. Treat it
       as evidence of method, not as an audit opinion.</p>
     <p class="hint" style="max-width:84ch">A v2 fork with the reentrancy guard and the ETH refund is
-      <b>deployed on Robinhood Chain, Base and Polygon</b> (BNB Chain pending a small gas top-up), but the site
-      still reads v1 — new locks do not use v2 yet, and v1 remains live with the warning above. The addresses,
-      deployment records and dual-read migration plan are in
+      <b>deployed on Robinhood Chain, BNB Chain, Base and Polygon at the same addresses</b>. New locks and new
+      launches go through v2; v1 remains live for every lock created before 2026-10-23, and the site reads both
+      (the warning above still applies to existing v1 locks). The addresses, deployment records and migration
+      notes are in
       <a href="https://github.com/OAKEN-spec/OAKEN-spec/blob/master/contracts/V2.md" target="_blank" rel="noopener">V2.md</a>.</p>
 
     <div class="ssplit">
@@ -168,6 +169,9 @@
           <tr><td>MultiSender</td><td class="mono">0x1f380ef5eFF9113314Ee175dCE4F226DFd75A50C</td><td>none</td></tr>
           <tr><td>OakenAirdrop</td><td class="mono">0x17E9910cDC37BdA5531414012aeA5b0862C22066</td><td>none</td></tr>
           <tr><td>PresaleFactory</td><td class="mono">0xAC070cf2ed45aEcb9f5299d4C670fFfCE6387724</td><td>none</td></tr>
+          <tr><td>LockVault · v2</td><td class="mono">0xbC511F31967D9EBF775d203661a2BEfF6AA42615</td><td>none</td></tr>
+          <tr><td>PinkLockAdapter · v2</td><td class="mono">0xDBE1f3dc1d6E6759355E1B164231748f0589cb41</td><td>none</td></tr>
+          <tr><td>OakenLauncher · v2</td><td class="mono">0x0d7cCEA7BabC5e3b4849267740D8fBBe6C4FDa58</td><td>none</td></tr>
         </tbody>
       </table>
     </div>
