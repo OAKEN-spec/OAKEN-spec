@@ -12,7 +12,8 @@
     "coverage": "hardhat coverage --config hardhat.coverage.config.ts",
     "test:foundry": "forge test --match-path \"test/foundry/*\"",
     "test:invariant": "forge test --match-path test/foundry/LockVaultInvariant.t.sol",
-    "coverage:foundry": "forge coverage --ir-minimum"
+    "coverage:foundry": "forge coverage --ir-minimum",
+    "addresses:v2": "hardhat run scripts/deterministic-addresses-v2.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.1.2",

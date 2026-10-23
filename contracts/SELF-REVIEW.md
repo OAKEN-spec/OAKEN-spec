@@ -53,9 +53,14 @@ Status on the deployed contracts: **cannot be patched** (no owner, no upgrade).
 Mitigation for the current deployment: the creation UI now warns explicitly that
 tokens with transfer hooks/callbacks (ERC-777 and similar) are not supported; the
 warning already covered fee-on-transfer, rebasing, blacklisting and pausable
-tokens. Future deployment: add a reentrancy guard, or allocate
-`lockId` / write a pending record **before** the transfer and settle the counted
-amount after it. Re-run the PoC against the fixed version to prove it fails.
+tokens.
+
+**Fixed in the v2 source, not deployed:** `contracts/v2/LockVaultV2.sol` adds a
+`nonReentrant` guard on `createLock`, `claim`, `revoke` and `editLock`.
+`test/foundry/V2Fixes.t.sol` runs the same re-entrant token against v2: the outer
+transaction reverts, no lock is booked and no tokens stay in the vault. The
+deployment/migration plan (new salts, dual-read old and new vaults) is in
+`contracts/V2.md`.
 
 ### SR-02 — `PinkLockAdapter` payable functions can retain ETH — **Low, accepted**
 
@@ -64,8 +69,10 @@ amount after it. Re-run the PoC against the fixed version to prove it fails.
 forever. The site never sends value; the functions do not need ETH. Impact is
 limited to a caller who attaches value by mistake.
 
-Status on the deployed contracts: cannot be patched. Future deployment: remove
-`payable` so the call reverts instead of accepting stray ETH.
+Status on the deployed contracts: cannot be patched. **Fixed in the v2 source,
+not deployed:** `contracts/v2/PinkLockAdapterV2.sol` keeps the functions payable
+for PinkSale's form but refunds `msg.value` to the caller in the same
+transaction; `V2Fixes.t.sol` asserts the adapter ends with a zero ETH balance.
 
 ### SR-03 — Slither informational / false positives — **informational**
 
@@ -117,10 +124,11 @@ triage rather than hiding the report.
 
 ## Recommended next steps
 
-1. Add the token-callback warning to the lock creation UI (SR-01) now.
-2. For any v2 deployment: reentrancy guard / pending-id pattern, adapter
-   `payable` removal, and the SR-01 PoC converted into a regression test that
-   must revert.
+1. Add the token-callback warning to the lock creation UI (SR-01) now — **done**.
+2. For any v2 deployment: the guarded `LockVaultV2` and refunding
+   `PinkLockAdapterV2` are ready in `contracts/v2/`; the PoC is converted into
+   `V2Fixes.t.sol` (must revert). Follow `contracts/V2.md` for the dual-read
+   migration.
 3. Run Halmos on a toolchain combination that supports it, or a symbolic tool
    that supports Foundry 1.8.6; publish the properties and results.
 4. Keep the public disclosure route (`SECURITY.md`, GitHub private advisories)

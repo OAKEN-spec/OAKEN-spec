@@ -69,3 +69,9 @@ is that a lock’s address and code can be checked by anyone.
 ## License
 
 Apache-2.0 for the contracts and tests. See the repository’s `LICENSE`.
+
+## v2 source (not deployed)
+
+`contracts/v2/` contains the two fixes from `SELF-REVIEW.md`: a reentrancy guard
+on `LockVaultV2` and an ETH refund in `PinkLockAdapterV2`. v1 remains live at
+its existing addresses; read `V2.md` before deploying anything.

@@ -92,6 +92,11 @@
     <p class="hint" style="max-width:84ch;margin-top:14px">This is not an independent review. The code was
       reviewed by the same person who wrote it, with public tools and a reproducible command list. Treat it
       as evidence of method, not as an audit opinion.</p>
+    <p class="hint" style="max-width:84ch">A v2 source fork with the reentrancy guard and the ETH refund is
+      prepared in <span class="mono">contracts/v2/</span>; its deterministic addresses are computed but it is
+      <b>not deployed</b> — v1 remains live and the v1 warning above still applies. The deployment and dual-read
+      migration plan is in
+      <a href="https://github.com/OAKEN-spec/OAKEN-spec/blob/master/contracts/V2.md" target="_blank" rel="noopener">V2.md</a>.</p>
 
     <div class="ssplit">
       <div class="scard ownerless">
