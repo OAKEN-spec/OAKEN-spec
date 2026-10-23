@@ -11,6 +11,8 @@ commit here before engagement.
 | P0 | LockVault | `contracts/LockVault.sol` (751 lines) | Holds user tokens; vesting arithmetic; no upgrade/rescue |
 | P0 | PositionLock | `contracts/PositionLock.sol` (292) | Holds ERC-721 positions; time-gated release |
 | P0 | PinkLockAdapter (“Oaken Lock Adapter”) | `contracts/PinkLockAdapter.sol` (513) | Third-party-compatible write path into LockVault; indexing views |
+| P0 | **LockVaultV2** | `contracts/v2/LockVaultV2.sol` (772) | **Deployed; every new lock uses it.** v1 plus `nonReentrant` on create/claim/revoke/edit |
+| P0 | **PinkLockAdapterV2** | `contracts/v2/PinkLockAdapterV2.sol` (544) | **Deployed; every new lock uses it.** v1 plus the guard and the ETH refund |
 | P1 | OakenLauncher | `contracts/OakenLauncher.sol` (200) | Deploys a token and locks supply in one transaction |
 | P1 | TokenFactory / OakenToken | `TokenFactory.sol` (95), `OakenToken.sol` (108) | Creates fixed-supply tokens; no mint after deployment |
 | P1 | MultiSender | `MultiSender.sol` (167) | Moves arbitrary amounts to many recipients; batch atomicity |
@@ -21,15 +23,21 @@ commit here before engagement.
 ## Addresses and trust boundaries
 
 The lock-family addresses are deterministic and identical across chains
-(`tools`/`src/chains.mjs`). The Timelock and Safe are Robinhood Chain (4663)
-deployments.
+(`tools`/`src/chains.mjs`). **v1 and v2 are both deployed on all four chains**:
+v1 holds every lock created before 2026-10-23 and stays the only way to claim or
+revoke those; v2 is what new locks and launches use. v1 has no admin and no
+migration function, so the two vaults are read side by side (see `V2.md`). The
+Timelock and Safe are Robinhood Chain (4663) deployments.
 
 | Item | Value |
 |---|---|
 | LockVault | `0xe410d0a21C1376992874a9bEEeE0d623A50D4a34` |
 | PositionLock | `0xfC9A43c90e0E0d548D95cEf3C77fce802806CbA9` |
 | PinkLockAdapter | `0x16e02A106fE6E978fB98F76756B3a06b4995a7A6` |
-| OakenLauncher | `0x1d7561fC331594820382E8dd64582645EbafD873` |
+| OakenLauncher (v1, legacy) | `0x1d7561fC331594820382E8dd64582645EbafD873` |
+| **LockVaultV2** | `0xbC511F31967D9EBF775d203661a2BEfF6AA42615` |
+| **PinkLockAdapterV2** | `0xDBE1f3dc1d6E6759355E1B164231748f0589cb41` |
+| **OakenLauncherV2** | `0x0d7cCEA7BabC5e3b4849267740D8fBBe6C4FDa58` |
 | TokenFactory | `0xc0A3AD1428EeB70cAF88bb89c3B17D0191E1Bd34` |
 | MultiSender | `0x1f380ef5eFF9113314Ee175dCE4F226DFd75A50C` |
 | OakenAirdrop | `0x17E9910cDC37BdA5531414012aeA5b0862C22066` |
@@ -117,19 +125,21 @@ deployments.
   four.meme launchpads, Jupiter Lock.
 - Bonds economics, NAV strategy, and the Safe signer identities (separate
   governance review).
-- The Solana program; it is not deployed and has not completed an on-chain E2E.
+- The Solana program; it is deployed on mainnet with its upgrade authority revoked and passed a 25-check local-validator E2E, but it is outside this EVM audit and has not been audited.
 - Formal verification (none has been performed; the invariant suite is not a
   proof).
 
 ## Readiness checklist
 
 - [x] Exact file list and addresses above.
-- [x] Hardhat unit/integration suite (120 passing).
+- [x] Hardhat unit/integration suite (124 passing: 120 v1 + 4 v2).
 - [x] Foundry fuzz (14 tests × 1,000 runs) and invariants (4 × 128 runs × 64 depth).
 - [x] Coverage: product contracts 99.58% statements / 99.82% lines / 100%
       functions (branch 73.38% — a branch-coverage pass remains).
 - [x] Written invariants, known limitations, and monotonic-time assumption.
-- [ ] Third-party audit engagement and frozen commit hash.
+- [x] Frozen tags and bundle hashes: `audit-2026-10-23` (v1) and `audit-2026-10-23-v2`
+      (deployed v2 + self-review + PoC); `audit/SHA256SUMS` covers both bundles.
+- [ ] Third-party audit engagement.
 - [ ] Public report link and “Audited by … on …” badge (only after the report).
 - [ ] Public bug bounty program (separate owner/platform decision).
 - [ ] Formal verification of release/schedule arithmetic (optional).

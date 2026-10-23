@@ -1,4 +1,4 @@
-// Regression tests for the two v2 fixes (not deployed yet; see contracts/V2.md):
+// Regression tests for the two v2 fixes (v2 is deployed; see contracts/V2.md):
 //   SR-01: reentrancy through a token transfer callback is rejected.
 //   SR-02: the adapter returns attached ETH instead of retaining it.
 pragma solidity ^0.8.24;
@@ -109,10 +109,12 @@ contract V2Fixes is Test {
     function test_adapter_refunds_attached_eth() public {
         vm.deal(address(this), 2 ether);
         uint256 before = address(this).balance;
-        adapter.lock(address(this), address(token), false, 100e18, block.timestamp + 100, "refund");
+        /* The call MUST carry value: with value 0 the refund path returns early
+           and both assertions below are trivially true (2026-10-23 review). */
+        adapter.lock{value: 1 ether}(address(this), address(token), false, 100e18, block.timestamp + 100, "refund");
 
         assertEq(address(adapter).balance, 0, "adapter must not retain ETH");
-        assertEq(address(this).balance, before, "attached ETH must be returned");
+        assertEq(address(this).balance, before, "the 1 ETH must be returned");
         assertEq(vault.nextLockId(), 2, "adapter created a lock");
     }
 }

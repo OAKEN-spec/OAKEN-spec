@@ -158,7 +158,7 @@ async function waitForRpc(conn, tries = 60) {
     /* 本地校验器一般从 0 开始，但 devnet 上程序可能已经跑过 —— 判据用**起点**，不写死 0。 */
     const startId = await S.readNextId(conn);
     console.log('  当前下一个 id：' + startId);
-    check('计数器读得到', startId >= 0, true);
+    check('计数器读得到', startId !== null && startId !== undefined, String(startId));
 
     /* ── 建一把锁（未来到期，不可撤）──────────────────────────────────── */
     console.log('\n② CreateLock');
@@ -218,6 +218,18 @@ async function waitForRpc(conn, tries = 60) {
     check('第二把锁已到期', (await S.readLock(conn, id2)).unlockDate < Math.floor(Date.now() / 1000), true);
 
     const dest2 = S.ata(beneficiary.publicKey, mint);
+    /* 改道攻击：把 destination 换成付款人自己的 ATA —— 程序必须拒绝
+       （destination 必须是 lock.beneficiary 的 ATA，见 processor.rs 的 claim）。 */
+    let redirected = false;
+    try {
+      await sendAndConfirm(conn, new Transaction().add(S.claimIx(S.claimKeys({
+        lock: lockPda2, vault: vault2, mint, destination: payerAta.address,
+        payer: payer.publicKey, beneficiary: beneficiary.publicKey,
+      }))), [payer]);
+    } catch { redirected = true; }
+    check('币不能改道到别人的账户', redirected, true);
+    check('改道被拒后金库没动', (await getAccount(conn, vault2)).amount, amount);
+
     // 由**第三方**提交（payer 付 gas），币必须进受益人
     await sendAndConfirm(conn, new Transaction().add(S.claimIx(S.claimKeys({
       lock: lockPda2, vault: vault2, mint, destination: dest2[0], payer: payer.publicKey, beneficiary: beneficiary.publicKey,

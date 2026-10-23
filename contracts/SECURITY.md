@@ -50,18 +50,25 @@ must not be presented as covered by an EVM audit.
 
 ## What the tests pin
 
-- Hardhat unit + integration tests: **120 passing** (`npm test`).
+- Hardhat unit + integration tests: **124 passing** (`npm test`; 120 v1 + 4 v2).
 - Foundry fuzz tests: **14 fuzz tests × 1,000 runs** across LockVault and
   PositionLock.
 - Foundry invariant tests: **4 invariants, 128 runs × 64 depth**, with a handler
   that calls create/claim/revoke/edit/transfer/renounce from the right and wrong
   callers on a monotonic chain clock.
 - Solidity coverage (Hardhat, viaIR for instrumentation):
-  - product contracts: **99.58% statements · 99.82% lines · 100% functions**;
-  - including mocks: **98.83% statements · 98.87% lines**;
-  - branch coverage is **73.38%** (product contracts) — intentionally reported
-    separately; line/statement coverage is above the 95% gate, branch coverage is
-    not. A branch-coverage pass is on the audit-readiness list.
+  - **v1 product contracts: 99.58% statements · 99.82% lines · 100% functions;
+    branch 73.38%** — the figure the >95% gate refers to;
+  - including mocks: 86.31% statements / 87.00% lines (the mock tokens used by
+    refusal tests are intentionally only partly exercised);
+  - **v2 (the deployed fork): 54.55% statements · 55.70% lines · 40% functions ·
+    35.29% branches.** v2 is a byte-for-byte copy of v1 plus a reentrancy guard
+    and an ETH refund, so the v1 suite describes the shared code; the v2-specific
+    paths (guard revert, refund with value) are covered by `test/V2.test.ts` (4
+    Hardhat tests) and `test/foundry/V2Fixes.t.sol` (3 Foundry tests). The
+    coverage number is reported separately rather than blended into v1's.
+  - branch coverage is reported separately; a branch-coverage pass on both
+    versions remains on the audit-readiness list.
 
 ### Run it yourself
 
@@ -69,7 +76,7 @@ must not be presented as covered by an EVM audit.
 cd contracts
 npm ci
 
-npm test                     # Hardhat (120 tests)
+npm test                     # Hardhat (124 tests)
 npm run coverage             # solidity-coverage, uses hardhat.coverage.config.ts
 
 # Foundry (install forge first: https://book.getfoundry.sh/)

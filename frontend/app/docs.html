@@ -58,8 +58,9 @@
   <section class="band" style="padding-top:40px">
     <p class="muted reveal" style="max-width:70ch">OAKEN is a lock service and a small launchpad. On the EVM
       chains we deploy to, tokens and liquidity go into contracts that have <b>no owner, no upgrade path and no
-      admin key</b> — nothing to renounce, because nothing was kept. Solana locks are different: they currently use
-      <b>Jupiter Lock</b>, a third-party, upgradeable program — the Solana section below says exactly what is live.
+      admin key</b> — nothing to renounce, because nothing was kept. Solana locks: OAKEN's own program is
+      <b>live on mainnet with its upgrade authority revoked</b>; <b>Jupiter Lock</b> remains a third-party,
+      upgradeable option — the Solana section below says exactly what is live.
       Everything this site shows is read from the chain it sits on; the site is a window, not the vault.
       Audit and bug-bounty status, coverage and known limitations are on the
       <a href="/security">Security page</a> — no audit claim is made.</p>
@@ -130,12 +131,13 @@
           <p class="muted" style="font-size:14px"><b>pump.fun</b> is a third-party route: its program creates the
             coin on its bonding curve. pump.fun's market, graduation and fee rules apply, and its program is
             upgradeable by pump.fun.</p>
-          <p class="muted" style="font-size:14px"><b>Locks on Solana</b> currently use <b>Jupiter Lock</b>
-            (<span class="mono">LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn</span>), a third-party vesting program.
-            It is upgradeable by Jupiter's team. OAKEN's own Solana lock program
-            (<span class="mono">Co9ZnAVxX2siGThhjTpPgXPHYrCev1nrXFyGB1VcZcQW</span>) is built and tested but not
-            deployed to mainnet; the <a href="/locks/solana">Solana locks page</a> says so before it asks for a
-            signature. EVM locks on Robinhood Chain and BNB Chain are live and unchanged.</p>
+          <p class="muted" style="font-size:14px"><b>Locks on Solana</b> use OAKEN's own program
+            (<span class="mono">Co9ZnAVxX2siGThhjTpPgXPHYrCev1nrXFyGB1VcZcQW</span>), deployed on mainnet with its
+            <b>upgrade authority revoked</b>, or <b>Jupiter Lock</b>
+            (<span class="mono">LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn</span>), a third-party vesting program
+            that Jupiter's team can upgrade. The <a href="/locks/solana">Solana locks page</a> says which program it
+            will use before it asks for a signature. EVM locks on Robinhood Chain and BNB Chain are live and
+            unchanged.</p>
           <p class="hint" style="margin-top:10px">Solana wallets are separate from the EVM wallet in the top bar.
             The Solana pages detect Phantom, Solflare, Backpack and Glow in the browser; nothing is signed until
             you approve it in that wallet.</p>
@@ -229,10 +231,10 @@
             says so, and when the listing itself cannot be reached the page says <i>that</i> instead of
             pretending there are no sales.</p></div>
         <div class="card"><h3>Can I lock on Solana?</h3>
-          <p>Yes — with <b>Jupiter Lock</b>, a third-party vesting program, while OAKEN's own Solana lock program
-            is not yet deployed to mainnet. The <a href="/locks/solana">Solana locks page</a> states which program
-            will be used and that Jupiter's program is upgradeable before it asks for a signature. EVM locks on
-            Robinhood Chain and BNB Chain are our own contracts.</p></div>
+          <p>Yes — with OAKEN's own lock program (live on mainnet, upgrade authority revoked) or <b>Jupiter
+            Lock</b>, a third-party vesting program. The <a href="/locks/solana">Solana locks page</a> states
+            which program will be used and that Jupiter's program is upgradeable before it asks for a signature.
+            EVM locks on Robinhood Chain and BNB Chain are our own contracts.</p></div>
         <div class="card"><h3>Something is stuck on “Reading…”</h3>
           <p>Chain reads go straight from your browser to public nodes. If a node stalls, the page now gives up
             after a few seconds and offers <b>Retry</b> — which also rotates to the chain's second RPC.

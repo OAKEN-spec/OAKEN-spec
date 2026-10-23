@@ -28,7 +28,7 @@ scripts/              deterministic addresses and deployment helpers
 
 ```bash
 npm ci
-npm test                       # Hardhat: 120 tests
+npm test                       # Hardhat: 124 tests
 npm run typecheck
 npm run build                  # compile
 
@@ -70,8 +70,11 @@ is that a lock’s address and code can be checked by anyone.
 
 Apache-2.0 for the contracts and tests. See the repository’s `LICENSE`.
 
-## v2 source (not deployed)
+## v2 (deployed 2026-10-23)
 
 `contracts/v2/` contains the two fixes from `SELF-REVIEW.md`: a reentrancy guard
-on `LockVaultV2` and an ETH refund in `PinkLockAdapterV2`. v1 remains live at
-its existing addresses; read `V2.md` before deploying anything.
+on `LockVaultV2` and an ETH refund in `PinkLockAdapterV2`. v2 is deployed at new
+deterministic addresses on Robinhood Chain (4663), BNB Chain (56), Base (8453) and
+Polygon (137); **new locks and new launches use v2**, while v1 remains live at its
+existing addresses for locks created before 2026-10-23. The site reads both.
+Read `V2.md` for the addresses, deployment blocks and the dual-read contract.

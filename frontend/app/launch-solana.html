@@ -140,7 +140,7 @@
             <div class="route on" data-route="own">
               <div>
                 <b>OAKEN Factory</b>
-                <span class="sub">Fixed-supply SPL token + Metaplex metadata. Mint authority is revoked, so no one can ever mint more. No owner, no pause, no OAKEN fee. There is no market until you create one.</span>
+                <span class="sub">Fixed-supply SPL token + Metaplex metadata. The second transaction revokes the mint authority — the result panel tells you if that step landed. No owner, no pause, no OAKEN fee. There is no market until you create one.</span>
               </div>
               <button type="button" class="btn btn-s" data-pick="own">Selected</button>
             </div>
@@ -274,7 +274,8 @@
         <div class="head"><h3>After launch</h3></div>
         <div class="body">
           <div class="hint">Lock tokens on Solana from the Solana locks page. It names the program it will use —
-            <b>Jupiter Lock</b> while OAKEN's own lock program is still undeployed — before it asks for a signature.</div>
+            OAKEN's own lock program (live, upgrade authority revoked) or <b>Jupiter Lock</b>, a third-party
+            option — before it asks for a signature.</div>
           <a class="btn btn-s" href="/locks/solana">Open Solana locks →</a>
         </div>
       </div>
@@ -591,6 +592,9 @@
 
   function showDone(res) {
     const isOwn = res.route === 'own';
+    /* The mint and the revoke are two transactions. If the second one did not
+       land, the creator still holds mint authority — do not print "revoked". */
+    const revoked = isOwn && !!res.metadataSignature;
     const links = [
       `<a class="btn btn-s" href="${SOL.SOLSCAN_TOKEN(res.mint)}" target="_blank" rel="noopener">View on Solscan ↗</a>`,
       isOwn ? '' : `<a class="btn btn-s" href="https://pump.fun/coin/${res.mint}" target="_blank" rel="noopener">Open on pump.fun ↗</a>`,
@@ -599,8 +603,8 @@
     $('donebody').innerHTML = `
       <div><b>${esc(res.name || '')}</b> <span class="muted">(${esc(res.symbol || '')})</span> is on Solana.</div>
       <div class="mono">mint ${esc(res.mint)} <button class="copybtn" type="button" data-copy="${esc(res.mint)}">copy</button></div>
-      ${isOwn ? `<div class="hint">Supply ${Number(res.supply || 0).toLocaleString('en-US')} base units · ${res.decimals} decimals · mint authority revoked${res.metadataSignature ? '' : ' — metadata not confirmed'}</div>` : '<div class="hint">pump.fun owns the market from here.</div>'}
-      ${res.metadataError ? `<div class="warnline">The token exists, but the metadata transaction did not land: ${esc(res.metadataError)}. Nothing is lost; the mint and supply are already on-chain.</div>` : ''}
+      ${isOwn ? `<div class="hint">Supply ${Number(res.supply || 0).toLocaleString('en-US')} base units · ${res.decimals} decimals · ${revoked ? 'mint authority revoked' : '<b style="color:var(--bad)">mint authority NOT revoked</b>'}</div>` : '<div class="hint">pump.fun owns the market from here.</div>'}
+      ${res.metadataError ? `<div class="warnline">The token exists, but the metadata/revoke transaction did not land: ${esc(res.metadataError)}. The creator still holds <b>mint authority</b> — the supply is not fixed until that step succeeds.</div>` : ''}
       <div class="btnrow">${links}</div>
       <div class="hint">Locking is a separate page — nothing was locked in this launch. The lock page names the program it will use before you sign.</div>
       ${(state.jupLive || state.programLive) ? '<a class="btn btn-p" href="/locks/solana">Lock on Solana →</a>' : ''}`;

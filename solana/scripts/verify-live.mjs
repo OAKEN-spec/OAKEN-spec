@@ -2,6 +2,7 @@
 //   node solana/scripts/verify-live.mjs
 // 退出码 0 = 全部对上；任何一条不对就 1。
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Connection, PublicKey } from '@solana/web3.js';
@@ -23,6 +24,24 @@ const check = (name, pass, detail = '') => {
 async function txOk(sig) {
   const t = await conn.getTransaction(sig, { maxSupportedTransactionVersion: 0, commitment: 'confirmed' });
   return Boolean(t && !t.meta?.err);
+}
+
+/* ── OAKEN Lock program（不看证据文件，直接读链）──────────────────────── */
+console.log('== OAKEN Lock program ==');
+const LOCK_PROGRAM = new PublicKey('Co9ZnAVxX2siGThhjTpPgXPHYrCev1nrXFyGB1VcZcQW');
+const prog = await conn.getAccountInfo(LOCK_PROGRAM);
+check('program account exists and is executable', Boolean(prog && prog.executable), prog ? `${prog.data.length}B owner ${prog.owner.toBase58()}` : 'missing');
+if (prog && prog.data.length === 36) {
+  const programDataAddr = new PublicKey(prog.data.slice(4, 36));
+  const pd = await conn.getAccountInfo(programDataAddr);
+  check('ProgramData exists', Boolean(pd), programDataAddr.toBase58());
+  if (pd && pd.data.length > 45) {
+    check('ProgramData type = 3', pd.data.readUInt32LE(0) === 3, String(pd.data.readUInt32LE(0)));
+    check('upgrade authority = none (tag 0)', pd.data[12] === 0, 'tag=' + pd.data[12]);
+    const elf = pd.data.slice(45);
+    const sha = createHash('sha256').update(elf).digest('hex');
+    check('on-chain ELF sha256 matches the published build', sha === '8de3b7cbe1041ad0f846e3a8e4e80d337e5a6f115f9aba0fbb4924bc65abdce4', sha);
+  }
 }
 
 const main = JSON.parse(fs.readFileSync(path.join(ROOT, 'solana', '_live-test-evidence.json'), 'utf8'));

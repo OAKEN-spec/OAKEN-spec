@@ -5,6 +5,12 @@ on:
   push:
     paths:
       - 'solana/**'
+      # The E2E drives the same client encoders the site uses; a change there
+      # must run this workflow too.
+      - 'frontend/app/solana-build.js'
+      - 'frontend/app/solana.js'
+      - 'frontend/app/launch-solana.html'
+      - 'frontend/app/locks-solana.html'
       - '.github/workflows/solana-e2e.yml'
 
 jobs:
@@ -39,6 +45,10 @@ jobs:
       - name: Install JS dependencies
         working-directory: solana
         run: npm ci
+
+      - name: Rust unit tests
+        working-directory: solana/program
+        run: cargo test
 
       - name: Instruction/ABI builders
         working-directory: solana

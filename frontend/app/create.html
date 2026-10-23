@@ -294,7 +294,7 @@
     const seg = $('chainseg');
     let walletChainId = null;
     const paint = () => {
-      /* Solana 是独立页（Solana 钱包、Jupiter Lock），放在最左边；点它只跳转，不参与 EVM 链选择。 */
+      /* Solana 是独立页（Solana 钱包；自有 OAKEN Lock，Jupiter 为第三方备选），放在最左边；点它只跳转，不参与 EVM 链选择。 */
       seg.innerHTML = '<button type="button" data-sol="1" title="Solana locks"><span class="chain-ico">' + chainIcon('solana', 13) + '</span>Solana</button>'
         + live.map((c) => '<button type="button" data-id="' + c.id + '" class="' + (c.id === state.chain.id ? 'on' : '') + '"><span class="chain-ico">' + chainIcon(c.id, 13) + '</span>' + c.name + '</button>').join('');
       const walletOn = live.find((c) => c.id === walletChainId);

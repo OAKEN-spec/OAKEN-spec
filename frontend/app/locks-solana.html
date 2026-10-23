@@ -225,7 +225,9 @@
           <div class="hint">Tokens sit in an associated token account owned by a program-derived lock address.
             Only the program can move them, and only after the unlock time. Claim is permissionless: anyone can
             submit it, and the tokens always go to the beneficiary. There is no per-lock admin key and no pause on
-            the lock itself — but the live program (Jupiter Lock) can be upgraded by its team; see below.</div>
+            the lock itself. OAKEN's own program has no upgrade authority; <b>Jupiter Lock, if you select it, can
+            be upgraded by Jupiter's team</b> — see below. This page refuses unlock dates in the past; the program
+            itself trusts the date it was given, so a lock made by another tool can already be claimable.</div>
           <div class="hint">OAKEN's own lock program is <span class="mono">Co9ZnAVxX2siGThhjTpPgXPHYrCev1nrXFyGB1VcZcQW</span>
             (source in the repository). It is <b>deployed on Solana mainnet, upgrade authority none</b>, and passed a
             25-check E2E on a local validator. Jupiter Lock
@@ -251,7 +253,8 @@
   const state = {
     addr: null, backend: 'jupiter', jupLive: false, oakenLive: false, busy: false,
     decimals: null, symbol: '', name: '', mint: null, balance: '0',
-    now: Math.floor(Date.now() / 1000), clockLocal: false,
+    now: Math.floor(Date.now() / 1000), nowAt: Date.now(), clockLocal: false,
+    locks: [],
   };
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const short = (a) => (a ? a.slice(0, 4) + '…' + a.slice(-4) : '—');
@@ -274,6 +277,15 @@
     const whole = v / base;
     const frac = (v % base).toString().padStart(decimals, '0').slice(0, Math.min(decimals, 4)).replace(/0+$/, '');
     return whole.toLocaleString('en-US') + (frac ? '.' + frac : '');
+  }
+  /** Full precision for an <input> value: never rounds away base units, so
+   *  "Lock all" locks the whole balance even below the 4-decimal display. */
+  function amountInput(raw, decimals) {
+    const v = BigInt(raw || 0);
+    const base = 10n ** BigInt(decimals);
+    const whole = (v / base).toString();
+    const frac = (v % base).toString().padStart(decimals, '0').replace(/0+$/, '');
+    return whole + (frac ? '.' + frac : '');
   }
   function fmtTime(sec) {
     if (!sec) return '—';
@@ -362,7 +374,7 @@
 
   $('max').onclick = () => {
     if (state.decimals === null) return;
-    $('amount').value = fmtToken(state.balance, state.decimals).replace(/,/g, '');
+    $('amount').value = amountInput(state.balance, state.decimals);
     update();
   };
 
@@ -407,6 +419,7 @@
     if ($('useother').checked) {
       const b = $('benef').value.trim();
       if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(b)) out.push('Beneficiary must be a valid Solana address.');
+      else if (b === '11111111111111111111111111111111') out.push('Beneficiary cannot be the zero address — nobody could ever claim the lock.');
     }
     return out;
   }
@@ -519,26 +532,38 @@
     try {
       const all = [];
       let scan = null;
+      const fails = [];
+      /* One backend failing must not hide the other: they are independent
+         programs, and OAKEN is the default. */
       if (state.jupLive) {
-        const jup = await SOL.jupMyLocks();
-        scan = jup.scan || null;
-        all.push(...await enrichJup(jup));
+        try {
+          const jup = await SOL.jupMyLocks();
+          scan = jup.scan || null;
+          all.push(...await enrichJup(jup));
+        } catch (e) { fails.push('Jupiter: ' + SOL.humanize(e)); }
       }
       if (state.oakenLive) {
-        const locks = await SOL.myLocks();
-        const det = (await Promise.all(locks.map((l) => SOL.lockDetail(l.id).catch(() => null)))).filter(Boolean);
-        all.push(...det.map((l) => ({ ...l, backend: 'oaken', address: l.address })));
+        try {
+          const locks = await SOL.myLocks();
+          const det = (await Promise.all(locks.map((l) => SOL.lockDetail(l.id).catch(() => null)))).filter(Boolean);
+          all.push(...det.map((l) => ({ ...l, backend: 'oaken', address: l.address })));
+        } catch (e) { fails.push('OAKEN: ' + SOL.humanize(e)); }
       }
       if (!all.length) {
-        $('listhint').textContent = scan && scan.mode === 'history'
-          ? `No Jupiter locks in the last ${scan.signatures || 0} transactions for this wallet. If you have an older lock, paste its escrow address above.`
-          : 'No locks where you are the creator or beneficiary.';
-        $('locklist').innerHTML = '<div class="empty">Nothing locked yet.</div>';
+        $('listhint').textContent = fails.length
+          ? 'Could not read locks — ' + fails.join(' · ')
+          : scan && scan.mode === 'history'
+            ? `No Jupiter locks in the last ${scan.signatures || 0} transactions for this wallet. If you have an older lock, paste its escrow address above.`
+            : 'No locks where you are the creator or beneficiary.';
+        $('locklist').innerHTML = fails.length ? '' : '<div class="empty">Nothing locked yet.</div>';
+        state.locks = [];
         return;
       }
       all.sort((a, b) => (Number(b.unlockDate || b.cliffTime || 0)) - (Number(a.unlockDate || a.cliffTime || 0)));
+      state.locks = all;
       $('listhint').textContent = `${all.length} lock${all.length === 1 ? '' : 's'} found.`
-        + (scan && scan.mode === 'history' ? ` (scanned the last ${scan.signatures} transactions${scan.complete ? '' : ' — the scan timed out, older locks may be missing'})` : '');
+        + (scan && scan.mode === 'history' ? ` (scanned the last ${scan.signatures} transactions${scan.complete ? '' : ' — the scan timed out, older locks may be missing'})` : '')
+        + (fails.length ? ` ${fails.join(' · ')} did not answer — its locks may be missing.` : '');
       $('locklist').innerHTML = all.map((l) => rowHtml(l)).join('');
       wireRows();
     } catch (e) {
@@ -547,7 +572,9 @@
   }
 
   function rowHtml(l) {
-    const now = state.now;
+    /* Advance the chain-read clock by wall time so a page left open reveals
+       the Claim button when a lock matures (no re-read needed). */
+    const now = state.now + Math.floor((Date.now() - state.nowAt) / 1000);
     const dec = l.mintInfo?.decimals ?? state.decimals ?? 0;
     const sym = l.meta?.symbol || state.symbol || (l.mint ? short(l.mint) : '');
     if (l.backend === 'jupiter') {
@@ -598,6 +625,15 @@
       </div>
     </div>`;
   }
+
+  /* Cheap 30s repaint from the rows already read: countdowns and the
+     "claimable now" button follow the clock instead of freezing at load. */
+  setInterval(() => {
+    if (!state.busy && Array.isArray(state.locks) && state.locks.length && $('locklist').children.length) {
+      $('locklist').innerHTML = state.locks.map((l) => rowHtml(l)).join('');
+      wireRows();
+    }
+  }, 30_000);
 
   function wireRows() {
     for (const row of $('locklist').querySelectorAll('.lockrow')) {
@@ -662,7 +698,7 @@
   (async () => {
     try {
       const cn = await SOL.clusterNow();
-      state.now = cn.now; state.clockLocal = cn.local;
+      state.now = cn.now; state.nowAt = Date.now(); state.clockLocal = cn.local;
       if (cn.local) $('datehint').textContent = 'Your browser clock is used for the date check; the chain enforces its own time.';
       await SOL.ready();
       [state.jupLive, state.oakenLive] = await Promise.all([SOL.jupLive(), SOL.programLive()]);

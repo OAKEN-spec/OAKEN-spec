@@ -29,8 +29,9 @@
 //!
 //! ## 程序地址
 //!
-//! 见下面的 `declare_id!`。部署用 `solana/program-keypair.json`，
-//! **那个文件就是程序的身份**（将来升级也用它），不要丢。
+//! 见下面的 `declare_id!`。部署用 `solana/program-keypair.json`，那个文件就是程序身份。
+//! 2026-10-23 已用 `--final` 部署并撤销升级权（ProgramData Authority = none）：
+//! **程序不能再升级**；keypair 留着只为核对地址、复现部署，不要丢。
 
 pub mod instruction;
 pub mod processor;

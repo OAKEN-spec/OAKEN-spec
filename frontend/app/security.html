@@ -78,7 +78,7 @@
     <h2 class="sec" style="font-size:28px">We looked, with tools. It is still not an audit.</h2>
     <div class="grid2" style="margin-top:18px">
       <div class="card"><h3>What was run</h3><p>Slither 0.11.6 over the product contracts (107 findings,
-        17 High/Medium before triage), the 120 Hardhat tests, the Foundry fuzz/invariant suites, and a
+        17 High/Medium before triage), the 124 Hardhat tests, the Foundry fuzz/invariant suites, and a
         reentrancy proof-of-concept. Halmos did not run on this Foundry toolchain; no symbolic result is
         claimed. <a href="https://github.com/OAKEN-spec/OAKEN-spec/blob/master/contracts/SELF-REVIEW.md"
         target="_blank" rel="noopener">Full self-review →</a></p></div>
@@ -129,14 +129,16 @@
     <div class="eyebrow" style="margin-top:46px">Tests and invariants</div>
     <h2 class="sec" style="font-size:28px">The parts we can put a number on.</h2>
     <div class="stats" id="coverage" style="margin-top:22px">
-      <div><div class="v">120</div><div class="k">Hardhat tests</div></div>
+      <div><div class="v">124</div><div class="k">Hardhat tests</div></div>
       <div><div class="v">14 × 1,000</div><div class="k">Foundry fuzz runs</div></div>
       <div><div class="v">4</div><div class="k">Invariants · 128 × 64</div></div>
-      <div><div class="v">99.8%</div><div class="k">Line coverage (product)</div></div>
+      <div><div class="v">99.8%</div><div class="k">v1 line coverage</div></div>
     </div>
-    <p class="hint" style="max-width:84ch;margin-top:14px">Coverage at the audit-readiness export: product
-      contracts <b>99.58% statements · 99.82% lines · 100% functions</b>; branch coverage <b>73.38%</b> and is
-      reported separately rather than rounded up. The four deterministic-address tests run in the normal suite;
+    <p class="hint" style="max-width:84ch;margin-top:14px">Coverage: <b>v1 product contracts</b>
+      <b>99.58% statements · 99.82% lines · 100% functions</b>; branch coverage <b>73.38%</b> and is
+      reported separately rather than rounded up. The deployed <b>v2</b> fork is v1 plus a reentrancy guard and
+      an ETH refund; its own paths are covered by 4 Hardhat tests and 3 Foundry tests and its coverage is
+      reported separately, not blended into v1's. The four deterministic-address tests run in the normal suite;
       the coverage build uses viaIR instrumentation and excludes them.</p>
     <div class="hint" style="max-width:84ch">The sanitized public repository is live at
       <a href="https://github.com/OAKEN-spec/OAKEN-spec" target="_blank" rel="noopener">OAKEN-spec/OAKEN-spec</a>

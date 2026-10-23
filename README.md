@@ -17,7 +17,7 @@ contracts/            Solidity 0.8.24 contracts + Hardhat/Foundry tests
 frontend/app/         Static frontend source (HTML/CSS/JS, media, bonds module)
 frontend/serve-local.mjs  Minimal static server for the exported pages (no indexer)
 frontend/brand/       OAKEN brand assets used by the pages
-solana/               Solana lock program source (not deployed; no keypair)
+solana/               Solana lock program source (deployed on mainnet; keypair not included)
 docs/                 Frontend/local-development notes
 THIRD-PARTY-NOTICES.md  Licenses of the bundled libraries and fonts
 ```
@@ -27,7 +27,7 @@ THIRD-PARTY-NOTICES.md  Licenses of the bundled libraries and fonts
 ```bash
 cd contracts
 npm ci
-npm test                         # Hardhat: 120 tests
+npm test                         # Hardhat: 124 tests
 forge test --match-path "test/foundry/*"   # Foundry: fuzz + invariant
 npm run coverage                 # solidity-coverage (viaIR instrumentation)
 ```
@@ -40,6 +40,11 @@ limitations.
 The lock-family contracts are deployed at deterministic, identical addresses on
 each supported EVM chain. Addresses live in `contracts/scripts/deterministic-addresses.ts`
 and the site registry; the tests compare both.
+
+**v1 and v2 are both deployed.** v1 holds every lock created before 2026-10-23;
+v2 adds a reentrancy guard and an ETH refund and is what new locks and launches
+use. The site reads both. Addresses, blocks and the dual-read contract are in
+[contracts/V2.md](contracts/V2.md).
 
 ## Frontend
 
@@ -65,9 +70,12 @@ states because the indexer is not part of this repository. See
 
 ## Solana
 
-`solana/` contains the program source and tests. It is **not deployed** and has
-not completed an on-chain E2E run; the site currently uses Jupiter Lock and says
-so on the page. Do not present it as an independent, deployed OAKEN program yet.
+`solana/` contains the SPL lock program (program id
+`Co9ZnAVxX2siGThhjTpPgXPHYrCev1nrXFyGB1VcZcQW`), its tests and the client
+encoders. It is **deployed on Solana mainnet with its upgrade authority revoked**;
+the on-chain ELF matches the local build (SHA-256 `8de3b7cb…`). GitHub Actions
+builds it with `cargo build-sbf` and runs a five-instruction E2E on a local
+validator (25 checks). Jupiter Lock remains a third-party, upgradeable option.
 
 ## License
 

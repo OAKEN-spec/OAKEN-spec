@@ -1,14 +1,14 @@
 {
   "name": "solana",
   "version": "1.0.0",
-  "description": "",
+  "description": "OAKEN Solana lock program, launch encoders and E2E",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test test/builders.test.mjs"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "type": "module",
   "dependencies": {
     "@pump-fun/pump-sdk": "^4.2.0",

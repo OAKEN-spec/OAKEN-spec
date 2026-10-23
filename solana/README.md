@@ -61,8 +61,8 @@
 > node scripts/e2e.mjs                            # 五条指令逐个走，判据取链
 > ```
 >
-> **② 在 Mac / Linux 上**：`node scripts/e2e-bankrun.mjs`（进程内 bank，一条命令跑完）
-> 或者 `node scripts/e2e.mjs --start`（自带验证器）。
+> **② 在 Mac / Linux 上**：`node scripts/e2e.mjs --start`（自带验证器；
+> 这也是 CI 跑的那条）。
 
 EVM 那边 `LockVault` 的 Solana 版：把 SPL 代币锁进一个只有到期才动得了的金库。
 **没有 owner、没有暂停、部署后升级权置空** —— 和 EVM 版的取舍是同一条。
@@ -147,3 +147,15 @@ solana CLI 4.3.0 / SBF 4.4.0  ~/.local/share/solana/install/active_release/bin
 @solana/web3.js 1.99          solana/node_modules  （浏览器那份已 vendor 到
                                                     public/app/vendor/solana-web3.iife.min.js）
 ```
+
+## 测试现状（2026-10-23 复核后）
+
+- **Rust 单元测试 17 条**（`program/src/*.rs`）：状态布局往返、指令编解码、SPL/ATA/System
+  指令字节、PDA 推导。`cargo test` 只编这些，**不依赖** `solana-program-test`。
+- **集成判据 = CI 的 E2E**：`.github/workflows/solana-e2e.yml` 在 ubuntu 上
+  `cargo build-sbf` → 起 `solana-test-validator` → `scripts/e2e.mjs` 五条指令 25 项判据。
+- 仓库里**不再保留**跑不起来的路径：`program/tests/lock.rs`（账户表过期、从未在 CI 跑过）、
+  `scripts/e2e-bankrun.mjs`（BanksClient 无 `getAccountInfo`，win32 也无预编译包）、
+  `lib/solana.js`（旧客户端副本，无任何调用方）。页面与测试共用的是 `frontend/app/solana-build.js`。
+- **程序不要求解锁日期在未来**（只有页面要求 `now + 30s`）。直接调用程序的集成方
+  可以建一把“立刻可领”的锁 —— 锁账户本身不构成“未来才解锁”的证明，页面才会。

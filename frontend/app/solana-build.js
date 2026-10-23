@@ -254,8 +254,19 @@ export function makeSolana(web3) {
   const lockPda = (id) => findPda([LOCK_SEED, u64le(id)], oaken);
 
   const createLockIx = ({ id, amount, unlockDate, revocable, label }, keys, program = oaken) => {
+    /* 64 BYTES on chain. Copy code point by code point so a multi-byte UTF-8
+       character is never split in half (a sliced byte sequence decodes as U+FFFD). */
     const labelRaw = Buf.alloc(LABEL_LEN);
-    Buf.from(String(label || ''), 'utf8').copy(labelRaw, 0, 0, LABEL_LEN);
+    {
+      const enc = new TextEncoder();
+      let used = 0;
+      for (const ch of String(label || '')) {
+        const b = enc.encode(ch);
+        if (used + b.length > LABEL_LEN) break;
+        labelRaw.set(b, used);
+        used += b.length;
+      }
+    }
     return new TransactionInstruction({
       programId: program,
       keys,
@@ -427,15 +438,20 @@ export function makeSolana(web3) {
    * 所以调用方要先发一条 `createAtaIdempotentIx`（Token-2022）。WSOL 侧的账户
    * 对 SOL 计价币只是占位，不需要存在。
    */
-  const pumpBuyExactQuoteV3Ix = ({ mint, user, quoteIn, minTokensOut = 0n }) => {
+  const pumpBuyExactQuoteV3Ix = ({ mint, user, quoteIn, minTokensOut = 0n, partialFill = false }) => {
     const mintKey = pk(mint);
     const userKey = pk(user);
     const bondingCurve = pumpBondingCurvePda(mintKey);
     const wsol = pk(WSOL_MINT);
+    /* Args per the pump IDL: spendable_quote_in u64, min_tokens_out u64,
+       partial_fill: OptionBool. OptionBool is a one-field struct (bool) — one
+       byte. Omitting it made Anchor reject the instruction and the whole
+       create+dev-buy transaction reverted. */
     const data = Buf.concat([
       buf(PUMP_BUY_EXACT_QUOTE_V3_DISC),
       u64le(quoteIn),
       u64le(minTokensOut),
+      Uint8Array.of(partialFill ? 1 : 0),
     ]);
     return new TransactionInstruction({
       programId: pump,

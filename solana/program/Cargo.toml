@@ -20,13 +20,3 @@ solana-program = "2"
 [features]
 default = []
 no-entrypoint = []
-
-# 测试用的依赖（不进程序产物）：`cargo test-sbf` 在进程内的 bank 里跑**真的 SBF 字节码**，
-# 不需要 solana-test-validator —— 而后者在这台 Windows 上起不来（它要建符号链接，
-# 那需要开发者模式或管理员权限，报的是 1314「客户端没有所需的特权」）。
-[dev-dependencies]
-solana-program-test = "2"
-solana-sdk = "2"
-solana-account = "2"
-spl-token = { version = "7", features = ["no-entrypoint"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

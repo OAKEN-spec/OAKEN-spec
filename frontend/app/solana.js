@@ -6,7 +6,8 @@
 // 三条写入路径：
 //   1. 自有发射（OAKEN Factory）—— SPL Token + Metaplex，代币没有 mint 权限、没有 owner；
 //   2. pump.fun 发射 —— `create_v2`，币进它的曲线，后续买卖在 pump.fun；
-//   3. OAKEN Lock —— 我们的 Solana 锁程序（`solana/program/`），程序上链后自动可用。
+//   3. OAKEN Lock —— 我们的 Solana 锁程序（`solana/program/`），已部署主网、Authority none；
+//      程序读不到时页面退回 Jupiter Lock，并如实说哪条路在用。
 //
 // ⚠ 这里**没有模拟数据**：读不到就回 null / 抛错，页面显示 `—` 或错误行。
 import { makeSolana, OAKEN_PROGRAM_ID, JUP_LOCK_PROGRAM_ID, JUP_ESCROW_LEN } from './solana-build.js';
@@ -629,9 +630,8 @@ export async function launchPump({
 
 /* ── Jupiter Lock（第三方；链上已部署）────────────────────────────────────
  *
- * 为什么页面上会有这条路：我们的 OAKEN Lock 程序还没在主网部署（部署要按字节
- * 付 rent，账户里没有那笔 SOL）。Jupiter Lock 是链上既有、可用的 vesting 程序，
- * 用它把“Solana 也能锁”这件事先变成真的 —— 但它是**第三方**：程序可升级，
+ * 为什么页面上还有这条路：OAKEN 自己的锁程序已经部署在主网（Authority none），
+ * 是页面的默认路线；Jupiter Lock 作为**第三方**备选保留 —— 程序可升级，
  * 页面必须如实写，不能借用 OAKEN 的“没有 owner”话术。
  */
 
@@ -836,7 +836,7 @@ export async function lockToken({
   const src = await c.getAccountInfo(source);
   if (!src) throw new Error('You do not hold that token in this wallet.');
   const ix = A.createLockIx(
-    { id, amount: raw, unlockDate: until, revocable: Boolean(revocable), label: String(label || '').slice(0, 64) },
+    { id, amount: raw, unlockDate: until, revocable: Boolean(revocable), label: String(label || '') },   // createLockIx truncates by UTF-8 bytes
     A.createLockKeys({ payer, beneficiary: benef, mint: mk, source, lock, vault, config }),
   );
   const sig = await send([ix], { units: 400000, microLamports: 30000, onStep });

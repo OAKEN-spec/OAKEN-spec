@@ -168,4 +168,23 @@ const WSOL = new PublicKey('So11111111111111111111111111111111111111112');
   assert.equal(ix.keys[3].isSigner, false, 'source（代币账户）不能要求签名');
 }
 
-console.log('✓ solana-build: SPL / Metaplex / pump createV2 / Jupiter createV2 / Oaken Lock 全部逐字节对上');
+/* ── pump.fun buy_exact_quote_in_v3（dev buy）───────────────────────────
+ *
+ * The IDL has three args — spendable_quote_in u64, min_tokens_out u64,
+ * partial_fill: OptionBool (a one-field struct => one byte). Shipping the
+ * first two only made Anchor reject the instruction and the whole
+ * create+dev-buy transaction reverted (2026-10-23 review).
+ */
+{
+  const ix = SB.pumpBuyExactQuoteV3Ix({ mint: MINT, user: USER, quoteIn: 1000n, minTokensOut: 7n });
+  const d = Buffer.from(ix.data);
+  assert.equal(d.length, 8 + 8 + 8 + 1, 'buy_exact_quote_in_v3 参数长度');
+  assert.deepEqual([...d.slice(0, 8)], [225, 247, 80, 30, 213, 179, 132, 136], 'discriminator');
+  assert.equal(d.readBigUInt64LE(8), 1000n);
+  assert.equal(d.readBigUInt64LE(16), 7n);
+  assert.equal(d[24], 0, 'partial_fill default = false');
+  const some = SB.pumpBuyExactQuoteV3Ix({ mint: MINT, user: USER, quoteIn: 1n, partialFill: true });
+  assert.equal(Buffer.from(some.data)[24], 1, 'partial_fill = true encodes as one byte');
+}
+
+console.log('✓ solana-build: SPL / Metaplex / pump createV2 / pump dev-buy / Jupiter createV2 / Oaken Lock 全部逐字节对上');

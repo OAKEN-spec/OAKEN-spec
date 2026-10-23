@@ -5,22 +5,26 @@ the existing fuzz/invariant suites, a hand triage of every High/Medium result,
 and one proof-of-concept for the only High finding. No independent reviewer has
 seen this code. Do not describe it as audited.
 
-Scope: the EVM contracts in `contracts/contracts/` (11 product contracts), with
-the deployed bytecode at the deterministic addresses on 4663 / 56 / 8453 / 137.
+Scope: the EVM contracts in `contracts/contracts/` (11 product contracts) **and
+the deployed v2 fork in `contracts/v2/`** (`LockVaultV2`, `PinkLockAdapterV2`),
+with the deployed bytecode at the deterministic addresses on 4663 / 56 / 8453 /
+137.
 Solana is covered separately in `solana/README.md` and the CI E2E; it was not
 run through an EVM analyzer.
 
-Frozen code: tag `audit-2026-10-23` (contracts commit `de736d3`).
+Frozen code: v1 at tag `audit-2026-10-23` (contracts commit `de736d3`); the v2
+fork and this self-review at tag `audit-2026-10-23-v2`. The two bundles and
+their SHA-256 hashes are listed in `audit/README.md`.
 
 ## Tools and commands
 
 | What | Command | Result |
 |---|---|---|
-| Hardhat unit/refusal tests | `npm test` | 120 passing |
-| Foundry fuzz + invariant | `forge test --match-path "test/foundry/*"` | 15 fuzz/invariant tests pass |
+| Hardhat unit/refusal tests | `npm test` | 124 passing (120 v1 + 4 v2) |
+| Foundry fuzz + invariant | `forge test --match-path "test/foundry/*"` | 14 fuzz tests + 4 invariants; 19 tests in total (including the PoC and v2 regressions) |
 | Reentrancy PoC | `forge test --match-contract ReentrancyPoC -vv` | passes — demonstrates SR-01 |
 | Slither 0.11.6 | `slither . --compile-force-framework hardhat --filter-paths "mocks\|test\|lib\|node_modules" --json audit/slither-product.json` | 107 findings, 17 High/Medium before triage |
-| Aggregated checks | `node check.js` | 120 contract + 52 JS tests, address/topic checks |
+| Aggregated checks | `node check.js` | 120 contract + 58 JS tests, v1 and v2 address/topic checks |
 | Halmos 0.3.3 | `halmos --forge-build-out foundry-out --contract LockVaultSymbolic --function check_` | **not executed**: tool fails on this Foundry 1.8.6 artifact format (`Unsupported cheat code: deployCode(string)`); no symbolic result is claimed |
 
 Solc 0.8.24 (solc-select) was used by Slither. The Slither JSON is kept at
@@ -55,7 +59,7 @@ tokens with transfer hooks/callbacks (ERC-777 and similar) are not supported; th
 warning already covered fee-on-transfer, rebasing, blacklisting and pausable
 tokens.
 
-**Fixed in v2 (deployed on 4663 / Base / Polygon, not wired to the site; BNB pending gas):** `contracts/v2/LockVaultV2.sol` adds a
+**Fixed in v2 (deployed on Robinhood 4663, BNB Chain 56, Base 8453 and Polygon 137; new locks use v2, v1 stays live for older locks):** `contracts/v2/LockVaultV2.sol` adds a
 `nonReentrant` guard on `createLock`, `claim`, `revoke` and `editLock`.
 `test/foundry/V2Fixes.t.sol` runs the same re-entrant token against v2: the outer
 transaction reverts, no lock is booked and no tokens stay in the vault. The
@@ -69,7 +73,7 @@ deployment/migration plan (new salts, dual-read old and new vaults) is in
 forever. The site never sends value; the functions do not need ETH. Impact is
 limited to a caller who attaches value by mistake.
 
-Status on the deployed contracts: cannot be patched. **Fixed in v2 (deployed on 4663 / Base / Polygon, not wired to the site; BNB pending gas):** `contracts/v2/PinkLockAdapterV2.sol` keeps the functions payable
+Status on the deployed contracts: cannot be patched. **Fixed in v2 (deployed on Robinhood 4663, BNB Chain 56, Base 8453 and Polygon 137; new locks use v2, v1 stays live for older locks):** `contracts/v2/PinkLockAdapterV2.sol` keeps the functions payable
 for PinkSale's form but refunds `msg.value` to the caller in the same
 transaction; `V2Fixes.t.sol` asserts the adapter ends with a zero ETH balance.
 

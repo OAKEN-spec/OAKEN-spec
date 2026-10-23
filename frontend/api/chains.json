@@ -16,7 +16,9 @@
       ],
       "explorer": "https://etherscan.io",
       "live": false,
-      "launcherBlock": null
+      "launcherBlock": null,
+      "v2DeployBlock": null,
+      "v2LauncherBlock": null
     },
     {
       "chainId": 10,
@@ -34,7 +36,9 @@
       ],
       "explorer": "https://optimistic.etherscan.io",
       "live": false,
-      "launcherBlock": null
+      "launcherBlock": null,
+      "v2DeployBlock": null,
+      "v2LauncherBlock": null
     },
     {
       "chainId": 56,
@@ -53,7 +57,9 @@
       ],
       "explorer": "https://bscscan.com",
       "live": true,
-      "launcherBlock": 127210000
+      "launcherBlock": 127210000,
+      "v2DeployBlock": 129300000,
+      "v2LauncherBlock": 129320444
     },
     {
       "chainId": 137,
@@ -72,7 +78,9 @@
       ],
       "explorer": "https://polygonscan.com",
       "live": true,
-      "launcherBlock": 95402285
+      "launcherBlock": 95402285,
+      "v2DeployBlock": 96030000,
+      "v2LauncherBlock": 96034606
     },
     {
       "chainId": 4663,
@@ -89,7 +97,9 @@
       ],
       "explorer": "https://robinhoodchain.blockscout.com",
       "live": true,
-      "launcherBlock": 86679098
+      "launcherBlock": 86679098,
+      "v2DeployBlock": 95928044,
+      "v2LauncherBlock": 95928269
     },
     {
       "chainId": 8453,
@@ -108,7 +118,9 @@
       ],
       "explorer": "https://basescan.org",
       "live": true,
-      "launcherBlock": 52509678
+      "launcherBlock": 52509678,
+      "v2DeployBlock": 52980000,
+      "v2LauncherBlock": 52983949
     },
     {
       "chainId": 42161,
@@ -126,7 +138,9 @@
       ],
       "explorer": "https://arbiscan.io",
       "live": false,
-      "launcherBlock": null
+      "launcherBlock": null,
+      "v2DeployBlock": null,
+      "v2LauncherBlock": null
     },
     {
       "chainId": 43114,
@@ -144,7 +158,9 @@
       ],
       "explorer": "https://snowtrace.io",
       "live": false,
-      "launcherBlock": null
+      "launcherBlock": null,
+      "v2DeployBlock": null,
+      "v2LauncherBlock": null
     }
   ]
 }
