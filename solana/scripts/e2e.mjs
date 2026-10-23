@@ -1,15 +1,20 @@
-// 本地验证器上的端到端：**建币 → 锁 → 到期前领被拒 → 到期领 → 转让 → 放弃 → 撤锁**。
+// 端到端：**建币 → 锁 → 到期前领被拒 → 到期领 → 转让 → 放弃 → 撤锁**。
 //
 // 判据全部取链：每一步之后重新读账户，断言的是链上的字节，不是脚本自己记的变量。
 // 它用的是**页面那份**布局与指令实现（`public/app/solana.js`）—— 所以这个脚本同时
 // 也是"页面和程序对同一份协议的理解一致"的证明。
 //
-//   node scripts/e2e.mjs                 # 需要已经有一个带程序的本地验证器
-//   node scripts/e2e.mjs --start         # 自己起验证器（--reset），跑完关掉
+//   node scripts/e2e.mjs                     # 本地验证器（需已带程序）
+//   node scripts/e2e.mjs --start             # 自己起本地验证器（Windows 受权限限制，见 README）
+//   RPC=https://api.devnet.solana.com node scripts/e2e.mjs
+//                                            # devnet：用 ~/.config/solana/id.json 付款，不领水
+//   PAYER_KEYPAIR=path node scripts/e2e.mjs  # 指定付款 keypair
 //
-// 起验证器：
-//   solana-test-validator --bpf-program Co9ZnAVxX2siGThhjTpPgXPHYrCev1nrXFyGB1VcZcQW \
-//     target/deploy/oaken_lock.so --reset
+// devnet 上需要：程序已部署、付款钱包里有约 0.2 SOL（三把锁的账户 rent 与手续费）。
+// 脚本会从付款钱包给 beneficiary/heir 各转 0.05 SOL —— 它们要自己签领取/转让交易。
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import * as web3 from '@solana/web3.js';
@@ -17,8 +22,9 @@ import { createMint, getOrCreateAssociatedTokenAccount, mintTo, getAccount } fro
 import { makeSolana } from '../../public/app/solana.js';
 
 const RPC = process.env.RPC || 'http://127.0.0.1:8899';
+const LOCAL = /127\.0\.0\.1|localhost/.test(RPC);
 const S = makeSolana(web3);
-const { Keypair, Connection, PublicKey, Transaction, sendAndConfirmTransaction, LAMPORTS_PER_SOL } = web3;
+const { Keypair, Connection, PublicKey, Transaction, SystemProgram, sendAndConfirmTransaction, LAMPORTS_PER_SOL } = web3;
 
 let ok = 0, bad = 0;
 const check = (label, got, want) => {
@@ -52,9 +58,27 @@ async function waitForRpc(conn, tries = 60) {
   try {
     /* ── 准备：付款账户、一个 6 位小数的代币 ─────────────────────────── */
     console.log('\n① 准备');
-    const payer = Keypair.generate();
-    await conn.confirmTransaction(await conn.requestAirdrop(payer.publicKey, 5 * LAMPORTS_PER_SOL));
+    let payer;
+    if (LOCAL && !process.env.PAYER_KEYPAIR) {
+      payer = Keypair.generate();
+      await conn.confirmTransaction(await conn.requestAirdrop(payer.publicKey, 5 * LAMPORTS_PER_SOL));
+    } else {
+      const kpPath = process.env.PAYER_KEYPAIR || path.join(os.homedir(), '.config', 'solana', 'id.json');
+      payer = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync(kpPath, 'utf8'))));
+      console.log('  付款账户 ' + payer.publicKey.toBase58() + '（' + kpPath + '）');
+      const bal = await conn.getBalance(payer.publicKey);
+      console.log('  余额 ' + (bal / LAMPORTS_PER_SOL).toFixed(4) + ' SOL');
+      if (bal < 0.15 * LAMPORTS_PER_SOL) {
+        console.error('  ✗ 余额不够：devnet 上三把锁约 0.05–0.1 SOL；再留 0.1 给 beneficiary/heir');
+        process.exit(1);
+      }
+    }
     check('付款账户有币', (await conn.getBalance(payer.publicKey)) > 0, true);
+    const fund = async (to, sol = 0.05) => {
+      await sendAndConfirmTransaction(conn, new Transaction().add(SystemProgram.transfer({
+        fromPubkey: payer.publicKey, toPubkey: to, lamports: Math.round(sol * LAMPORTS_PER_SOL),
+      })), [payer]);
+    };
 
     // 6 位小数：故意不用 18 —— 精度换算的坑只在位数不是 18 的时候才露头
     const mint = await createMint(conn, payer, payer.publicKey, null, 6);
@@ -64,12 +88,16 @@ async function waitForRpc(conn, tries = 60) {
     check('付款人拿到代币', (await getAccount(conn, payerAta.address)).amount, total);
 
     const beneficiary = Keypair.generate();
+    await fund(beneficiary.publicKey);                 // 它要自己签 claim/transfer/renounce
     const [config] = S.configPda();
-    check('下一个 id 是 0', await S.readNextId(conn), 0);
+    /* 本地校验器一般从 0 开始，但 devnet 上程序可能已经跑过 —— 判据用**起点**，不写死 0。 */
+    const startId = await S.readNextId(conn);
+    console.log('  当前下一个 id：' + startId);
+    check('计数器读得到', startId >= 0n, true);
 
     /* ── 建一把锁（未来到期，不可撤）──────────────────────────────────── */
     console.log('\n② CreateLock');
-    const id = await S.readNextId(conn);
+    const id = startId;
     const [lockPda] = S.lockPda(id);
     const [vault] = S.vaultAta(lockPda, mint);
     const amount = 400_000_000n;
@@ -144,6 +172,7 @@ async function waitForRpc(conn, tries = 60) {
     /* ── 转让 / 放弃 ────────────────────────────────────────────────── */
     console.log('\n⑤ 转让与放弃');
     const heir = Keypair.generate();
+    await fund(heir.publicKey);
     await sendAndConfirmTransaction(conn, new Transaction().add(S.transferIx({
       lock: lockPda2, beneficiary: beneficiary.publicKey, newBeneficiary: heir.publicKey,
     })), [beneficiary]);
@@ -194,7 +223,7 @@ async function waitForRpc(conn, tries = 60) {
 
     /* ── 计数器 ─────────────────────────────────────────────────────── */
     console.log('\n⑦ 计数器');
-    check('下一个 id', await S.readNextId(conn), 4);
+    check('下一个 id', await S.readNextId(conn), startId + 3n);
 
     console.log(`\n${bad === 0 ? `✓ 全部通过（${ok} 条）` : `✗ ${bad} 条没过（通过 ${ok}）`}`);
     process.exitCode = bad === 0 ? 0 : 1;
