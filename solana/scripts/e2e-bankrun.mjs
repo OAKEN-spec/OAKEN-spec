@@ -34,9 +34,9 @@ const check = (label, got, want) => {
 
 (async () => {
   const ctx = await start([
-    { name: 'oaken_lock', programId: new PublicKey(S.programId) },
+    { name: 'oaken_lock', programId: S.oaken },
     { name: 'spl_token', programId: SPL_TOKEN },
-    { name: 'spl_associated_token_account', programId: S.ATA_PROGRAM_ID },
+    { name: 'spl_associated_token_account', programId: S.ataProgram },
   ], []);
 
   const payer = Keypair.generate();
@@ -69,7 +69,7 @@ const check = (label, got, want) => {
   console.log('\n② CreateLock');
   const id = await S.readNextId(ctx.banksClient);
   const [lockPda] = S.lockPda(id);
-  const [vault] = S.vaultAta(lockPda, mint);
+  const [vault] = S.ata(lockPda, mint);
   const [config] = S.configPda();
   const amount = 400_000_000n;
   const unlock = Math.floor(Date.now() / 1000) + 3600;
@@ -105,7 +105,7 @@ const check = (label, got, want) => {
   // 同一段到期逻辑，只是日期在过去 —— 再造一把（本地 bank 里没有"拨块时间"的接口）
   const id2 = await S.readNextId(ctx.banksClient);
   const [lockB] = S.lockPda(id2);
-  const [vaultB] = S.vaultAta(lockB, mint);
+  const [vaultB] = S.ata(lockB, mint);
   await send([S.createLockIx(
     { id: id2, amount, unlockDate: Math.floor(Date.now() / 1000) - 1, revocable: false, label: 'Advisors' },
     S.createLockKeys({
@@ -150,7 +150,7 @@ const check = (label, got, want) => {
 
   const id3 = await S.readNextId(ctx.banksClient);
   const [lockC] = S.lockPda(id3);
-  const [vaultC] = S.vaultAta(lockC, mint);
+  const [vaultC] = S.ata(lockC, mint);
   await send([S.createLockIx(
     { id: id3, amount, unlockDate: Math.floor(Date.now() / 1000) + 3600, revocable: true, label: 'Marketing' },
     S.createLockKeys({

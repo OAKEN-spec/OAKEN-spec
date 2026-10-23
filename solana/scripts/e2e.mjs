@@ -44,7 +44,7 @@ async function startValidator() {
   const so = new URL('../target/deploy/oaken_lock.so', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
   console.log('起本地验证器（带程序）…');
   const proc = spawn('solana-test-validator', [
-    '--bpf-program', S.programId.toBase58(), so, '--reset', '--quiet',
+    '--bpf-program', S.oaken.toBase58(), so, '--reset', '--quiet',
   ], { stdio: 'ignore', detached: false, shell: process.platform === 'win32' });
   return proc;
 }
@@ -106,7 +106,7 @@ async function waitForRpc(conn, tries = 60) {
     console.log('\n② CreateLock');
     const id = startId;
     const [lockPda] = S.lockPda(id);
-    const [vault] = S.vaultAta(lockPda, mint);
+    const [vault] = S.ata(lockPda, mint);
     const amount = 400_000_000n;
     const unlockDate = Math.floor(Date.now() / 1000) + 3600;
 
@@ -148,7 +148,7 @@ async function waitForRpc(conn, tries = 60) {
     // 这两把锁互不影响，而到期判断走的是同一段代码。
     const id2 = await S.readNextId(conn);
     const [lockPda2] = S.lockPda(id2);
-    const [vault2] = S.vaultAta(lockPda2, mint);
+    const [vault2] = S.ata(lockPda2, mint);
     const createIx2 = S.createLockIx(
       { id: id2, amount, unlockDate: Math.floor(Date.now() / 1000) - 1, revocable: false, label: 'Advisors' },
       S.createLockKeys({
@@ -211,7 +211,7 @@ async function waitForRpc(conn, tries = 60) {
 
     const id3 = await S.readNextId(conn);
     const [lockPda3] = S.lockPda(id3);
-    const [vault3] = S.vaultAta(lockPda3, mint);
+    const [vault3] = S.ata(lockPda3, mint);
     await sendAndConfirmTransaction(conn, new Transaction().add(S.createLockIx(
       { id: id3, amount, unlockDate: Math.floor(Date.now() / 1000) + 3600, revocable: true, label: 'Marketing' },
       S.createLockKeys({
