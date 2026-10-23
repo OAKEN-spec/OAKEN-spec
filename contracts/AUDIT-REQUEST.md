@@ -9,9 +9,8 @@ OAKEN — ownerless token/LP locks and a small set of token tools on EVM chains.
 Deployed at deterministic, identical addresses on Robinhood Chain (4663),
 BNB Chain (56), Base (8453) and Polygon (137).
 
-- Public repository: **pending publication** (the sanitized export is ready; the
-  link will be filled here before engagement)
-- Frozen commit: `git rev-parse audit-2026-10-23` (code commit `de736d3`)
+- Public repository: https://github.com/OAKEN-spec/OAKEN-spec
+- Frozen commit: `git rev-parse audit-2026-10-23` (contracts commit `de736d3`)
 - Tag: `audit-2026-10-23`
 - Language: Solidity 0.8.24, no OpenZeppelin in the lock family.
 - Licenses: Apache-2.0 for our contracts; vendored forge-std keeps its own.
