@@ -158,7 +158,7 @@ async function waitForRpc(conn, tries = 60) {
     /* 本地校验器一般从 0 开始，但 devnet 上程序可能已经跑过 —— 判据用**起点**，不写死 0。 */
     const startId = await S.readNextId(conn);
     console.log('  当前下一个 id：' + startId);
-    check('计数器读得到', startId !== null && startId !== undefined, String(startId));
+    check('计数器读得到', Number.isFinite(Number(startId)), true);   // readNextId threw => the script already stopped
 
     /* ── 建一把锁（未来到期，不可撤）──────────────────────────────────── */
     console.log('\n② CreateLock');
