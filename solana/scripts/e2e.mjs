@@ -132,7 +132,7 @@ async function waitForRpc(conn, tries = 60) {
     console.log('\n③ 到期前 claim（应当失败）');
     const dest = S.ata(beneficiary.publicKey, mint);
     const claimIx = S.claimIx(S.claimKeys({
-      lock: lockPda, vault, mint, destination: dest[0], payer: beneficiary.publicKey,
+      lock: lockPda, vault, mint, destination: dest[0], payer: beneficiary.publicKey, beneficiary: beneficiary.publicKey,
     }));
     let rejected = false;
     try {
@@ -162,7 +162,7 @@ async function waitForRpc(conn, tries = 60) {
     const dest2 = S.ata(beneficiary.publicKey, mint);
     // 由**第三方**提交（payer 付 gas），币必须进受益人
     await sendAndConfirmTransaction(conn, new Transaction().add(S.claimIx(S.claimKeys({
-      lock: lockPda2, vault: vault2, mint, destination: dest2[0], payer: payer.publicKey,
+      lock: lockPda2, vault: vault2, mint, destination: dest2[0], payer: payer.publicKey, beneficiary: beneficiary.publicKey,
     }))), [payer]);
     check('受益人拿到了', (await getAccount(conn, dest2[0])).amount, amount);
     check('金库空了', (await getAccount(conn, vault2)).amount, 0n);
@@ -171,7 +171,7 @@ async function waitForRpc(conn, tries = 60) {
     let doubleClaim = false;
     try {
       await sendAndConfirmTransaction(conn, new Transaction().add(S.claimIx(S.claimKeys({
-        lock: lockPda2, vault: vault2, mint, destination: dest2[0], payer: beneficiary.publicKey,
+        lock: lockPda2, vault: vault2, mint, destination: dest2[0], payer: beneficiary.publicKey, beneficiary: beneficiary.publicKey,
       }))), [beneficiary]);
     } catch { doubleClaim = true; }
     check('领不了第二次', doubleClaim, true);

@@ -96,7 +96,7 @@ const check = (label, got, want) => {
   const dest = S.ata(payer.publicKey, mint)[0];
   let early = false;
   try {
-    await send([S.claimIx(S.claimKeys({ lock: lockPda, vault, mint, destination: dest, payer: payer.publicKey }))]);
+    await send([S.claimIx(S.claimKeys({ lock: lockPda, vault, mint, destination: dest, payer: payer.publicKey, beneficiary: payer.publicKey }))]);
   } catch { early = true; }
   check('没到期领不出来', early, true);
   check('失败的那笔没动钱', await tokenAmount(vault), amount);
@@ -115,14 +115,14 @@ const check = (label, got, want) => {
   )]);
   check('第二把已到期', (await S.readLock(ctx.banksClient, id2)).unlockDate < Math.floor(Date.now() / 1000), true);
 
-  await send([S.claimIx(S.claimKeys({ lock: lockB, vault: vaultB, mint, destination: dest, payer: payer.publicKey }))]);
+  await send([S.claimIx(S.claimKeys({ lock: lockB, vault: vaultB, mint, destination: dest, payer: payer.publicKey, beneficiary: payer.publicKey }))]);
   check('受益人拿到币', await tokenAmount(dest), amount);
   check('金库空了', await tokenAmount(vaultB), 0n);
   check('claimed 记账', (await S.readLock(ctx.banksClient, id2)).claimed, amount);
 
   let twice = false;
   try {
-    await send([S.claimIx(S.claimKeys({ lock: lockB, vault: vaultB, mint, destination: dest, payer: payer.publicKey }))]);
+    await send([S.claimIx(S.claimKeys({ lock: lockB, vault: vaultB, mint, destination: dest, payer: payer.publicKey, beneficiary: payer.publicKey }))]);
   } catch { twice = true; }
   check('领不了第二次', twice, true);
 

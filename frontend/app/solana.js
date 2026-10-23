@@ -855,7 +855,7 @@ export async function claimLock(id, onStep) {
   const [destination] = A.ata(benef, new w.PublicKey(l.mint));
   const keys = A.claimKeys({
     lock: new w.PublicKey(l.address), vault: new w.PublicKey(l.vault),
-    mint: new w.PublicKey(l.mint), destination, payer,
+    mint: new w.PublicKey(l.mint), destination, payer, beneficiary: benef,
   });
   return send([A.claimIx(keys)], { units: 300000, microLamports: 30000, onStep });
 }

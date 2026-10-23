@@ -210,8 +210,12 @@ fn create_lock(
 }
 
 /// 账户：0 lock（只读，PDA）· 1 vault（可写）· 2 mint（只读）· 3 destination（可写，
-/// 受益人的 ATA）· 4 payer（签名，可写，谁都可以）· 5 token program · 6 ata program ·
-/// 7 system program · 8 clock
+/// 受益人的 ATA）· 4 payer（签名，可写，谁都可以）· 5 beneficiary（只读）· 6 token program ·
+/// 7 ata program · 8 system program · 9 clock
+///
+/// 第 5 项 beneficiary 不是装饰：claim 要在受益人还没有 ATA 时替他建一个，
+/// ATA 程序的 `CreateIdempotent` 把 owner 作为**账户**引用 —— 交易里没有它，
+/// CPI 就会报 unknown account（2026-10-23 第一次真 E2E 抓到的）。
 fn claim(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
     let it = &mut accounts.iter();
     let lock_info = next_account_info(it)?;
@@ -219,6 +223,7 @@ fn claim(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
     let mint = next_account_info(it)?;
     let destination = next_account_info(it)?;
     let payer = next_account_info(it)?;
+    let beneficiary = next_account_info(it)?;
     let token_program = next_account_info(it)?;
     let ata_program = next_account_info(it)?;
     let system_program = next_account_info(it)?;
@@ -232,6 +237,9 @@ fn claim(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
         return Err(ProgramError::InvalidSeeds);
     }
     if *mint.key != lock.mint {
+        return Err(ProgramError::InvalidSeeds);
+    }
+    if *beneficiary.key != lock.beneficiary {
         return Err(ProgramError::InvalidSeeds);
     }
 
@@ -249,11 +257,11 @@ fn claim(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
     }
 
     invoke(
-        &spl::create_ata_idempotent(payer.key, destination.key, &lock.beneficiary, mint.key),
+        &spl::create_ata_idempotent(payer.key, destination.key, beneficiary.key, mint.key),
         &[
             payer.clone(),
             destination.clone(),
-            lock_info.clone(),
+            beneficiary.clone(),
             mint.clone(),
             system_program.clone(),
             token_program.clone(),

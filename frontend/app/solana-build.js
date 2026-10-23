@@ -290,13 +290,17 @@ export function makeSolana(web3) {
   ];
 
   const claimKeys = ({
-    lock, vault, mint, destination, payer,
+    lock, vault, mint, destination, payer, beneficiary,
   }) => [
     { pubkey: pk(lock), isSigner: false, isWritable: false },
     { pubkey: pk(vault), isSigner: false, isWritable: true },
     { pubkey: pk(mint), isSigner: false, isWritable: false },
     { pubkey: pk(destination), isSigner: false, isWritable: true },
     { pubkey: pk(payer), isSigner: true, isWritable: true },
+    /* ATA 程序建账户时要把 owner 作为账户传进来；owner = 受益人。
+       少了这一项，CPI 会引用一个交易里不存在的账户（unknown account）——
+       2026-10-23 第一次真 E2E 抓到的就是这条。 */
+    { pubkey: pk(beneficiary), isSigner: false, isWritable: false },
     { pubkey: token, isSigner: false, isWritable: false },
     { pubkey: ataProgram, isSigner: false, isWritable: false },
     { pubkey: system, isSigner: false, isWritable: false },
