@@ -64,8 +64,9 @@
 
     <div class="note reveal" style="margin-top:22px;border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;color:var(--muted);font-size:13.5px;line-height:1.65">
       <b style="color:var(--parch)">Security &amp; audit status.</b> No third-party audit has been completed; no bug
-      bounty is live. The test coverage, invariants, known limitations and disclosure policy are stated in full on the
-      <a href="/security">Security page</a>.</div>
+      bounty is live. The <a href="/security#coverage">test coverage</a> (99.8% lines on the product contracts) and
+      the invariant list are on the Security page; the reporting route and scope are on the
+      <a href="/security/bug-bounty">bug bounty page</a>.</div>
 
     <div class="panel reveal" style="margin-top:30px">
       <div class="head"><h3>Contracts — one address on every chain</h3></div>
@@ -86,6 +87,32 @@
         <div class="hint" style="margin-top:14px">Chains: Robinhood Chain (4663), BNB Chain (56), Base (8453),
           Polygon (137). The deterministic salt derives the address from the bytecode, so the same address is
           the same contract on each chain — not a copy with different rules.</div>
+      </div>
+    </div>
+
+    <div class="panel reveal" style="margin-top:26px">
+      <div class="head"><h3>Chains we have <em>not</em> deployed to</h3></div>
+      <div class="body">
+        <p class="muted" style="font-size:14px;margin-top:0">These are in our chain registry so the indexer and the
+          deployment tooling can be pointed at them, but <b>there is no OAKEN contract on them today</b>. They are
+          deliberately absent from the site's chain selector: a selector entry with no code behind it invites a
+          transaction that succeeds at the wallet and reverts on chain. Do not send funds to the deterministic
+          address on these chains until this table and the
+          <a href="/api/chains" target="_blank" rel="noopener">live chain list</a> say otherwise.</p>
+        <div class="tablewrap">
+        <table class="list">
+          <thead><tr><th>Chain</th><th>Chain id</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Ethereum</td><td class="mono">1</td><td class="warn">configured — not deployed</td></tr>
+            <tr><td>OP Mainnet</td><td class="mono">10</td><td class="warn">configured — not deployed</td></tr>
+            <tr><td>Arbitrum One</td><td class="mono">42161</td><td class="warn">configured — not deployed</td></tr>
+            <tr><td>Avalanche C-Chain</td><td class="mono">43114</td><td class="warn">configured — not deployed</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="hint" style="margin-top:14px">Deploying there is a decision, not a promise. The addresses are
+          deterministic, so a deployment would land at the same address — but until it is announced and visible in
+          the live chain list, treat those chains as having no OAKEN contracts at all.</div>
       </div>
     </div>
 
@@ -146,8 +173,9 @@
         <h2 class="sec">None of them go through us.</h2><div class="sec-rule"></div></div>
       <div class="grid3" data-stagger style="margin-top:26px">
         <div class="card"><span class="n">01</span><h3>Open its record page</h3>
-          <p>Every number there is read live from the chain. If the page and a block explorer disagree, believe
-            the explorer. The record page also links the transaction that created the lock.</p></div>
+          <p>Every number there is read live from the chain, and its <b>Verify this page</b> panel re-reads the
+            vault and compares every field. If the page and a block explorer disagree, believe the explorer.
+            The record page also links the transaction that created the lock.</p></div>
         <div class="card"><span class="n">02</span><h3>Call the vault directly</h3>
           <p>Paste the vault address into Blockscout or BscScan, open <span class="mono">getLock(id)</span> and
             read it. It returns the same amount, dates, steps and beneficiary the page shows. No ABI encoding
@@ -155,6 +183,29 @@
         <div class="card"><span class="n">03</span><h3>Use your own node</h3>
           <p>Point your node at the chain and make the call yourself. The schedule is in the contract; this
             website is a reader, not a dependency for a release.</p></div>
+      </div>
+
+      <div class="panel reveal" style="margin-top:26px">
+        <div class="head"><h3>Walk through one real lock (id 16)</h3>
+          <a class="pill ok" href="/locks/robinhood/record/16" target="_blank" rel="noopener">open #16 ↗</a></div>
+        <div class="body">
+          <ol style="display:grid;gap:12px;color:var(--muted);font-size:14.5px;list-style:none;margin:0;padding:0">
+            <li><b style="color:var(--parch)">1 · Open the record page.</b>
+              <a href="/locks/robinhood/record/16" target="_blank" rel="noopener">Lock #16 on Robinhood Chain</a>
+              — every figure there was read with <span class="mono">eth_call</span> in your browser, not from a database.</li>
+            <li><b style="color:var(--parch)">2 · Press “Read on chain” in “Verify this page”.</b> The page calls
+              <span class="mono">vault.getLock(16)</span> and compares the result field by field with what it rendered.
+              If anything differs it says so; the contract wins.</li>
+            <li><b style="color:var(--parch)">3 · Do the same without us.</b> Open the
+              <a href="https://robinhoodchain.blockscout.com/address/0xe410d0a21C1376992874a9bEEeE0d623A50D4a34?tab=read_contract"
+                 target="_blank" rel="noopener">vault on Blockscout</a>, choose <b>Read contract</b>, call
+              <span class="mono">getLock(16)</span>, and compare the same fields. The <b>Code</b> tab also shows the
+              runtime bytecode — the record page prints its <span class="mono">keccak256</span>, so you can check
+              Sourcify's Exact Match against it.</li>
+          </ol>
+          <div class="hint" style="margin-top:14px">If the explorer and this site disagree, the explorer is right.
+            Send us the id and the two values — that is a bug we want to hear about.</div>
+        </div>
       </div>
 
       <div class="panel reveal" style="margin-top:26px">

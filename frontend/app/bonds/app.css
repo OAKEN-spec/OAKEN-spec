@@ -44,7 +44,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.mono { font-family: var(--mono); letter-spacing: .12em; }
+.mono { font-family: var(--mono); letter-spacing: .12em; overflow-wrap:anywhere; }
 
 /* ── 顶栏 ────────────────────────────────────────────────────────────── */
 .bar {

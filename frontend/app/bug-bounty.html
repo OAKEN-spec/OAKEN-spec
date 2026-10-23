@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bug bounty &amp; disclosure · OAKEN</title>
+<meta name="description" content="OAKEN's vulnerability disclosure scope, rules and reporting route. No paid bug bounty is live yet; this page says what is in scope and how to report.">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&(e.reason&&(e.reason.message||e.reason))||'promise rejection'));});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div'); d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    d.innerHTML='<b style="color:#e0785f">This page did not finish starting.</b> Reload with <b>Ctrl+F5</b>.';
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg"><video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/chain.webp"><source src="/app/media/chain-head.mp4" type="video/mp4"></video></div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Bug bounty &amp; disclosure</div>
+    <h1 class="reveal">Help us keep locked assets safe.</h1>
+    <p class="ph-lede reveal">Responsible disclosure is welcome. A paid bounty program is <b>not live</b> yet —
+      this page states the scope, the rules and how to report without promising a payout that does not exist.</p>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <div class="note reveal" style="border:1px solid rgba(224,120,95,.4);background:rgba(224,120,95,.06);border-radius:var(--r);padding:16px 18px;color:var(--parch);font-size:14px;line-height:1.65">
+      <b style="color:var(--bad)">Program status: NOT LIVE.</b> There is no Immunefi / Code4rena / Sherlock page,
+      no reward pool, and no guarantee of payment at this time. We still want the report. Reward amounts will be
+      published here before any bounty is accepted; do not assume a payout from this page.
+    </div>
+
+    <div class="eyebrow" style="margin-top:40px">In scope</div>
+    <div class="grid2" style="margin-top:16px">
+      <div class="card"><h3>Core locks — highest priority</h3><p class="mono" style="font-size:13px;line-height:1.9">
+        LockVault · <span class="mono">0xe410d0a21C1376992874a9bEEeE0d623A50D4a34</span><br>
+        PositionLock · <span class="mono">0xfC9A43c90e0E0d548D95cEf3C77fce802806CbA9</span><br>
+        PinkLockAdapter · <span class="mono">0x16e02A106fE6E978fB98F76756B3a06b4995a7A6</span></p></div>
+      <div class="card"><h3>Tools and launch path</h3><p class="mono" style="font-size:13px;line-height:1.9">
+        OakenLauncher · <span class="mono">0x1d7561fC331594820382E8dd64582645EbafD873</span><br>
+        TokenFactory · <span class="mono">0xc0A3AD1428EeB70cAF88bb89c3B17D0191E1Bd34</span><br>
+        MultiSender · <span class="mono">0x1f380ef5eFF9113314Ee175dCE4F226DFd75A50C</span><br>
+        OakenAirdrop · <span class="mono">0x17E9910cDC37BdA5531414012aeA5b0862C22066</span><br>
+        PresaleFactory · <span class="mono">0xAC070cf2ed45aEcb9f5299d4C670fFfCE6387724</span></p></div>
+    </div>
+    <p class="hint" style="max-width:80ch">All addresses are the same on Robinhood Chain (4663), BNB Chain (56),
+      Base (8453) and Polygon (137). Source is intended to be verified byte-for-byte on Sourcify; verification is
+      not an audit.</p>
+
+    <div class="eyebrow" style="margin-top:40px">Out of scope</div>
+    <div class="grid2" style="margin-top:16px">
+      <div class="card"><h3>Different trust boundary</h3><p>Bonds (OAKEN/aOAKEN) have a 2-of-3 Safe, a Timelock and
+        a NAV keeper; they are a separate product with a separate scope. The HD Protocol `.hood` registry, third-party
+        launchpads (Pons, Genius, Flap, Clanker, four.meme) and Jupiter Lock are third-party contracts and are not
+        ours to fix.</p></div>
+      <div class="card"><h3>Not a contract bug</h3><p>Frontend-only issues, copy, SEO, gas optimisation suggestions,
+        spam/DoS against public RPCs, and reports that require compromising a user’s wallet or a third-party service
+        are out of scope for this page. If a frontend issue can move funds or sign the wrong transaction, report it
+        anyway — it is still useful.</p></div>
+    </div>
+
+    <div class="eyebrow" style="margin-top:40px">Severity, without invented numbers</div>
+    <div class="tablewrap" style="margin-top:14px">
+      <table class="list">
+        <thead><tr><th>Severity</th><th>What it means here</th><th>Reward</th></tr></thead>
+        <tbody>
+          <tr><td>Critical</td><td>Loss or permanent lock of user funds in an in-scope contract; unauthorized movement of locked tokens.</td><td>Not set</td></tr>
+          <tr><td>High</td><td>Bypass of the beneficiary/creator rules, incorrect release amounts, or a reachable denial of claims for many locks.</td><td>Not set</td></tr>
+          <tr><td>Medium</td><td>Griefing or incorrect state that does not directly move funds; a single lock affected with a realistic path.</td><td>Not set</td></tr>
+          <tr><td>Low</td><td>Best-practice, informational or UI/UX issues without a fund path.</td><td>Not set</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="eyebrow" style="margin-top:40px">How to report</div>
+    <div class="grid2" style="margin-top:16px">
+      <div class="card"><h3>Send it privately</h3><p>Direct message <b>@oakenhood</b> on X. Include the chain,
+        contract address, function, a minimal reproduction, the expected/actual result, and whether funds are at risk.
+        If you prefer, put the report in a private gist and send the link.</p>
+        <p><a class="btn btn-p" href="https://x.com/oakenhood" target="_blank" rel="noopener noreferrer">Message @oakenhood</a></p></div>
+      <div class="card"><h3>Rules</h3><p>Do not exploit beyond what is needed to demonstrate the issue. Do not access
+        other users’ data or wallets. Do not run denial-of-service tests. Give us reasonable time to reproduce and fix
+        before public disclosure. Reports must be original and not already known.</p></div>
+    </div>
+    <div class="hint" style="max-width:80ch;margin-top:14px">We will acknowledge a report, reproduce it, and agree on
+      a disclosure date. A public program and reward policy will be linked here when they exist; this page will not
+      claim a bounty that is not live.</div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:22px">
+      <a class="btn btn-s" href="/security">Security &amp; audit status</a>
+      <a class="btn btn-s" href="/verify">Verify it yourself</a>
+      <a class="btn btn-s" href="/faq">FAQ</a>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+  import { shell, reveal } from '/app/oaken.js';
+  shell({ active: 'security' });
+  reveal();
+</script>
+</body>
+</html>

@@ -2327,7 +2327,7 @@ export function shell({ active } = {}) {
         ${link('/names', 'Names', active === 'names')}
         ${link('/locks', 'Locks', active === 'locks')}
         ${link('/tools', 'Tools', active === 'tools')}
-        ${link('/bonds', 'Bonds', active === 'bonds')}
+        ${link('/bonds', 'Bonds <span class="pill" style="font-size:10px;padding:2px 6px;margin-left:4px;vertical-align:1px" title="Bonds has a 2-of-3 Safe admin — Locks do not">admin</span>', active === 'bonds')}
         ${link('/activity', 'Activity', active === 'activity')}
         ${link('/leaderboard', 'Leaderboard', active === 'leaderboard')}
         ${link('/me', 'My OAKEN', active === 'me')}
@@ -2350,6 +2350,8 @@ export function shell({ active } = {}) {
       <a href="/faq">FAQ</a>
       <span>·</span>
       <a href="/verify">Verify</a>
+      <span>·</span>
+      <a href="/dashboard">Dashboard</a>
       <span>·</span>
       <a href="/security">Security</a>
       <span>·</span>

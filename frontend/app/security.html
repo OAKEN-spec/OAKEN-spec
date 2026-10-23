@@ -38,6 +38,9 @@
   .scard p { color:var(--muted); font-size:14px; line-height:1.65; }
   .scard.ownerless { border-color:rgba(157,191,122,.3); }
   .scard.admin { border-color:rgba(224,120,95,.32); }
+  /* 42-char addresses are unbreakable by default; on a 390px screen that alone widens
+     the whole layout viewport (measured 441px on 2026-10-23). Let them break inside the card. */
+  .scard .mono { overflow-wrap:anywhere; }
   .slist { margin:10px 0 0; padding-left:18px; color:var(--muted); font-size:13.5px; line-height:1.7; }
   .stags { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
   @media (max-width:940px){ .sstatus{grid-template-columns:repeat(2,1fr)} .ssplit{grid-template-columns:1fr} }
@@ -100,7 +103,7 @@
 
     <div class="eyebrow" style="margin-top:46px">Tests and invariants</div>
     <h2 class="sec" style="font-size:28px">The parts we can put a number on.</h2>
-    <div class="stats" style="margin-top:22px">
+    <div class="stats" id="coverage" style="margin-top:22px">
       <div><div class="v">120</div><div class="k">Hardhat tests</div></div>
       <div><div class="v">14 × 1,000</div><div class="k">Foundry fuzz runs</div></div>
       <div><div class="v">4</div><div class="k">Invariants · 128 × 64</div></div>
@@ -146,6 +149,7 @@
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
       <a class="btn btn-p" href="/verify">Verify it yourself</a>
+      <a class="btn btn-s" href="/security/bug-bounty">Bug bounty &amp; disclosure</a>
       <a class="btn btn-s" href="https://x.com/oakenhood" target="_blank" rel="noopener noreferrer">Report a vulnerability · @oakenhood</a>
     </div>
     <p class="hint" style="max-width:80ch;margin-top:12px">For a vulnerability report, include the chain/address,

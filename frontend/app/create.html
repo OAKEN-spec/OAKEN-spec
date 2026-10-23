@@ -261,7 +261,7 @@
 <!-- defer：不让 514 KB 的 ethers 挡住首屏；顺序仍在我们自己的模块之前（模块默认 deferred） -->
 <script src="/app/vendor/ethers.umd.min.js" defer></script>
 <script type="module">
-  import { shell, wallet, erc20, adapter, ADAPTER, tokenMeta, fmtAmount, toast, explorerHref, short,
+  import { shell, wallet, erc20, adapter, ADAPTER, tokenMeta, fmtAmount, fmtDate, toast, explorerHref, short,
     chains, currentChain, provider, nativeBalance, isV2Pair, lockCreatedFromReceipt, storedTitle,
     humanizeTxError, safeRead, showReadFail, txNotice, onWallet, showChainSegFailed , mountDatePicker,
     onChainSwitch, setSiteChain, sealMoment, chainNow, chainIcon } from '/app/oaken.js';
@@ -908,7 +908,22 @@
      * The page cannot detect fee-on-transfer/rebase/blacklist tokens reliably,
      * so the user has to acknowledge the risk before the first signature.
      */
-    if (!window.confirm('Before you sign:\n\nFee-on-transfer, rebasing, blacklisting or pausable tokens can make this lock hold less than it says, or block the release. The vault only counts what actually arrives.\n\nIf your token does any of that, do not lock it here. Continue?')) return;
+    /**
+     * 二次确认（清单阶段三.9）。除了 token 行为那几条风险，还要把**这一笔的精确数字**
+     * 摆出来：数量按 base units 格式化（不是表单里的字符串）、收款人、第一次释放 /
+     * 分档排期。native confirm 是唯一在所有钱包内置浏览器里都可靠的弹层。
+     */
+    const until = fmtDate(Math.floor(f.date.getTime() / 1000));
+    const who = state.beneficiary && state.addr
+      && state.beneficiary.toLowerCase() !== state.addr.toLowerCase()
+      ? '\nLocked for: ' + state.beneficiary + ' (not your wallet — you cannot claim it)' : '';
+    const sched = f.vest
+      ? '\nSchedule: ' + f.vest.tgePct + '% at TGE on ' + until + ', then ' + f.vest.pct + '% every '
+        + f.vest.days + ' day' + (f.vest.days === 1 ? '' : 's') + '.'
+      : '\nUnlocks: ' + until + ' (single unlock).';
+    if (!window.confirm('Confirm this lock:\n\nAmount: ' + fmtAmount(state.amountWei, state.decimals) + ' '
+      + (state.symbol || 'token') + '\nFrom: ' + state.addr + who + sched
+      + '\n\nFee-on-transfer, rebasing, blacklisting or pausable tokens can make this lock hold less than it says, or block the release. The vault only counts what actually arrives.\n\nIf your token does any of that, do not lock it here. Continue?')) return;
     /* ⚠ 快照在**这一行**取：校验刚过、还没 await 过任何东西。往下挪任何一步都会重新打开
        "读到一半 state.token 是空的"那个窗口（真链 E2E 抓过两次）。 */
     const tokenAddr = state.token;

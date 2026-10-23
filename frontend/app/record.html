@@ -66,9 +66,9 @@
 <!-- defer：不让 514 KB 的 ethers 挡住首屏；顺序仍在我们自己的模块之前（模块默认 deferred） -->
 <script src="/app/vendor/ethers.umd.min.js" defer></script>
 <script type="module">
-  import { shell, readLock, countdown, fmtAmount, fmtDate, short, explorerHref, ADAPTER, wallet, adapter, toast, reveal,
-    chainBySlug, currentChain, onWallet, humanizeTxError, erc20, storedTitle, copyBtn, copy,
-    safeRead, showReadFail, txNotice , onChainSwitch} from '/app/oaken.js';
+  import { shell, readLock, countdown, fmtAmount, fmtDate, short, explorerHref, ADAPTER, VAULT, wallet, adapter, vault, provider,
+    toast, reveal, chainBySlug, currentChain, onWallet, humanizeTxError, erc20, storedTitle, copyBtn, copy,
+    safeRead, showReadFail, txNotice, cachedRead, cacheDrop, onChainSwitch} from '/app/oaken.js';
   import { icon } from '/app/icons.js';
   shell();
 
@@ -203,6 +203,164 @@
       + fmtDate(l.endTime) + ', and the record stops accruing there.</div>'
       + more
       + '</div></div>';
+  }
+
+  /* ── Verify this page ────────────────────────────────────────────────
+   * 阶段二.5 的两件事落在这一块：
+   *   ① 链上核验：两个合约地址 + eth_getCode 的 keccak256 + Sourcify 链接；
+   *   ② Live call：手输任意 lock id，直接 `vault.getLock(id)`，把返回值与页面
+   *      渲染的逐字段对比 —— 不一致就明说，合约是准的。
+   * 判据取链：页面上的数字只有和合约一致才算数；读不到就如实说读不到。
+   */
+  const escText = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const shortHash = (h) => String(h).slice(0, 10) + '…' + String(h).slice(-8);
+
+  function verifyPanel(l, chain) {
+    const ex = (p) => explorerHref(p, chain);
+    const addr = (a) => (ex('/address/' + a)
+      ? `<a class="mono" style="font-size:12px" target="_blank" rel="noopener" href="${ex('/address/' + a)}">${a}</a>`
+      : `<span class="mono" style="font-size:12px">${a}</span>`);
+    return `
+      <div class="panel reveal" id="verifypanel" style="margin-top:24px">
+        <div class="head"><h3>Verify this page</h3>
+          <a class="pill ok" href="/verify" title="what source-verified means">source verified ↗</a></div>
+        <div class="body">
+          <p class="hint" style="margin-top:0">Nothing here asks you to trust the page. The bytecode hash is computed from
+            <span class="mono">eth_getCode</span> for the contracts this page is talking to; Sourcify's Exact Match means
+            its compiled source produces that same bytecode. The live call asks the <b>vault</b> for the lock and compares
+            every field with what this page rendered.</p>
+          <div class="grid2" style="margin-top:18px;gap:26px">
+            <div>
+              <dl class="kv">
+                <dt>Adapter</dt><dd>${addr(ADAPTER)} ${copyBtn(ADAPTER, 'copy')}</dd>
+                <dt>Vault</dt><dd>${addr(VAULT)} ${copyBtn(VAULT, 'copy')}</dd>
+                <dt>Vault bytecode</dt><dd id="vcode"><span class="muted">reading eth_getCode…</span></dd>
+                <dt>Adapter bytecode</dt><dd id="acode"><span class="muted">reading eth_getCode…</span></dd>
+              </dl>
+              <div class="hint">Same address on Robinhood, BNB, Base and Polygon — the salt derives it from the bytecode.
+                Sourcify: <a href="https://sourcify.dev/#/lookup/${VAULT}" target="_blank" rel="noopener">vault</a>
+                · <a href="https://sourcify.dev/#/lookup/${ADAPTER}" target="_blank" rel="noopener">adapter</a>.</div>
+            </div>
+            <div>
+              <label class="f" for="livecallid">Live call · <span class="mono">vault.getLock(id)</span></label>
+              <div style="display:flex;gap:8px">
+                <input class="i" id="livecallid" inputmode="numeric" autocomplete="off" value="${l.id}">
+                <button class="btn btn-s" id="livecallbtn" type="button" style="white-space:nowrap">Read on chain</button>
+              </div>
+              <div class="hint">Reads the vault directly — not the adapter view, not our index. Any id works.</div>
+              <div id="livecallout" class="hint"></div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  async function readCodeHash(chain, address, elId) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    try {
+      const code = await cachedRead('code:' + chain.id + ':' + address, 10 * 60_000,
+        () => safeRead(() => provider(chain).getCode(address), { chain, label: 'eth_getCode' }));
+      if (!el.isConnected) return;
+      if (!code || code === '0x') {
+        el.innerHTML = '<span style="color:#e0a85f">No contract code at this address on ' + escText(chain.name) + '.</span>';
+        return;
+      }
+      const hash = window.ethers.keccak256(code);
+      el.innerHTML = '<span class="mono" style="font-size:12px" title="' + hash + '">' + shortHash(hash) + '</span>'
+        + ' <span class="muted" style="font-size:12px">' + ((code.length - 2) / 2).toLocaleString('en-US') + ' bytes</span> '
+        + copyBtn(hash, 'copy hash');
+    } catch (e) {
+      if (!el.isConnected) return;
+      el.innerHTML = '<span style="color:#e0a85f">Could not read the bytecode ('
+        + escText(String((e && e.message) || e).slice(0, 70)) + ').</span> '
+        + '<button class="btn btn-s" type="button" id="coderetry">Retry</button>';
+      const r = document.getElementById('coderetry');
+      if (r) r.onclick = () => { cacheDrop('code:'); readCodeHash(chain, address, elId); };
+    }
+  }
+
+  function liveCompare(l, v) {
+    const sym = l.symbol || '';
+    const amt = (x) => fmtAmount(x, l.decimals) + (sym ? ' ' + sym : '');
+    const rows = [
+      ['Token', short(v.token), short(l.token), String(v.token).toLowerCase() === String(l.token).toLowerCase()],
+      ['Owner / beneficiary', short(v.beneficiary), short(l.owner), String(v.beneficiary).toLowerCase() === String(l.owner).toLowerCase()],
+      ['Amount', amt(v.amount), amt(l.amount), String(v.amount) === String(l.amount)],
+      ['Schedule starts', fmtDate(Number(v.startTime)), fmtDate(l.lockDate), Number(v.startTime) === l.lockDate],
+      ['First release', fmtDate(Number(v.cliffTime)), fmtDate(l.firstRelease), Number(v.cliffTime) === l.firstRelease],
+      ['Ends', fmtDate(Number(v.endTime)), fmtDate(l.endTime), Number(v.endTime) === l.endTime],
+      ['Steps', String(Number(v.steps)), String(l.steps), Number(v.steps) === l.steps],
+      ['Released at TGE', (Number(v.initialUnlockBps) / 100) + '%', (l.tgeBps / 100) + '%', Number(v.initialUnlockBps) === l.tgeBps],
+      ['Claimed', amt(v.claimed), amt(l.claimed), String(v.claimed) === String(l.claimed)],
+    ];
+    /* 页面读不到金库那份（l.revocable/renounced 为 null）时不列出这两行 —— 不拿 "—" 冒充"一致"。 */
+    if (l.revocable !== null) rows.push(['Revocable', v.revocable ? 'yes' : 'no', l.revocable ? 'yes' : 'no', v.revocable === l.revocable]);
+    if (l.renounced !== null) rows.push(['Renounced', v.renounced ? 'yes' : 'no', l.renounced ? 'yes' : 'no', v.renounced === l.renounced]);
+    return rows;
+  }
+
+  function wireVerifyPanel(l, chain) {
+    readCodeHash(chain, VAULT, 'vcode');
+    readCodeHash(chain, ADAPTER, 'acode');
+    const btn = document.getElementById('livecallbtn');
+    const inp = document.getElementById('livecallid');
+    const out = document.getElementById('livecallout');
+    if (!btn || !inp || !out) return;
+    const run = async () => {
+      const raw = String(inp.value || '').trim();
+      if (!/^\d{1,78}$/.test(raw)) {
+        out.innerHTML = '<span class="warnline">Enter a lock id as a whole number.</span>';
+        return;
+      }
+      out.innerHTML = '<span class="muted">Calling <span class="mono">getLock(' + raw + ')</span> on '
+        + escText(chain.name) + '…</span>';
+      btn.disabled = true;
+      try {
+        const v = await safeRead(() => vault(chain).getLock(raw), { chain, timeout: 9_000, label: 'getLock' });
+        if (!v || !v.token || v.token === window.ethers.ZeroAddress) {
+          out.innerHTML = '<b>The vault has no lock #' + raw + ' on ' + escText(chain.name) + '.</b> '
+            + '<span class="muted">getLock returned an empty record — that id was never created on this chain.</span>';
+          return;
+        }
+        if (String(raw) === String(l.id)) {
+          const rows = liveCompare(l, v);
+          const bad = rows.filter((r) => !r[3]);
+          const head = bad.length
+            ? '<div class="hint warnline"><b>' + bad.length + ' field' + (bad.length === 1 ? '' : 's')
+              + ' differ' + (bad.length === 1 ? 's' : '') + ' from what this page shows (' + bad.map((r) => r[0]).join(', ') + ').</b> '
+              + 'The contract is the truth — do not trust this page\'s numbers over the vault\'s.</div>'
+            : '<div class="hint okline"><b>All ' + rows.length + ' fields match the vault.</b> This page rendered exactly what '
+              + '<span class="mono">getLock(' + raw + ')</span> returned.</div>';
+          out.innerHTML = head
+            + '<div class="tablewrap" style="margin-top:10px"><table class="list"><thead><tr><th>Field</th><th>This page</th><th>Vault (chain)</th><th></th></tr></thead><tbody>'
+            + rows.map((r) => '<tr><td>' + r[0] + '</td><td class="mono">' + r[1] + '</td><td class="mono">' + r[2]
+              + '</td><td style="text-align:right">' + (r[3] ? '<span class="pill ok">match</span>'
+                : '<span class="pill warn" style="color:#e0a85f;border-color:rgba(224,168,95,.45)">differs</span>') + '</td></tr>').join('')
+            + '</tbody></table></div>';
+        } else {
+          const rows = [
+            ['Token', short(v.token)], ['Beneficiary', short(v.beneficiary)], ['Amount (base units)', String(v.amount)],
+            ['Schedule starts', fmtDate(Number(v.startTime))], ['First release', fmtDate(Number(v.cliffTime))],
+            ['Ends', fmtDate(Number(v.endTime))], ['Steps', String(Number(v.steps))],
+            ['Released at TGE', (Number(v.initialUnlockBps) / 100) + '%'], ['Claimed (base units)', String(v.claimed)],
+            ['Revocable', v.revocable ? 'yes' : 'no'], ['Renounced', v.renounced ? 'yes' : 'no'],
+          ];
+          out.innerHTML = '<div class="hint">This is not the lock this page shows (#' + l.id
+            + ') — showing the raw vault record instead.</div>'
+            + '<div class="tablewrap" style="margin-top:10px"><table class="list"><thead><tr><th>Field</th><th>Vault (chain)</th></tr></thead><tbody>'
+            + rows.map((r) => '<tr><td>' + r[0] + '</td><td class="mono">' + r[1] + '</td></tr>').join('')
+            + '</tbody></table></div>';
+        }
+      } catch (e) {
+        out.innerHTML = '<div class="hint warnline"><b>Could not read that lock from the vault.</b> '
+          + escText(String((e && e.message) || e).slice(0, 140)) + '</div>';
+      } finally {
+        btn.disabled = false;
+      }
+    };
+    btn.onclick = run;
+    inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); run(); } });
   }
 
   /**
@@ -384,9 +542,11 @@
           </div>
         </div>
       </div>
-      ${schedulePanel(l, now)}`;
+      ${schedulePanel(l, now)}
+      ${verifyPanel(l, chain)}`;
 
     reveal();   // ⚠ 内容刚插进来，得**再跑一次** —— shell() 里那次跑在这两块面板存在之前
+    wireVerifyPanel(l, chain);
 
     const shareBtn = document.getElementById('sharelock');
     if (shareBtn) shareBtn.onclick = async () => {

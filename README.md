@@ -12,6 +12,7 @@ live. See [SECURITY.md](SECURITY.md) and
 ```
 contracts/            Solidity 0.8.24 contracts + Hardhat/Foundry tests
 frontend/app/         Static frontend source (HTML/CSS/JS, media, bonds module)
+frontend/serve-local.mjs  Minimal static server for the exported pages (no indexer)
 frontend/brand/       OAKEN brand assets used by the pages
 solana/               Solana lock program source (not deployed; no keypair)
 docs/                 Frontend/local-development notes
@@ -44,6 +45,19 @@ separate service and is not part of this repository. `frontend/app` is the sourc
 of truth for page markup and client-side chain reads; it references assets under
 `/app/` and `/oaken/`, which a static server should map to this tree (see
 `docs/FRONTEND.md`).
+
+Local run (static pages, no indexer/API):
+
+```bash
+node frontend/serve-local.mjs 8080
+# open http://localhost:8080
+```
+
+Record pages read the chain directly from your browser. The local server ships a
+static `/api/chains` snapshot (generated from the real registry) so they can
+resolve which chain to read. List pages fall back to their read-failure/empty
+states because the indexer is not part of this repository. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the rules a pull request has to keep.
 
 ## Solana
 

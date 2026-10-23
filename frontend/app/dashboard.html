@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · OAKEN</title>
+<meta name="description" content="OAKEN's public lock dashboard: indexed lock counts by chain, upcoming unlocks and the source-verification entry point. No invented TVL.">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&(e.reason&&(e.reason.message||e.reason))||'promise rejection'));});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div'); d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    d.innerHTML='<b style="color:#e0785f">This page did not finish starting.</b> Reload with <b>Ctrl+F5</b>.';
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+<style>
+  .dashchains { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--r); overflow:hidden; margin-top:24px; }
+  .dashchains > button { background:var(--panel); border:0; color:var(--parch); text-align:left; padding:16px 18px; cursor:pointer; font:inherit; }
+  .dashchains > button:hover, .dashchains > button.on { background:rgba(217,163,67,.08); }
+  .dashchains .v { font-family:'Oaken Display',Georgia,serif; font-size:24px; color:var(--gold); line-height:1; }
+  .dashchains .k { font-size:12px; color:var(--muted); margin-top:7px; }
+  .dashchains .u { font-size:11px; color:var(--green, var(--ok)); margin-top:4px; }
+  .dashnote { border:1px solid var(--line); border-radius:var(--r); padding:14px 16px; color:var(--muted); font-size:13px; line-height:1.65; margin-top:18px; }
+  .dashnote b { color:var(--parch); }
+  @media (max-width:940px) { .dashchains { grid-template-columns:repeat(2,1fr); } }
+  @media (max-width:520px) { .dashchains { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg"><video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/chain.webp"><source src="/app/media/chain-head.mp4" type="video/mp4"></video></div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Dashboard</div>
+    <h1 class="reveal">Locks, by chain.</h1>
+    <p class="ph-lede reveal">Counts and upcoming unlocks from our own index and live chain reads. No dollar TVL is invented:
+      there is no price oracle for arbitrary tokens, and a made-up number would be worse than none.</p>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:36px">
+    <div class="between" style="margin-bottom:8px">
+      <div class="eyebrow">The index</div>
+      <button class="btn btn-s" type="button" id="refresh">Refresh</button>
+    </div>
+    <div class="stats" style="margin-top:14px">
+      <div><div class="v" id="s-locks">—</div><div class="k">Locks indexed</div></div>
+      <div><div class="v" id="s-chains">—</div><div class="k">Chains deployed</div></div>
+      <div><div class="v" id="s-upcoming">—</div><div class="k">Upcoming unlocks</div></div>
+      <div><div class="v" id="s-next" style="font-size:18px">—</div><div class="k">Next unlock</div></div>
+    </div>
+    <div class="hint" id="stamp" style="margin-top:10px">Reading the index…</div>
+    <div class="dashchains" id="chaincards" aria-live="polite"></div>
+
+    <div class="controls" style="margin-top:26px">
+      <div class="tabs" id="tabs"><a href="#" data-chain="all" class="on">All chains</a></div>
+      <span class="pill" id="count">—</span>
+      <a class="pill ok" href="/verify" title="all contracts are exact matches on Sourcify">source verified ↗</a>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <div class="tablewrap">
+        <table class="list">
+          <thead><tr><th>Lock</th><th>Chain</th><th>Token</th><th>Still locked</th><th>Unlocks</th><th>Owner</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="errbox"></div>
+    <div class="dashnote">
+      <b>What this counts.</b> The index is our own record of locks created through OAKEN; a lock that was created
+      directly against the contract and never indexed will not appear. “Upcoming” is the next 30 days from the first
+      indexed page per chain, not a full event scan. Amounts are token units, not dollars. Positions (Uniswap V3/V4 NFTs)
+      are on <a href="/locks">Locks</a>, not in this token table.
+      <br><br>If the index cannot be read, this page keeps the last successful numbers and says how old they are;
+      it never replaces them with zero. If only some chains answer, the totals stay blank, the missing chains
+      say they did not answer, and the rest of the table still renders.
+    </div>
+  </section>
+</main>
+
+<script type="module">
+  import { shell, chains, short, fmtDate, emptyState, reveal, onChainSwitch } from '/app/oaken.js';
+
+  shell({ active: 'dashboard' });
+  onChainSwitch(() => { /* dashboard is cross-chain; a site chain switch does not change the data */ });
+
+  const $ = (id) => document.getElementById(id);
+  const CACHE = 'oaken.dashboard.v1';
+  const SOON = 30 * 86400;
+  let state = { live: [], byChain: {}, upcoming: [], failedChains: [], chain: 'all', savedAt: 0, stale: false };
+  let seq = 0;
+
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+  const num = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n.toLocaleString('en-US', { maximumFractionDigits: 4 }) : '—';
+  };
+  const ago = (ms) => {
+    const s = Math.max(0, Math.floor((Date.now() - Number(ms || 0)) / 1000));
+    if (!ms) return 'never';
+    if (s < 60) return s + 's ago';
+    if (s < 3600) return Math.floor(s / 60) + 'm ago';
+    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+    return Math.floor(s / 86400) + 'd ago';
+  };
+  const readCache = () => {
+    try {
+      const j = JSON.parse(localStorage.getItem(CACHE) || 'null');
+      return j && Array.isArray(j.upcoming) && j.byChain ? j : null;
+    } catch { return null; }
+  };
+  const writeCache = () => {
+    try {
+      localStorage.setItem(CACHE, JSON.stringify({
+        savedAt: state.savedAt, byChain: state.byChain, upcoming: state.upcoming, live: state.live,
+      }));
+    } catch { /* private mode / quota */ }
+  };
+
+  async function getJson(url, ms = 12000) {
+    const r = await fetch(url, { signal: AbortSignal.timeout(ms) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    if (!j || typeof j !== 'object') throw new Error('not JSON');
+    return j;
+  }
+
+  function paint() {
+    const live = state.live;
+    /* 读失败的链**不并进总数、也不画 0**：一条链没答上来时，它的 0 是编的。 */
+    const failed = new Set((state.failedChains || []).map(String));
+    const known = live.filter((c) => !failed.has(String(c.id)));
+    const totals = known.map((c) => state.byChain[c.id] || { total: 0, docs: [] });
+    const indexed = totals.reduce((n, x) => n + (Number(x.total) || 0), 0);
+    const now = Math.floor(Date.now() / 1000);
+    const upcoming = state.upcoming.filter((u) => Number(u.unlock) > now && !failed.has(String(u.chain_id)));
+    const soon = upcoming.filter((u) => Number(u.unlock) <= now + SOON);
+    const next = upcoming.length ? Math.min(...upcoming.map((u) => Number(u.unlock))) : 0;
+
+    /* 总数只在**每条链都答了**时才是总数；否则是"—"，不是把已知部分当成全部。 */
+    $('s-locks').textContent = live.length && !failed.size ? num(indexed) : '—';
+    $('s-chains').textContent = live.length ? String(live.length) : '—';
+    $('s-upcoming').textContent = soon.length ? num(soon.length) : '0';
+    $('s-next').textContent = next ? fmtDate(next) : '—';
+    $('stamp').textContent = state.stale
+      ? `Index read ${state.savedAt ? ago(state.savedAt) : 'never'} — the latest read failed; showing the last successful numbers.`
+      : failed.size
+        ? `Index read ${state.savedAt ? ago(state.savedAt) : 'never'} — ${failed.size} of ${live.length} chains did not answer; these numbers are partial. Refresh reads again.`
+        : `Index read ${state.savedAt ? ago(state.savedAt) : 'never'}. Refresh reads again.`;
+
+    const cards = live.map((c) => {
+      if (failed.has(String(c.id))) {
+        return `<button type="button" data-chain="${c.id}" class="${String(state.chain) === String(c.id) ? 'on' : ''}">
+        <div class="v">—</div>
+        <div class="k">${esc(c.name)}</div>
+        <div class="u" style="color:var(--bad)">did not answer this time</div></button>`;
+      }
+      const x = state.byChain[c.id] || { total: 0, docs: [] };
+      const n = (x.docs || []).filter((u) => Number(u.unlock) > now).length;
+      return `<button type="button" data-chain="${c.id}" class="${String(state.chain) === String(c.id) ? 'on' : ''}">
+        <div class="v">${esc(num(x.total))}</div>
+        <div class="k">${esc(c.name)}</div>
+        <div class="u">${n ? n + ' upcoming' : 'no upcoming in the indexed window'}</div></button>`;
+    }).join('');
+    $('chaincards').innerHTML = cards || '<div class="hint" style="padding:16px">No live chains returned.</div>';
+    $('chaincards').querySelectorAll('[data-chain]').forEach((b) => {
+      b.onclick = () => {
+        state.chain = state.chain === Number(b.dataset.chain) ? 'all' : Number(b.dataset.chain);
+        paint();
+      };
+    });
+
+    $('tabs').innerHTML = [['all', 'All chains'], ...live.map((c) => [String(c.id), c.short || c.name])]
+      .map(([id, label]) => `<a href="#" data-chain="${id}" class="${String(state.chain) === id ? 'on' : ''}">${esc(label)}</a>`).join('');
+    $('tabs').querySelectorAll('[data-chain]').forEach((a) => {
+      a.onclick = (ev) => { ev.preventDefault(); state.chain = a.dataset.chain; paint(); };
+    });
+
+    const list = upcoming
+      .filter((u) => state.chain === 'all' || String(u.chain_id) === String(state.chain))
+      .sort((a, b) => Number(a.unlock) - Number(b.unlock))
+      .slice(0, 80);
+    $('count').textContent = list.length + ' upcoming';
+    if (!list.length) {
+      const missed = state.chain !== 'all' && failed.has(String(state.chain));
+      $('rows').innerHTML = `<tr><td colspan="7">${emptyState(missed ? {
+        title: 'That chain did not answer this time',
+        body: 'Its rows are not being guessed at. The other chains are unaffected; Refresh tries this one again.',
+        actions: [{ label: 'Refresh', href: '#', primary: true }],
+      } : {
+        title: 'No upcoming unlocks in the indexed window',
+        body: 'New locks appear after the index refreshes; a lock created seconds ago may still be on its way. The Locks page reads a live tail from the chain.',
+        actions: [{ label: 'Open Locks', href: '/locks', primary: true }],
+      })}</td></tr>`;
+      if (missed) {
+        const host = $('rows').querySelector('[data-action], a');
+        if (host) { host.removeAttribute('href'); host.onclick = (ev) => { ev.preventDefault(); load(); }; }
+      }
+      return;
+    }
+    $('rows').innerHTML = list.map((u) => {
+      const c = live.find((x) => Number(x.id) === Number(u.chain_id));
+      const slug = c ? c.slug : '';
+      const href = slug && u.lockId ? `/locks/${esc(slug)}/record/${esc(u.lockId)}` : '/locks';
+      return `<tr>
+        <td class="mono">#${esc(u.lockId)}</td>
+        <td>${esc(c ? c.name : u.chain_id)}</td>
+        <td>${esc(u.symbol || '—')}</td>
+        <td>${esc(num(u.current))} <span class="muted" style="font-size:11px">${esc(u.symbol || '')}</span></td>
+        <td>${esc(fmtDate(u.unlock))}</td>
+        <td class="mono">${esc(short(u.owner))}</td>
+        <td style="text-align:right"><a href="${href}">View →</a></td>
+      </tr>`;
+    }).join('');
+    reveal();
+  }
+
+  async function load() {
+    const my = ++seq;
+    $('refresh').disabled = true;
+    if (!state.savedAt) $('stamp').textContent = 'Reading the index…';
+    try {
+      const live = await chains();
+      if (!live.length) throw new Error('the chain list did not answer');
+      const results = await Promise.all(live.map(async (c) => {
+        const [stats, page] = await Promise.allSettled([
+          getJson('/api/v1/lockers?chain_id=' + c.id + '&limit=1'),
+          getJson('/api/v1/lockers?chain_id=' + c.id + '&limit=200'),
+        ]);
+        const ok = stats.status === 'fulfilled' || page.status === 'fulfilled';
+        const docs = page.status === 'fulfilled' && Array.isArray(page.value.docs) ? page.value.docs : [];
+        const total = stats.status === 'fulfilled' ? Number(stats.value.totalDocs)
+          : (page.status === 'fulfilled' ? Number(page.value.totalDocs) : 0);
+        return { c, total: Number.isFinite(total) ? total : docs.length, docs, ok };
+      }));
+      if (my !== seq) return;
+      /* 一条都没读回来 = 这次读失败（走 catch、保住上次成功的数）；
+         只挂了一部分 = 只画读回来的，并把缺的那几条链如实标出来，绝不当成 0。 */
+      const failedChains = results.filter((r) => !r.ok).map((r) => r.c.id);
+      if (failedChains.length === live.length) throw new Error('every chain read failed');
+      const upcoming = [];
+      const byChain = {};
+      for (const { c, total, docs, ok } of results) {
+        if (!ok) continue;
+        byChain[c.id] = { total, docs };
+        for (const d of docs) {
+          const unlock = Number(d.unlock);
+          if (!unlock || unlock * 1000 <= Date.now()) continue;
+          upcoming.push({
+            lockId: d.lockId, chain_id: c.id, symbol: d.symbol || '',
+            current: d.formatted_current_locked_amount ?? d.raw_current_locked_amount ?? '—',
+            unlock, owner: d.owner || '', address: d.address || '',
+          });
+        }
+      }
+      state = { live, byChain, upcoming, failedChains, chain: state.chain, savedAt: Date.now(), stale: false };
+      /* 只有整轮都读成功才覆盖缓存 —— 半截数据不能冒充"上次成功"。 */
+      if (!failedChains.length) writeCache();
+      paint();
+    } catch (e) {
+      if (my !== seq) return;
+      const cached = readCache();
+      if (cached) {
+        state = { ...state, ...cached, failedChains: [], chain: state.chain, stale: true };
+        paint();
+      } else {
+        $('stamp').textContent = 'The index could not be read right now. Nothing is being disguised as zero.';
+        $('rows').innerHTML = `<tr><td colspan="7"><div class="readfail"><b>Could not read the lock index.</b>
+          <span class="muted" style="font-size:12px">(${esc(String(e && e.message || e).slice(0, 120))})</span>
+          <button class="btn btn-s" type="button" id="retry">Retry</button></div></td></tr>`;
+        const r = $('retry'); if (r) r.onclick = () => load();
+      }
+    } finally {
+      if (my === seq) $('refresh').disabled = false;
+    }
+  }
+
+  $('refresh').onclick = () => load();
+  const cached = readCache();
+  if (cached) {
+    state = { ...state, ...cached, failedChains: [], chain: 'all', stale: true };
+    paint();
+  }
+  load();
+</script>
+</body>
+</html>

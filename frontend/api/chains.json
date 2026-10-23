@@ -1,0 +1,150 @@
+{
+  "chains": [
+    {
+      "chainId": 1,
+      "name": "Ethereum",
+      "shortName": "Ethereum",
+      "slug": "ethereum",
+      "nativeCurrency": {
+        "name": "Ether",
+        "symbol": "ETH",
+        "decimals": 18
+      },
+      "rpc": [
+        "https://ethereum-rpc.publicnode.com",
+        "https://eth.llamarpc.com"
+      ],
+      "explorer": "https://etherscan.io",
+      "live": false,
+      "launcherBlock": null
+    },
+    {
+      "chainId": 10,
+      "name": "OP Mainnet",
+      "shortName": "OP",
+      "slug": "optimism",
+      "nativeCurrency": {
+        "name": "Ether",
+        "symbol": "ETH",
+        "decimals": 18
+      },
+      "rpc": [
+        "https://mainnet.optimism.io",
+        "https://optimism-rpc.publicnode.com"
+      ],
+      "explorer": "https://optimistic.etherscan.io",
+      "live": false,
+      "launcherBlock": null
+    },
+    {
+      "chainId": 56,
+      "name": "BNB Chain",
+      "shortName": "BNB",
+      "slug": "bsc",
+      "nativeCurrency": {
+        "name": "BNB",
+        "symbol": "BNB",
+        "decimals": 18
+      },
+      "rpc": [
+        "https://bsc-rpc.publicnode.com",
+        "https://bsc.rpc.blxrbdn.com",
+        "https://bsc-dataseed.binance.org"
+      ],
+      "explorer": "https://bscscan.com",
+      "live": true,
+      "launcherBlock": 127210000
+    },
+    {
+      "chainId": 137,
+      "name": "Polygon",
+      "shortName": "Polygon",
+      "slug": "polygon",
+      "nativeCurrency": {
+        "name": "POL",
+        "symbol": "POL",
+        "decimals": 18
+      },
+      "rpc": [
+        "https://polygon-bor-rpc.publicnode.com",
+        "https://polygon.gateway.tenderly.co",
+        "https://polygon-rpc.com"
+      ],
+      "explorer": "https://polygonscan.com",
+      "live": true,
+      "launcherBlock": 95402285
+    },
+    {
+      "chainId": 4663,
+      "name": "Robinhood Chain",
+      "shortName": "Robinhood",
+      "slug": "robinhood",
+      "nativeCurrency": {
+        "name": "Ether",
+        "symbol": "ETH",
+        "decimals": 18
+      },
+      "rpc": [
+        "https://rpc.mainnet.chain.robinhood.com"
+      ],
+      "explorer": "https://robinhoodchain.blockscout.com",
+      "live": true,
+      "launcherBlock": 86679098
+    },
+    {
+      "chainId": 8453,
+      "name": "Base",
+      "shortName": "Base",
+      "slug": "base",
+      "nativeCurrency": {
+        "name": "Ether",
+        "symbol": "ETH",
+        "decimals": 18
+      },
+      "rpc": [
+        "https://mainnet.base.org",
+        "https://base-rpc.publicnode.com",
+        "https://base.rpc.blxrbdn.com"
+      ],
+      "explorer": "https://basescan.org",
+      "live": true,
+      "launcherBlock": 52509678
+    },
+    {
+      "chainId": 42161,
+      "name": "Arbitrum One",
+      "shortName": "Arbitrum",
+      "slug": "arbitrum",
+      "nativeCurrency": {
+        "name": "Ether",
+        "symbol": "ETH",
+        "decimals": 18
+      },
+      "rpc": [
+        "https://arb1.arbitrum.io/rpc",
+        "https://arbitrum-one-rpc.publicnode.com"
+      ],
+      "explorer": "https://arbiscan.io",
+      "live": false,
+      "launcherBlock": null
+    },
+    {
+      "chainId": 43114,
+      "name": "Avalanche C-Chain",
+      "shortName": "Avalanche",
+      "slug": "avalanche",
+      "nativeCurrency": {
+        "name": "Avalanche",
+        "symbol": "AVAX",
+        "decimals": 18
+      },
+      "rpc": [
+        "https://api.avax.network/ext/bc/C/rpc",
+        "https://avalanche-c-chain-rpc.publicnode.com"
+      ],
+      "explorer": "https://snowtrace.io",
+      "live": false,
+      "launcherBlock": null
+    }
+  ]
+}
