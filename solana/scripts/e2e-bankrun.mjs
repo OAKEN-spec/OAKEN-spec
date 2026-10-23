@@ -9,7 +9,7 @@
 // 两个外部程序（SPL Token / ATA）是 `solana program dump` **从主网 dump 下来的真字节码** ——
 // 我们程序里那些手写的 CPI 字节只有对着真程序跑才算验过。
 //
-// 用的是**页面那份**实现（`public/app/solana.js`）：所以这个脚本同时证明
+// 用的是**页面那份**指令构造（`app/solana-build.js`）：所以这个脚本同时证明
 // "页面和程序对协议的理解是同一份"。
 //
 //   node scripts/e2e-bankrun.mjs
@@ -20,7 +20,7 @@ import {
   createAccount, createInitializeAccountInstruction, createMintToInstruction,
   TOKEN_PROGRAM_ID as SPL_TOKEN,
 } from '@solana/spl-token';
-import { makeSolana } from '../../frontend/app/solana.js';
+import { makeSolana } from '../../frontend/app/solana-build.js';
 
 const S = makeSolana(web3);
 const { Keypair, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } = web3;

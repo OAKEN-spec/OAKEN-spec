@@ -1,7 +1,7 @@
 // 端到端：**建币 → 锁 → 到期前领被拒 → 到期领 → 转让 → 放弃 → 撤锁**。
 //
 // 判据全部取链：每一步之后重新读账户，断言的是链上的字节，不是脚本自己记的变量。
-// 它用的是**页面那份**布局与指令实现（`public/app/solana.js`）—— 所以这个脚本同时
+// 它用的是**页面那份**指令构造（`app/solana-build.js`）—— 所以这个脚本同时
 // 也是"页面和程序对同一份协议的理解一致"的证明。
 //
 //   node scripts/e2e.mjs                     # 本地验证器（需已带程序）
@@ -20,13 +20,13 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import * as web3 from '@solana/web3.js';
 import { createMint, getOrCreateAssociatedTokenAccount, mintTo, getAccount } from '@solana/spl-token';
 
-/* 页面与脚本共用同一份布局/指令实现。源码树里是 `app/solana.js`，导出仓库里是
-   `frontend/app/solana.js`；旧的 `public/app` 也留着兼容。 */
+/* 指令构造在 solana-build.js（纯函数）；`solana.js` 只做网络与钱包，不导出 makeSolana。
+   源码树里是 `app/solana-build.js`，导出仓库里是 `frontend/app/solana-build.js`。 */
 let makeSolana;
-for (const candidate of ['../../frontend/app/solana.js', '../../frontend/app/solana.js', '../../frontend/app/solana.js']) {
+for (const candidate of ['../../frontend/app/solana-build.js', '../../frontend/app/solana-build.js']) {
   try { ({ makeSolana } = await import(candidate)); break; } catch { /* 试下一个 */ }
 }
-if (!makeSolana) { console.error('✗ 找不到 solana.js（app/ 或 frontend/app/）'); process.exit(1); }
+if (!makeSolana) { console.error('✗ 找不到 solana-build.js（app/ 或 frontend/app/）'); process.exit(1); }
 
 const RPC = process.env.RPC || 'http://127.0.0.1:8899';
 const LOCAL = /127\.0\.0\.1|localhost/.test(RPC);
