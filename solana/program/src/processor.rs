@@ -117,8 +117,15 @@ fn create_lock(
     let clock = Clock::from_account_info(clock_info)?;
 
     // 计数器：第一次用时现建（8 字节的租金可以忽略），之后每建一把锁 +1。
+    //
+    // ⚠ 这两个 `create_account` 的**新账户是 PDA**，System Program 要求它签名 ——
+    // 普通 `invoke` 签不了，必须 `invoke_signed` 带上种子。第一次真链/验证器 E2E
+    // 抓到的就是这条（`signer privilege escalated`），此前 17 个单测都只验字节、没跑 CPI。
+    let id_bytes = id.to_le_bytes();
+    let config_seeds: &[&[u8]] = &[CONFIG_SEED, &[config_bump]];
+    let lock_seeds: &[&[u8]] = &[LOCK_SEED, id_bytes.as_ref(), &[bump]];
     let mut config = if config_info.data_len() == 0 {
-        invoke(
+        invoke_signed(
             &spl::create_account(
                 payer.key,
                 config_info.key,
@@ -127,6 +134,7 @@ fn create_lock(
                 program_id,
             ),
             &[payer.clone(), config_info.clone(), system_program.clone()],
+            &[config_seeds],
         )?;
         Config { count: 0 }
     } else {
@@ -141,8 +149,8 @@ fn create_lock(
         return Err(ProgramError::AccountAlreadyInitialized);
     }
 
-    // 锁账户：定长、owner 是本程序。
-    invoke(
+    // 锁账户：定长、owner 是本程序。PDA 同样要 `invoke_signed`。
+    invoke_signed(
         &spl::create_account(
             payer.key,
             lock_info.key,
@@ -151,6 +159,7 @@ fn create_lock(
             program_id,
         ),
         &[payer.clone(), lock_info.clone(), system_program.clone()],
+        &[lock_seeds],
     )?;
 
     // 金库：锁 PDA 名下的 ATA。幂等版 —— 已经在了就跳过。
