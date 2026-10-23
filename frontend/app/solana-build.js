@@ -292,7 +292,9 @@ export function makeSolana(web3) {
   const claimKeys = ({
     lock, vault, mint, destination, payer, beneficiary,
   }) => [
-    { pubkey: pk(lock), isSigner: false, isWritable: false },
+    /* claim 会把 claimed 写回锁账户 —— 这里必须是可写，只读会得到
+       "instruction modified data of a read-only account"（2026-10-23 E2E）。 */
+    { pubkey: pk(lock), isSigner: false, isWritable: true },
     { pubkey: pk(vault), isSigner: false, isWritable: true },
     { pubkey: pk(mint), isSigner: false, isWritable: false },
     { pubkey: pk(destination), isSigner: false, isWritable: true },

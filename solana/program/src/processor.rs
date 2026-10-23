@@ -209,7 +209,7 @@ fn create_lock(
     Ok(())
 }
 
-/// 账户：0 lock（只读，PDA）· 1 vault（可写）· 2 mint（只读）· 3 destination（可写，
+/// 账户：0 lock（可写，PDA）· 1 vault（可写）· 2 mint（只读）· 3 destination（可写，
 /// 受益人的 ATA）· 4 payer（签名，可写，谁都可以）· 5 beneficiary（只读）· 6 token program ·
 /// 7 ata program · 8 system program · 9 clock
 ///
