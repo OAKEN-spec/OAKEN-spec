@@ -100,7 +100,7 @@ async function waitForRpc(conn, tries = 60) {
     /* 本地校验器一般从 0 开始，但 devnet 上程序可能已经跑过 —— 判据用**起点**，不写死 0。 */
     const startId = await S.readNextId(conn);
     console.log('  当前下一个 id：' + startId);
-    check('计数器读得到', startId >= 0n, true);
+    check('计数器读得到', startId >= 0, true);
 
     /* ── 建一把锁（未来到期，不可撤）──────────────────────────────────── */
     console.log('\n② CreateLock');
@@ -230,7 +230,7 @@ async function waitForRpc(conn, tries = 60) {
 
     /* ── 计数器 ─────────────────────────────────────────────────────── */
     console.log('\n⑦ 计数器');
-    check('下一个 id', await S.readNextId(conn), startId + 3n);
+    check('下一个 id', await S.readNextId(conn), startId + 3);
 
     console.log(`\n${bad === 0 ? `✓ 全部通过（${ok} 条）` : `✗ ${bad} 条没过（通过 ${ok}）`}`);
     process.exitCode = bad === 0 ? 0 : 1;
