@@ -251,6 +251,7 @@ export async function launchesByCreator(chain, address, { lookback = 1_000_000, 
     : Math.max(0, head - lookback)
   const topic = window.ethers.id('Launched(address,address,address,uint256,uint256,uint256,uint64,string,string)')
   const who = window.ethers.zeroPadValue(String(address).toLowerCase(), 32)
+  const set = contractSet(version)
   const iface = launcher(chain, null, version).interface
   const out = []
   let oldest = head
@@ -280,7 +281,7 @@ export async function launchesByCreator(chain, address, { lookback = 1_000_000, 
       const left = deadline - Date.now()
       if (left < 500) return null
       try {
-        return await withTimeout(ep.getLogs({ address: OAKEN_LAUNCHER, topics: [topic, null, who], fromBlock: from, toBlock: to }), Math.min(5000, left))
+        return await withTimeout(ep.getLogs({ address: set.launcher, topics: [topic, null, who], fromBlock: from, toBlock: to }), Math.min(5000, left))
       } catch { /* 这个端点不行（超时/限流/区间太大），换下一个 */ }
     }
     return null
