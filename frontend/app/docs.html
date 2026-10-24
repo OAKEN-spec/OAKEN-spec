@@ -92,6 +92,9 @@
         <div class="head"><h3>Contracts — same address on every chain</h3></div>
         <div class="body">
           <dl class="kv">
+            <dt>Oaken Lock (adapter) · v3</dt><dd class="mono">0x6022DA059FAa0673E3058ADECEef375c2Abfb4A1</dd>
+            <dt>Vault · v3</dt><dd class="mono">0xd4064d8E73AAB53D7d9efd8A6E8DBE2003d1de4B</dd>
+            <dt>Launcher · v3</dt><dd class="mono">0x4488C369116D0C6FEA84162313c3840976D5A9a5</dd>
             <dt>Oaken Lock (adapter) · v2</dt><dd class="mono">0xDBE1f3dc1d6E6759355E1B164231748f0589cb41</dd>
             <dt>Vault · v2</dt><dd class="mono">0xbC511F31967D9EBF775d203661a2BEfF6AA42615</dd>
             <dt>Launcher · v2</dt><dd class="mono">0x0d7cCEA7BabC5e3b4849267740D8fBBe6C4FDa58</dd>
@@ -104,12 +107,12 @@
             <dt>Airdrop</dt><dd class="mono">0x17E9910cDC37BdA5531414012aeA5b0862C22066</dd>
             <dt>Presale factory</dt><dd class="mono">0xAC070cf2ed45aEcb9f5299d4C670fFfCE6387724</dd>
           </dl>
-          <div class="hint" style="margin-top:14px">v2 is what new locks and new launches use (the reentrancy guard
-            and the ETH refund); v1 stays live for everything created before 2026-10-23, and the site reads both.
+          <div class="hint" style="margin-top:14px">v3 is what new locks and new launches use (v2 plus the revoke
+            clamp); v2 and v1 stay live for the locks created under them, and the site reads all three.
             Same addresses on every chain we deploy to.</div>
           <div class="hint" style="margin-top:14px"><span class="pill ok">source verified</span>
-            <b>All eleven contracts, on all four chains</b> are exact matches on
-            <a href="https://sourcify.dev/#/lookup/0xbC511F31967D9EBF775d203661a2BEfF6AA42615" target="_blank" rel="noopener">Sourcify</a>
+            <b>All fourteen contracts, on all four chains</b> are exact matches on
+            <a href="https://sourcify.dev/#/lookup/0xd4064d8E73AAB53D7d9efd8A6E8DBE2003d1de4B" target="_blank" rel="noopener">Sourcify</a>
             (the lock contracts are also published on
             <a href="https://robinhoodchain.blockscout.com/address/0xe410d0a21C1376992874a9bEEeE0d623A50D4a34#code" target="_blank" rel="noopener">Blockscout</a>).
             Paste any address above into Sourcify to compare it byte for byte.

@@ -472,7 +472,7 @@
     curveLaunchAndBuy,
     CLANKER, clankerFactory, clankerDeployParams, clankerTokenFromReceipt, recordLaunch, copyBtn,
     flap, flapParams, flapTaxParams, flapTokenFromReceipt, mineFlapSalt, FLAP,
-    FOURMEME, fmLogin, fmQuote, fmUpload, fmCreate, fmCreatePayload, fmTokenFromReceipt, fourMemeManager, onWallet , onChainSwitch, sealMoment, chainNow, chainIcon} from '/app/oaken.js';
+    FOURMEME, fmLogin, fmQuote, fmUpload, fmCreate, fmCreatePayload, fmTokenFromReceipt, fourMemeManager, onWallet , onChainSwitch, sealMoment, chainNow, chainIcon, NEW_VERSION} from '/app/oaken.js';
   shell({ active: 'launch' });
 
   const $ = (id) => document.getElementById(id);
@@ -1478,7 +1478,7 @@
       if (!state.addr) { await wallet.connect(); await refreshWallet(); }
       await wallet.ensureChain(state.chain);
       const signer = await wallet.signer();
-      const c = launcher(state.chain, signer, 'v2');
+      const c = launcher(state.chain, signer, NEW_VERSION);
 
       if (state.route === 'flap') {
         const name = $('fname').value.trim();
@@ -1784,7 +1784,7 @@
       toast('Launch sent — waiting for the block…');
       const receipt = await tx.wait();
 
-      const ev = launchedFromReceipt(receipt, state.chain, 'v2');
+      const ev = launchedFromReceipt(receipt, state.chain, NEW_VERSION);
       const tokenAddr = ev ? ev.token : null;
       /* 自有合约的币**链上没有图槽** —— 上传过的图登记到我们自己的图床，
          代币页据此显示（只认我们自己图床的 /i/… 地址；不阻塞成功面板）。 */

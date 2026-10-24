@@ -123,6 +123,22 @@ contract LockVaultHandler is Test {
         LockVault.Lock memory l = vault.getLock(id);
         if (l.token == address(0)) return;
         uint128 newAmount = uint128(bound(newAmountSeed, 0, l.amount));
+        /**
+         * V1 is frozen and has a known hole (2026-10-24): reducing the amount
+         * after a claim, then revoking, can refund more than the vault holds
+         * for this lock. V3's `revoke` clamps at `max(vestedNow, claimed)`; the
+         * unconstrained proof lives in LockVaultV3Invariant.t.sol. This suite
+         * stays on the states the deployed v1 can handle, so its other
+         * invariants remain meaningful:
+         *   only reduce to an amount whose *current* curve still covers what
+         *   was already claimed. Time only moves forward, so vesting at revoke
+         *   is >= vesting at this edit.
+         */
+        if (newAmount < l.amount) {
+            uint256 vestedNow = vault.vestedAt(id, uint64(block.timestamp));
+            uint256 vestedNew = (vestedNow * uint256(newAmount)) / uint256(l.amount);
+            if (vestedNew < l.claimed) return;
+        }
         vm.prank(BENEFICIARY);
         try vault.editLock(id, newAmount, l.endTime) { } catch { }
     }

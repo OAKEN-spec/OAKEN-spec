@@ -82,18 +82,22 @@
             <tr><td>Airdrop</td><td class="mono addr">0x17E9910cDC37BdA5531414012aeA5b0862C22066</td><td></td></tr>
             <tr><td>Presale factory</td><td class="mono addr">0xAC070cf2ed45aEcb9f5299d4C670fFfCE6387724</td><td></td></tr>
             <tr><td>Launcher · v1</td><td class="mono addr">0x1d7561fC331594820382E8dd64582645EbafD873</td><td>legacy launches</td></tr>
-            <tr><td><b>Oaken Lock adapter · v2</b></td><td class="mono addr">0xDBE1f3dc1d6E6759355E1B164231748f0589cb41</td><td><b>new locks</b></td></tr>
-            <tr><td><b>Vault · v2</b></td><td class="mono addr">0xbC511F31967D9EBF775d203661a2BEfF6AA42615</td><td><b>new locks</b></td></tr>
-            <tr><td><b>Launcher · v2</b></td><td class="mono addr">0x0d7cCEA7BabC5e3b4849267740D8fBBe6C4FDa58</td><td><b>new launches</b></td></tr>
+            <tr><td><b>Oaken Lock adapter · v3</b></td><td class="mono addr">0x6022DA059FAa0673E3058ADECEef375c2Abfb4A1</td><td><b>new locks</b></td></tr>
+            <tr><td><b>Vault · v3</b></td><td class="mono addr">0xd4064d8E73AAB53D7d9efd8A6E8DBE2003d1de4B</td><td><b>new locks</b></td></tr>
+            <tr><td><b>Launcher · v3</b></td><td class="mono addr">0x4488C369116D0C6FEA84162313c3840976D5A9a5</td><td><b>new launches</b></td></tr>
+            <tr><td><b>Oaken Lock adapter · v2</b></td><td class="mono addr">0xDBE1f3dc1d6E6759355E1B164231748f0589cb41</td><td>2026-10-23 to 2026-10-24</td></tr>
+            <tr><td><b>Vault · v2</b></td><td class="mono addr">0xbC511F31967D9EBF775d203661a2BEfF6AA42615</td><td>2026-10-23 to 2026-10-24</td></tr>
+            <tr><td><b>Launcher · v2</b></td><td class="mono addr">0x0d7cCEA7BabC5e3b4849267740D8fBBe6C4FDa58</td><td>2026-10-23 to 2026-10-24</td></tr>
           </tbody>
         </table>
         <div class="hint" style="margin-top:14px">Chains: Robinhood Chain (4663), BNB Chain (56), Base (8453),
           Polygon (137). The deterministic salt derives the address from the bytecode, so the same address is
           the same contract on each chain — not a copy with different rules.
-          <b>v1 and v2 are both live.</b> v1 holds every lock created before 2026-10-23; v2 is used for new
-          locks and adds the reentrancy guard and ETH refund described in
+          <b>v1, v2 and v3 are all live.</b> v1 holds locks created before 2026-10-23; v2 holds locks from
+          2026-10-23 to 2026-10-24 (reentrancy guard + ETH refund); v3 is what new locks and launches use
+          (v2 plus the revoke clamp). The safeguards are described in
           <a href="https://github.com/OAKEN-spec/OAKEN-spec/blob/master/contracts/SELF-REVIEW.md" target="_blank" rel="noopener">the self-review</a>.
-          The site reads both; old record URLs stay on v1 and new ones carry <span class="mono">?vault=v2</span>.</div>
+          Old record URLs stay on v1; newer ones carry <span class="mono">?vault=v2</span> or <span class="mono">?vault=v3</span>.</div>
       </div>
     </div>
 
@@ -167,7 +171,7 @@
         <table class="list">
           <thead><tr><th>Contract</th><th>4663</th><th>56</th><th>8453</th><th>137</th><th>Source</th></tr></thead>
           <tbody>
-            <tr><td>All contracts above (v1 and v2)</td><td class="ok">exact</td><td class="ok">exact</td><td class="ok">exact</td><td class="ok">exact</td>
+            <tr><td>All contracts above (v1, v2 and v3)</td><td class="ok">exact</td><td class="ok">exact</td><td class="ok">exact</td><td class="ok">exact</td>
               <td><a href="https://sourcify.dev" target="_blank" rel="noopener">Sourcify</a> · <a href="https://robinhoodchain.blockscout.com/address/0xe410d0a21C1376992874a9bEEeE0d623A50D4a34#code" target="_blank" rel="noopener">Blockscout</a></td></tr>
           </tbody>
         </table>

@@ -1,30 +1,32 @@
-# OAKEN contracts — internal self-review (2026-10-23)
+# OAKEN contracts — internal self-review (2026-10-23; v3 addendum 2026-10-24)
 
 **This is not an audit.** It is a reproducible internal review: static analysis,
 the existing fuzz/invariant suites, a hand triage of every High/Medium result,
 and one proof-of-concept for the only High finding. No independent reviewer has
 seen this code. Do not describe it as audited.
 
-Scope: the EVM contracts in `contracts/contracts/` (11 product contracts) **and
-the deployed v2 fork in `contracts/v2/`** (`LockVaultV2`, `PinkLockAdapterV2`),
-with the deployed bytecode at the deterministic addresses on 4663 / 56 / 8453 /
-137.
+Scope: the EVM contracts in `contracts/contracts/` (11 product contracts), **the
+deployed v2 fork in `contracts/v2/`** (`LockVaultV2`, `PinkLockAdapterV2`) and
+**the deployed v3 fork in `contracts/v3/`** (`LockVaultV3`,
+`PinkLockAdapterV3`), with the deployed bytecode at the deterministic addresses
+on 4663 / 56 / 8453 / 137.
 Solana is covered separately in `solana/README.md` and the CI E2E; it was not
 run through an EVM analyzer.
 
 Frozen code: v1 at tag `audit-2026-10-23` (contracts commit `de736d3`); the v2
-fork and this self-review at tag `audit-2026-10-23-v2`. The two bundles and
-their SHA-256 hashes are listed in `audit/README.md`.
+fork and this self-review at tag `audit-2026-10-23-v2`; the v3 fork and this
+addendum at tag `audit-2026-10-24-v3`. The three bundles and their SHA-256 hashes
+are listed in `audit/README.md`.
 
 ## Tools and commands
 
 | What | Command | Result |
 |---|---|---|
-| Hardhat unit/refusal tests | `npm test` | 124 passing (120 v1 + 4 v2) |
-| Foundry fuzz + invariant | `forge test --match-path "test/foundry/*"` | 14 fuzz tests + 4 invariants; 19 tests in total (including the PoC and v2 regressions) |
+| Hardhat unit/refusal tests | `npm test` | 129 passing (120 v1 + 4 v2 + 5 v3) |
+| Foundry fuzz + invariant | `forge test --match-path "test/foundry/*"` | 14 fuzz tests, two 4-invariant suites (v1 and v3), 20 tests in total (including the PoC and v2 regressions) |
 | Reentrancy PoC | `forge test --match-contract ReentrancyPoC -vv` | passes — demonstrates SR-01 |
-| Slither 0.11.6 | `slither . --compile-force-framework hardhat --filter-paths "mocks\|test\|lib\|node_modules" --json audit/slither-product.json` | 107 findings, 17 High/Medium before triage |
-| Aggregated checks | `node check.js` | 120 contract + 58 JS tests, v1 and v2 address/topic checks |
+| Slither 0.11.6 | `slither . --compile-force-framework hardhat --filter-paths "mocks\|test\|lib\|node_modules" --json audit/slither-product.json` | 107 findings, 17 High/Medium before triage. **Run predates v3** (v1/v2 only); SR-04 was found by the invariant suite, not Slither |
+| Aggregated checks | `node check.js` | 129 contract + 63 JS tests, v1/v2/v3 address and topic checks |
 | Halmos 0.3.3 | `halmos --forge-build-out foundry-out --contract LockVaultSymbolic --function check_` | **not executed**: tool fails on this Foundry 1.8.6 artifact format (`Unsupported cheat code: deployCode(string)`); no symbolic result is claimed |
 
 Solc 0.8.24 (solc-select) was used by Slither. The Slither JSON is kept at
@@ -100,6 +102,32 @@ Triaged and dismissed, with reasons:
 
 The raw Slither report still contains all of these; this file records the
 triage rather than hiding the report.
+
+### SR-04 — `revoke()` after a downward edit can refund from other locks — **High (conditional), fixed in v3**
+
+Found on 2026-10-24 by the unconstrained invariant suite, not by Slither:
+
+1. a revocable lock partially vests and the beneficiary claims part of it
+   (50 of 100);
+2. the amount is edited down to 60 — allowed, because the only guard is
+   `newAmount >= claimed`;
+3. the curve is scaled by `amount`, so at the same timestamp the 60-token
+   schedule has vested 36 — less than the 50 already paid;
+4. `revoke()` froze `amount` at `vestedNow` (36) and refunded `60 - 36 = 24`,
+   but the vault held only `60 - 50 = 10` for this lock. The other 14 came from
+   tokens held for **other locks of the same token**, and the record showed
+   `claimed > amount`.
+
+No revocable locks existed on chain when this was found; the create form could
+still make one.
+
+**Fixed in v3 (deployed on all four chains on 2026-10-24; new locks and launches
+use v3, v1 and v2 stay live for earlier locks):**
+`contracts/v3/LockVaultV3.sol` sets `frozen = max(vestedNow, claimed)` and
+refunds `amount - frozen`. `test/V3.test.ts` (5 Hardhat tests) pins the sequence
+and the normal paths; `test/foundry/LockVaultV3Invariant.t.sol` is the
+unconstrained suite and is documented to fail when pointed at v2. The deployment
+and multi-read migration are in `contracts/V3.md`.
 
 ## Solana
 

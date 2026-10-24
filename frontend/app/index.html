@@ -408,11 +408,11 @@
           <div class="head"><h3>Contracts — one address, every chain</h3></div>
           <div class="body">
             <dl class="kv">
-              <dt>Oaken Lock (adapter) · v2</dt>
+              <dt>Oaken Lock (adapter) · v3</dt>
               <dd class="mono" id="addr-adapter">—</dd>
-              <dt>Vault · v2</dt>
+              <dt>Vault · v3</dt>
               <dd class="mono" id="addr-vault">—</dd>
-              <dt>Legacy v1 pair</dt>
+              <dt>Legacy v2 / v1 pairs</dt>
               <dd class="mono" id="addr-v1" style="font-size:12.5px;line-height:1.7">—</dd>
               <dt>Chains</dt>
               <dd id="addr-chains">Same address on every chain we deploy to.</dd>
@@ -427,9 +427,9 @@
                  **逐条如实写** —— 验证过的说验证过，没验的不蹭。 -->
             <div class="hint" style="margin-top:14px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
               <span class="pill ok">source verified</span>
-              <span><b>All eleven contracts, on all four chains</b> — both lock pairs (v1 and v2), the position lock,
+              <span><b>All fourteen contracts, on all four chains</b> — the v1, v2 and v3 lock sets, the position lock,
                 the four tools and both launchers — are <b>exact matches</b> on
-                <a href="https://sourcify.dev/#/lookup/0xbC511F31967D9EBF775d203661a2BEfF6AA42615" target="_blank" rel="noopener">Sourcify</a>
+                <a href="https://sourcify.dev/#/lookup/0xd4064d8E73AAB53D7d9efd8A6E8DBE2003d1de4B" target="_blank" rel="noopener">Sourcify</a>
                 (the three lock contracts also published on
                 <a href="https://robinhoodchain.blockscout.com/address/0xe410d0a21C1376992874a9bEEeE0d623A50D4a34#code" target="_blank" rel="noopener">Blockscout</a>).
                 Verification is not an audit — we still claim none. Read the code.</span>
@@ -511,9 +511,9 @@
 <!-- defer：不让 514 KB 的 ethers 挡住首屏；顺序仍在我们自己的模块之前（模块默认 deferred） -->
 <script src="/app/vendor/ethers.umd.min.js" defer></script>
 <script type="module">
-  import { shell, reveal, emberField, countTo, ADAPTER, VAULT, ADAPTER_V2, VAULT_V2, readLock, totalLocks,
+  import { shell, reveal, emberField, countTo, ADAPTER, VAULT, ADAPTER_V2, VAULT_V2, ADAPTER_V3, VAULT_V3, readLock, totalLocks,
     lockedTokenAddresses, short, fmtAmount, countdown, chains, rotateRpc, chainIcon,
-    safeRead, cachedRead, cacheDrop, copyBtn , onChainSwitch} from '/app/oaken.js';
+    safeRead, cachedRead, cacheDrop, copyBtn, LOCK_VERSIONS , onChainSwitch} from '/app/oaken.js';
   import { icon } from '/app/icons.js';   // ⚠ icon 在 icons.js 里，不在 oaken.js（import 错会整页不执行）
   import { chainOf, esc, amount, usd, monogram, statusPill, poolHref, when,
     hardCapOf, raisedOf, raisedUsd, pctOf, prices } from '/app/explore.js';
@@ -548,19 +548,20 @@
     /* 这一页的字都是**跨链**统计出来的（/api/stats + 每条链各数一遍），
        钱包换链不改变这里的任何一块 —— 登记一个空的处理器，省掉那次没意义的重载。 */
     onChainSwitch(() => { /* 什么都不用做（见上） */ });
-  document.getElementById('addr-adapter').textContent = ADAPTER_V2;
-  document.getElementById('addr-vault').textContent = VAULT_V2;
-  document.getElementById('addr-v1').textContent = 'adapter ' + ADAPTER + ' · vault ' + VAULT;
-  document.getElementById('tk-adapter').textContent = ADAPTER_V2.slice(0, 10) + '…' + ADAPTER_V2.slice(-4);
+  document.getElementById('addr-adapter').textContent = ADAPTER_V3;
+  document.getElementById('addr-vault').textContent = VAULT_V3;
+  document.getElementById('addr-v1').textContent = 'v2 adapter ' + ADAPTER_V2 + ' · vault ' + VAULT_V2
+    + ' · v1 adapter ' + ADAPTER + ' · vault ' + VAULT;
+  document.getElementById('tk-adapter').textContent = ADAPTER_V3.slice(0, 10) + '…' + ADAPTER_V3.slice(-4);
   /* 复制按钮 + 一键去验证（Sourcify 的 lookup 页接受任意链的地址）——
      清单第 2 条：地址要能复制，旁边要有验证/浏览器的去处。
-     新锁走 v2，所以面板和按钮都以 v2 为主；v1 只用于 2026-10-23 之前建的锁。 */
+     新锁走 v3，所以面板和按钮都以 v3 为主；v2 / v1 只用于它们之前建的锁。 */
   document.getElementById('addr-btns').innerHTML =
-    copyBtn(ADAPTER_V2, 'copy adapter') + copyBtn(VAULT_V2, 'copy vault')
+    copyBtn(ADAPTER_V3, 'copy adapter') + copyBtn(VAULT_V3, 'copy vault')
     + '<a class="btn btn-s" style="padding:5px 12px;font-size:12.5px" target="_blank" rel="noopener"'
-    + ' href="https://sourcify.dev/#/lookup/' + VAULT_V2 + '">Verify on Sourcify ↗</a>'
+    + ' href="https://sourcify.dev/#/lookup/' + VAULT_V3 + '">Verify on Sourcify ↗</a>'
     + '<a class="btn btn-s" style="padding:5px 12px;font-size:12.5px" target="_blank" rel="noopener"'
-    + ' href="https://robinhoodchain.blockscout.com/address/' + VAULT_V2 + '#code">Read the source ↗</a>';
+    + ' href="https://robinhoodchain.blockscout.com/address/' + VAULT_V3 + '#code">Read the source ↗</a>';
 
   /* 工具卡的图标（icons.js 现画，不挂外链） */
   for (const el of document.querySelectorAll('[data-ic]')) el.innerHTML = icon(el.dataset.ic, 19);
@@ -652,15 +653,15 @@
     const perChain = await Promise.all(live.map(async (c) => {
       /* 失败**不进缓存**（缓存了失败，重试按钮就点不动了）—— 所以抛，而不是把 null 存下来 */
       const n = await safeRead(() => cachedRead('stat.locks.' + c.id, 45_000, async () => {
-        const [a, b] = await Promise.all([totalLocks(c, 'v1'), totalLocks(c, 'v2')]);
-        if (a === null || b === null) throw new Error('unreadable');
-        return a + b;
+        const [a, b, d] = await Promise.all([totalLocks(c, 'v1'), totalLocks(c, 'v2'), totalLocks(c, 'v3')]);
+        if (a === null || b === null || d === null) throw new Error('unreadable');
+        return a + b + d;
       }), { chain: c, timeout: 12_000 }).catch(() => null);
       const r = await safeRead(() => cachedRead('stat.tokens.' + c.id, 45_000, async () => {
-        const [a, b] = await Promise.all([lockedTokenAddresses(c, 150, 'v1'), lockedTokenAddresses(c, 150, 'v2')]);
-        const tokens = new Set([...a.tokens, ...b.tokens]);
-        if ((a.total > 0 && a.scanned === 0) || (b.total > 0 && b.scanned === 0)) throw new Error('unreadable');
-        return { tokens, complete: a.complete && b.complete, scanned: a.scanned + b.scanned, total: a.total + b.total };
+        const [a, b, d] = await Promise.all([lockedTokenAddresses(c, 150, 'v1'), lockedTokenAddresses(c, 150, 'v2'), lockedTokenAddresses(c, 150, 'v3')]);
+        const tokens = new Set([...a.tokens, ...b.tokens, ...d.tokens]);
+        if ((a.total > 0 && a.scanned === 0) || (b.total > 0 && b.scanned === 0) || (d.total > 0 && d.scanned === 0)) throw new Error('unreadable');
+        return { tokens, complete: a.complete && b.complete && d.complete, scanned: a.scanned + b.scanned + d.scanned, total: a.total + b.total + d.total };
       }), { chain: c, timeout: 15_000 }).catch(() => null);
       return { c, n, r };
     }));
@@ -751,7 +752,7 @@
     const withTimeout = (p, ms = 6000) => Promise.race([p, new Promise((res) => setTimeout(() => res(null), ms))]);
     const failed = [];
     for (const c of live) {
-      for (const version of ['v1', 'v2']) {
+      for (const version of LOCK_VERSIONS) {
         let n = null;
         try { n = await withTimeout(totalLocks(c, version)); } catch (e) { failed.push(c); continue; }
         if (n === null) { failed.push(c); continue; }   // 超时也算这条链这次读不到
@@ -789,12 +790,12 @@
       + rows.map(({ l, c: chain, version }) => {
         const c = countdown(l.unlock);
         return `<tr>
-          <td class="mono">#${l.id}${version === 'v2' ? ' <span class="pill">v2</span>' : ''}</td>
+          <td class="mono">#${l.id}${version !== 'v1' ? ` <span class="pill">${version}</span>` : ''}</td>
           <td>${l.symbol} <span class="muted mono" style="font-size:12px">${short(l.token)}</span></td>
           <td><span class="chip">${chain.name}</span></td>
           <td>${fmtAmount(l.amount, l.decimals)}</td>
           <td>${c.done ? '<span class="pill ok">unlocked</span>' : `<span class="pill lock">${c.text}</span>`}</td>
-          <td style="text-align:right"><a href="/locks/${chain.slug}/record/${l.id}${version === 'v2' ? '?vault=v2' : ''}">View →</a></td>
+          <td style="text-align:right"><a href="/locks/${chain.slug}/record/${l.id}${version !== 'v1' ? '?vault=' + version : ''}">View →</a></td>
         </tr>`;
       }).join('') + '</tbody></table>' + notice;
     retryWire();

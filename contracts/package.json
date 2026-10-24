@@ -13,7 +13,8 @@
     "test:foundry": "forge test --match-path \"test/foundry/*\"",
     "test:invariant": "forge test --match-path test/foundry/LockVaultInvariant.t.sol",
     "coverage:foundry": "forge coverage --ir-minimum",
-    "addresses:v2": "hardhat run scripts/deterministic-addresses-v2.ts"
+    "addresses:v2": "hardhat run scripts/deterministic-addresses-v2.ts",
+    "addresses:v3": "hardhat run scripts/deterministic-addresses-v3.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.1.2",

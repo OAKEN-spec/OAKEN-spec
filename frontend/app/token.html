@@ -52,7 +52,7 @@
 <script src="/app/vendor/ethers.umd.min.js" defer></script>
 <script type="module">
   import { shell, locksForToken, readLock, readLocks, tokenLocksPage, tokenMeta, fmtAmount, fmtDate, short, countdown, explorer,
-    chainBySlug, currentChain, copyBtn, safeRead, showReadFail, ADAPTER, ADAPTER_V2, onChainSwitch} from '/app/oaken.js';
+    chainBySlug, currentChain, copyBtn, safeRead, showReadFail, ADAPTER, ADAPTER_V2, ADAPTER_V3, LOCK_VERSIONS, onChainSwitch} from '/app/oaken.js';
   shell();
 
     /* 同记录页：链来自 URL（/locks/<链>/<代币>），钱包换链不影响这一页。 */
@@ -79,10 +79,10 @@
      * 快路径：**两轮 Multicall** 把整页读完（枚举+元数据一轮，金库/标记一轮）。
      * 这条链没有 Multicall3 或批读失败时，退回 `tokenMeta` + 逐把读。
      */
-    /* v1 and v2 have separate id spaces and separate adapters. Read both; each
+    /* v1/v2/v3 have separate id spaces and separate adapters. Read them all; each
        row carries its version so the record link can select the right vault. */
     const pages = [];
-    for (const v of ['v1', 'v2']) {
+    for (const v of LOCK_VERSIONS) {
       try { const p = await tokenLocksPage(token, chain, v); if (p) pages.push(p); } catch { /* try the other vault */ }
     }
     let symbol = 'TOKEN', decimals = 18;
@@ -95,7 +95,7 @@
       try { [symbol, decimals] = await tokenMeta(token, chain); } catch { /* 保持 TOKEN/18 */ }
       document.title = `${symbol} locks · OAKEN`;
       let ok = 0;
-      for (const v of ['v1', 'v2']) {
+      for (const v of LOCK_VERSIONS) {
         try {
           const got = await safeRead(() => locksForToken(token, chain, v), { chain, timeout: 12_000, retries: 1, label: 'token locks' });
           ok++;
@@ -117,7 +117,7 @@
     if (pages.length) {
       for (const p of pages) { rows.push(...p.rows); lockFails += p.failed; }
     } else {
-      for (const v of ['v1', 'v2']) {
+      for (const v of LOCK_VERSIONS) {
         const vids = ids.filter((x) => x.v === v).map((x) => x.id);
         if (!vids.length) continue;
         let batched = null;
@@ -154,10 +154,10 @@
       });
       return;
     }
-    /* 新锁在前：v2 是 2026-10-23 起的新金库，它的锁号从 1 重新开始 ——
-       只按 id 排会把 v2 的锁全压到最后（"刚锁的看不见"）。 */
+    /* 新锁在前：v2/v3 的锁号各自从 1 重新开始 ——
+       只按 id 排会把新金库的锁全压到最后（"刚锁的看不见"）。 */
     rows.sort((a, b) =>
-      (Number(b.version === 'v2') - Number(a.version === 'v2')) || Number(b.id) - Number(a.id));
+      (LOCK_VERSIONS.indexOf(b.version || 'v1') - LOCK_VERSIONS.indexOf(a.version || 'v1')) || Number(b.id) - Number(a.id));
     /* 「金库持有」= 还没被领走的量：amount 是**当初锁进去的**，claimed 是已经出去的。
        只加 amount 会把领过的锁也算成全额在库里 —— 那个数比链上余额大。 */
     const held = rows.reduce((s, r) => s + (BigInt(r.amount) - BigInt(r.claimed || 0)), 0n);
@@ -180,7 +180,7 @@
         <span class="pill lock">${fmtAmount(held, decimals)} ${symbol} still in the vault</span>
         <a class="pill" target="_blank" rel="noopener" href="${explorer('/token/' + token, chain)}">explorer ↗</a>
         <a class="pill ok" target="_blank" rel="noopener" title="the lock contracts are exact matches on Sourcify"
-           href="https://sourcify.dev/#/lookup/${rows.some((r) => r.version === 'v2') ? ADAPTER_V2 : ADAPTER}">source verified ↗</a>
+           href="https://sourcify.dev/#/lookup/${rows.some((r) => r.version === 'v3') ? ADAPTER_V3 : rows.some((r) => r.version === 'v2') ? ADAPTER_V2 : ADAPTER}">source verified ↗</a>
       </div>
       <div class="panel" style="margin-top:26px">
         <table class="list">
@@ -192,13 +192,13 @@
               const c = countdown(l.endTime);
               const ver = l.version || 'v1';
               return `<tr>
-                <td class="mono">#${l.id}${ver === 'v2' ? ' <span class="pill" title="read from the v2 vault">v2</span>' : ''}</td>
+                <td class="mono">#${l.id}${ver !== 'v1' ? ` <span class="pill" title="read from the ${ver} vault">${ver}</span>` : ''}</td>
                 <td>${fmtAmount(l.amount, l.decimals)}</td>
                 <td class="mono muted" style="font-size:13px">${short(l.owner)}</td>
                 <td>${c.done ? '<span class="pill ok">released</span>' : `<span class="pill lock">${c.text}</span>`}
                     ${l.steps ? `<span class="muted" style="font-size:12px"> · ${l.steps} steps</span>` : ''}
                     <div class="muted" style="font-size:12px;margin-top:4px">${fmtDate(l.endTime)}</div></td>
-                <td style="text-align:right"><a href="/locks/${chain.slug}/record/${l.id}${ver === 'v2' ? '?vault=v2' : ''}">View →</a></td>
+                <td style="text-align:right"><a href="/locks/${chain.slug}/record/${l.id}${ver !== 'v1' ? '?vault=' + ver : ''}">View →</a></td>
               </tr>`;
             }).join('') : '<tr><td colspan="5" class="muted" style="padding:26px 14px">Nothing locked for this token yet.</td></tr>'}
           </tbody>

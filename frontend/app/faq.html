@@ -125,7 +125,7 @@
           <p>Standard ERC-20s, including LP tokens. <b>Not rebase tokens</b> — a balance that changes on its own
             breaks the arithmetic. Fee-on-transfer, max-transaction and blacklist tokens need care: exclude the
             adapter <span class="mono">0xDBE1f3dc…</span> and the vault <span class="mono">0xbC511F31…</span>
-            (the v2 pair every new lock uses) from fees and limits first, because the vault only counts what
+            (the v3 pair every new lock uses) from fees and limits first, because the vault only counts what
             actually arrives. Locks created before 2026-10-23 live in the v1 pair — the adapter
             <span class="mono">0x16e02A10…</span> and the vault <span class="mono">0xe410d0a2…</span> — so use
             those addresses when you are changing one of those older locks.</p></div>

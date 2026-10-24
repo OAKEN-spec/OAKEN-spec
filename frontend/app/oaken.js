@@ -24,11 +24,19 @@ export const VAULT = '0xe410d0a21C1376992874a9bEEeE0d623A50D4a34';
 export const ADAPTER_V2 = '0xDBE1f3dc1d6E6759355E1B164231748f0589cb41';
 export const VAULT_V2 = '0xbC511F31967D9EBF775d203661a2BEfF6AA42615';
 export const OAKEN_LAUNCHER_V2 = '0x0d7cCEA7BabC5e3b4849267740D8fBBe6C4FDa58';
-/** Resolve the v1/v2 contract set. v1 is the default so old URLs keep working. */
+/** v3 (2026-10-24). V2 plus the revoke clamp; new locks and launches use it. */
+export const ADAPTER_V3 = '0x6022DA059FAa0673E3058ADECEef375c2Abfb4A1';
+export const VAULT_V3 = '0xd4064d8E73AAB53D7d9efd8A6E8DBE2003d1de4B';
+export const OAKEN_LAUNCHER_V3 = '0x4488C369116D0C6FEA84162313c3840976D5A9a5';
+/** Every vault generation, oldest first. Lists and per-owner reads cover all three. */
+export const LOCK_VERSIONS = ['v1', 'v2', 'v3'];
+/** Where new locks and launches go. */
+export const NEW_VERSION = 'v3';
+/** Resolve a contract set. v1 is the default so old URLs keep working. */
 export function contractSet(version = 'v1') {
-  return version === 'v2'
-    ? { adapter: ADAPTER_V2, vault: VAULT_V2, launcher: OAKEN_LAUNCHER_V2 }
-    : { adapter: ADAPTER, vault: VAULT, launcher: OAKEN_LAUNCHER };
+  if (version === 'v3') return { adapter: ADAPTER_V3, vault: VAULT_V3, launcher: OAKEN_LAUNCHER_V3 };
+  if (version === 'v2') return { adapter: ADAPTER_V2, vault: VAULT_V2, launcher: OAKEN_LAUNCHER_V2 };
+  return { adapter: ADAPTER, vault: VAULT, launcher: OAKEN_LAUNCHER };
 }
 
 /** 没连钱包、URL 里也没写链时的落点。 */
@@ -62,6 +70,8 @@ export async function chains() {
       launcherBlock: c.launcherBlock ?? null,
       v2DeployBlock: c.v2DeployBlock ?? null,
       v2LauncherBlock: c.v2LauncherBlock ?? null,
+      v3DeployBlock: c.v3DeployBlock ?? null,
+      v3LauncherBlock: c.v3LauncherBlock ?? null,
     }))
     /**
      * 排序：**我们的主链（4663）排最前**，其余按链 id。
@@ -246,9 +256,8 @@ export async function launchesByCreator(chain, address, { lookback = 1_000_000, 
    * 早于它的区间不可能有 `Launched` —— 从创世或"一年前"扫，纯属白烧 RPC。
    * 注册表没给（老接口）才退回固定回看窗口。
    */
-  const floor = chain && (version === 'v2' ? chain.v2LauncherBlock : chain.launcherBlock)
-    ? Math.max(0, version === 'v2' ? chain.v2LauncherBlock : chain.launcherBlock)
-    : Math.max(0, head - lookback)
+  const launcherStart = version === 'v3' ? chain?.v3LauncherBlock : version === 'v2' ? chain?.v2LauncherBlock : chain?.launcherBlock
+  const floor = launcherStart != null ? Math.max(0, launcherStart) : Math.max(0, head - lookback)
   const topic = window.ethers.id('Launched(address,address,address,uint256,uint256,uint256,uint64,string,string)')
   const who = window.ethers.zeroPadValue(String(address).toLowerCase(), 32)
   const set = contractSet(version)

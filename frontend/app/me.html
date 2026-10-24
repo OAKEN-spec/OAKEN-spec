@@ -120,7 +120,7 @@
   // ⚠ 这一页**不加载 ethers**（500 KB 只为把 wei 变成小数不值得）——
   //   所以金额走 explore.js 里自己展开的 `amount()`，不是 oaken.js 的 `fmtAmount()`
   //   （后者要 window.ethers，没有就静默回「—」，看起来像"没有金额"）。
-  import { shell, wallet, ownLocks, locksForOwner, launchesByCreator, countdown, short, fmtDate, toast, reveal, chains, launchedHere, copyBtn , onChainSwitch} from '/app/oaken.js';
+  import { shell, wallet, ownLocks, locksForOwner, launchesByCreator, countdown, short, fmtDate, toast, reveal, chains, launchedHere, copyBtn , onChainSwitch, LOCK_VERSIONS} from '/app/oaken.js';
   import { allPools, chainOf, esc, amount, day, getSaved, getRecent, poolHref, shortAddr } from '/app/explore.js';
 
   shell({ active: 'me' });
@@ -194,7 +194,7 @@
         await loadEthers();
         /* 四条链**并行**读：原来是串行 for-await，2.3 秒里一半是链与链之间排队。 */
         const groups = await Promise.all(live.map(async (c) => {
-          const lists = await Promise.all(['v1', 'v2'].map((v) => locksForOwner(c, addr, v).catch(() => [])));
+          const lists = await Promise.all(LOCK_VERSIONS.map((v) => locksForOwner(c, addr, v).catch(() => [])));
           return lists.flat().map((l) => ({
             id: l.id, vault: l.version || 'v1', chain: c, symbol: l.symbol || short(l.token), decimals: l.decimals,
             remaining: BigInt(l.amount) - BigInt(l.claimed || 0),
@@ -203,10 +203,10 @@
           }));
         }));
         for (const g of groups) rows.push(...g);
-        /* v2 的锁首先列出（新金库、号从 1 起），再按 id 倒序 ——
+        /* 新金库的锁首先列出（v3 → v2 → v1，号各自从 1 起），再按 id 倒序 ——
            只按 id 排会把"今天刚锁的那把"排到最下面。 */
         rows.sort((a, b) =>
-          (Number(b.vault === 'v2') - Number(a.vault === 'v2')) || Number(b.id) - Number(a.id));
+          (LOCK_VERSIONS.indexOf(b.vault || 'v1') - LOCK_VERSIONS.indexOf(a.vault || 'v1')) || Number(b.id) - Number(a.id));
         /* ⚠ 链表为空时不能写 "read live from 0 chains"（假数据，且和空状态叠在一起像"你没有锁"）。
            链表拿不到 → 后面那条 catch 分支会如实说"这次读不到链"。 */
         if (!live.length) throw new Error('the chain list did not load');
@@ -239,13 +239,13 @@
           : c.done ? '<span class="pill ok">unlocked</span>' : `<span class="pill lock">${esc(c.text)}</span>`;
         const part = r.claimed > 0n && r.claimed < r.amount ? ' · <span class="muted">partly claimed</span>' : '';
         return `<div class="row">
-          <span class="t mono">#${esc(r.id)}${r.vault === 'v2' ? ' <span class="pill" title="read from the v2 vault">v2</span>' : ''}</span>
+          <span class="t mono">#${esc(r.id)}${r.vault && r.vault !== 'v1' ? ` <span class="pill" title="read from the ${r.vault} vault">${r.vault}</span>` : ''}</span>
           <span style="flex:1 1 auto;min-width:0">${esc(r.symbol)}${r.token ? ' ' + copyBtn(r.token, 'copy CA') : ''}
             <span class="muted" style="font-size:12.5px"> · ${esc(amount(r.remaining, r.decimals))}${r.steps ? ' · ' + esc(r.steps) + ' steps' : ''}${part}</span></span>
           <span class="chip">${esc(r.chain.name)}</span>
           <span class="muted" style="font-size:12.5px">${r.unlock ? esc(fmtDate(r.unlock)) : ''}</span>
           <span>${state}</span>
-          <a href="/locks/${esc(r.chain.slug)}/record/${esc(r.id)}${r.vault === 'v2' ? '?vault=v2' : ''}">View →</a>
+          <a href="/locks/${esc(r.chain.slug)}/record/${esc(r.id)}${r.vault && r.vault !== 'v1' ? '?vault=' + r.vault : ''}">View →</a>
         </div>`;
       })) : emptyRow('No locks are held for this address on any chain we are on. If you just created one, reload — this list is read from the chain, not from a cache.');
     })();
@@ -265,7 +265,7 @@
         let complete = true, truncated = false, scanned = 0;
         /* 四条链的日志扫描也**并行**（每条链自己还有 8 片上限）。 */
         const scannedPer = await Promise.all(live.map(async (c) => {
-          const sets = await Promise.all(['v1', 'v2'].map((v) => launchesByCreator(c, addr, { version: v }).catch(() => ({ launches: [], complete: false, truncated: false, scannedBlocks: 0 }))));
+          const sets = await Promise.all(LOCK_VERSIONS.map((v) => launchesByCreator(c, addr, { version: v }).catch(() => ({ launches: [], complete: false, truncated: false, scannedBlocks: 0 }))));
           return {
             launches: sets.flatMap((x) => x.launches),
             complete: sets.every((x) => x.complete),
@@ -295,7 +295,7 @@
                 x.locked > 0n ? ' · <b>' + lockedPct.toFixed(2) + '% locked</b> until ' + esc(day(x.unlockDate)) : ' · no lock'}</span></span>
             <span class="chip">${esc(c.name)}</span>
             <span><a href="/locks/${esc(c.slug)}/${esc(x.token)}">Token →</a>${
-              x.locked > 0n ? ' <a href="/locks/' + esc(c.slug) + '/record/' + esc(x.lockId) + (x.vault === 'v2' ? '?vault=v2' : '') + '">Lock →</a>' : ''}</span>
+              x.locked > 0n ? ' <a href="/locks/' + esc(c.slug) + '/record/' + esc(x.lockId) + (x.vault && x.vault !== 'v1' ? '?vault=' + x.vault : '') + '">Lock →</a>' : ''}</span>
           </div>`;
         })) : emptyRow('Nothing has been launched from this address yet. <a href="/launch">Launch a token →</a>');
       } catch (e) {

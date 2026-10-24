@@ -110,7 +110,7 @@
 <script type="module">
   import { shell, readLock, totalLocks, locksForToken, countdown, fmtAmount, short, fmtDate, chains,
     positionLock, labelText, wallet, onWallet, rotateRpc, explorerHref, emptyState,
-    safeRead, cachedRead, cacheDrop, raceTimeout, TOO_SLOW, stillReadingAfter, showReadFail , onChainSwitch} from '/app/oaken.js';
+    safeRead, cachedRead, cacheDrop, raceTimeout, TOO_SLOW, stillReadingAfter, showReadFail , onChainSwitch, LOCK_VERSIONS} from '/app/oaken.js';
   shell({ active: 'locks' });
 
     /* 2026-10-16：这一页的数据**不是按钱包那条链渲染的**（跨链读 / 由 URL 决定）——
@@ -190,13 +190,13 @@
     }
     const vault = d.vault || 'v1';
     return `<tr data-chain="${d.chain.id}" data-vault="${vault}" data-key="${[d.lockId, d.address, d.owner, symbol, d.name, d.chain.name, vault].join(' ').toLowerCase()}">
-      <td class="mono">#${d.lockId}${vault === 'v2' ? ' <span class="pill" title="read from the v2 vault">v2</span>' : ''}${d.live ? ' <span class="pill ok" title="read from the chain just now">live</span>' : ''}</td>
+      <td class="mono">#${d.lockId}${vault !== 'v1' ? ` <span class="pill" title="read from the ${vault} vault">${vault}</span>` : ''}${d.live ? ' <span class="pill ok" title="read from the chain just now">live</span>' : ''}</td>
       <td>${symbol}${d.name ? ` <span class="muted" style="font-size:13px">${d.name}</span>` : ''}</td>
       <td><span class="chip">${d.chain.name}</span></td>
       <td>${amountText}</td>
       <td class="mono muted" style="font-size:13px">${short(d.owner)}</td>
       <td>${state}<div class="muted" style="font-size:12px;margin-top:4px">${d.unlock ? fmtDate(d.unlock) : ''}</div></td>
-      <td style="text-align:right"><a href="/locks/${d.chain.slug}/record/${d.lockId}${vault === 'v2' ? '?vault=v2' : ''}">View →</a>${exArrow('/token/' + d.address, d.chain, 'The token contract on the explorer')}</td>
+      <td style="text-align:right"><a href="/locks/${d.chain.slug}/record/${d.lockId}${vault !== 'v1' ? '?vault=' + vault : ''}">View →</a>${exArrow('/token/' + d.address, d.chain, 'The token contract on the explorer')}</td>
     </tr>`;
   }
 
@@ -209,7 +209,7 @@
       const seen = new Set(shown.map((d) => d.chain.id + ':' + (d.vault || 'v1') + ':' + d.lockId));
       for (const r of lookup.rows) if (!seen.has(r.chain.id + ':' + (r.vault || 'v1') + ':' + r.lockId)) shown.push(r);
     }
-    /* 排序按**新旧**，不按锁号：v1 和 v2 各自从 1 开始编号，v2 的新锁号反而最小，
+    /* 排序按**新旧**，不按锁号：v1/v2/v3 各自从 1 开始编号，新金库的锁号反而最小，
        按 id 排会把它压到最后一页（"我锁完了列表里却没有"）。live 行（刚锁的那把）
        永远在前；其余按链上创建块；没有块的（链上现读、索引快照的旧形状）按 id 兜底。 */
     shown.sort((a, b) =>
@@ -304,7 +304,7 @@
     const rows = [];
     await Promise.all(targets.map(async (c) => {
       const idSets = [];
-      for (const v of ['v1', 'v2']) {
+      for (const v of LOCK_VERSIONS) {
         try { idSets.push({ v, ids: await locksForToken(addr, c, v) }); } catch { /* skip this vault */ }
       }
       let i = 0;
@@ -329,7 +329,7 @@
           } catch { /* 这一把读不到就跳过 */ }
         }
       };
-      await Promise.all(Array.from({ length: Math.min(4, ids.length) }, worker));
+      await Promise.all(Array.from({ length: Math.min(4, flat.length) }, worker));
     }));
     // 迟到的结果别画到别的搜索上（世代号，同挖 salt 那个坑）
     if (!lookup || lookup.addr !== addr) return;
@@ -542,17 +542,17 @@
        已经回来的照常显示。原来逐链串行，四条链最坏 4×(6+6) 秒。 */
     const tailWork = Promise.all(snaps.filter((r) => !r.failed).map(async (r) => {
       const c = r.c;
-      const seenV1 = r.list.filter((x) => (x.vault || 'v1') === 'v1').map((x) => Number(x.lockId) || 0);
-      const seenV2 = r.list.filter((x) => x.vault === 'v2').map((x) => Number(x.lockId) || 0);
-      const [tailV1, tailV2, pos] = await Promise.all([
-        withTimeout(liveTail(c, seenV1, 'v1')),
-        withTimeout(liveTail(c, seenV2, 'v2')),
-        withTimeout(positionRows(c)),
-      ]);
-      for (const tail of [tailV1, tailV2]) {
-        if (tail === TIMEOUT || tail.failed) tailsFailed.push(c);
-        else for (const d of tail) docs.push({ ...d, chain: c });
+      const tails = await Promise.all(LOCK_VERSIONS.map((v) => {
+        const seen = r.list.filter((x) => (x.vault || 'v1') === v).map((x) => Number(x.lockId) || 0);
+        return withTimeout(liveTail(c, seen, v));
+      }));
+      const pos = await withTimeout(positionRows(c));
+      const anyTailFailed = tails.some((tail) => tail === TIMEOUT || tail.failed);
+      for (const tail of tails) {
+        if (tail === TIMEOUT || tail.failed) continue;
+        for (const d of tail) docs.push({ ...d, chain: c });
       }
+      if (anyTailFailed) tailsFailed.push(c);
       if (pos === TIMEOUT) tailsFailed.push(c); else for (const d of pos) docs.push({ ...d, chain: c });
       paintSafe();   // 每读完一条链就重画一次
     }));

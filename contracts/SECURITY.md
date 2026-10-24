@@ -1,6 +1,6 @@
 # Security policy and audit readiness — OAKEN contracts
 
-**Status as of 2026-10-23: no third-party audit has been completed. No bug bounty
+**Status as of 2026-10-24: no third-party audit has been completed. No bug bounty
 is live. This document is an internal readiness package, not an audit report.**
 
 The site currently says “Verification is not an audit.” That stays true until a
@@ -26,8 +26,12 @@ on every chain where they are deployed.
 
 **v2 (deployed 2026-10-23):** the reentrancy fix from `SELF-REVIEW.md` (SR-01) and
 the ETH-refund fix (SR-02) live in a fork, at new deterministic addresses on all
-four chains. New locks and new launches use v2; v1 stays live for everything
-created before that date.
+four chains. v2 holds the locks created 2026-10-23 → 2026-10-24; v1 stays live
+for everything created before that. **v3 (deployed 2026-10-24)** adds the
+revoke-clamp fix (SR-03, found by the unconstrained invariant suite) and is what
+new locks and launches use.
+
+v2 contracts (deployed 2026-10-23; hold the locks created 2026-10-23 → 2026-10-24):
 
 | Contract | File | Address (same on every chain) | Change from v1 |
 |---|---|---|---|
@@ -35,8 +39,17 @@ created before that date.
 | PinkLockAdapterV2 | `contracts/v2/PinkLockAdapterV2.sol` | `0xDBE1f3dc1d6E6759355E1B164231748f0589cb41` | same guard; returns attached ETH to the caller |
 | OakenLauncherV2 | `contracts/OakenLauncher.sol` (same source) | `0x0d7cCEA7BabC5e3b4849267740D8fBBe6C4FDa58` | constructor points at PinkLockAdapterV2 |
 
-See `contracts/V2.md` for regression tests, deployment blocks and the dual-read
-migration. Both v1 and v2 are Sourcify exact matches on all four chains.
+v3 contracts (deployed 2026-10-24; **what new locks and launches use**):
+
+| Contract | File | Address (same on every chain) | Change from v2 |
+|---|---|---|---|
+| LockVaultV3 | `contracts/v3/LockVaultV3.sol` | `0xd4064d8E73AAB53D7d9efd8A6E8DBE2003d1de4B` | `revoke()` freezes at `max(vestedNow, claimed)`; refund is `amount - frozen` |
+| PinkLockAdapterV3 | `contracts/v3/PinkLockAdapterV3.sol` | `0x6022DA059FAa0673E3058ADECEef375c2Abfb4A1` | same source as the v2 adapter, pointed at the v3 vault |
+| OakenLauncherV3 | `contracts/OakenLauncher.sol` (same source) | `0x4488C369116D0C6FEA84162313c3840976D5A9a5` | constructor points at PinkLockAdapterV3 |
+
+See `contracts/V2.md` and `contracts/V3.md` for the failing sequences, regression
+tests, deployment blocks and the multi-read migration. v1, v2 and v3 are all
+Sourcify exact matches on all four chains.
 
 The Safe that proposes through the Timelock is a 2-of-3 at
 `0x5E8C4c241a29ff7E60c648f378A4AA70053Ee92e`. It is a different trust boundary
@@ -50,24 +63,27 @@ must not be presented as covered by an EVM audit.
 
 ## What the tests pin
 
-- Hardhat unit + integration tests: **124 passing** (`npm test`; 120 v1 + 4 v2).
+- Hardhat unit + integration tests: **129 passing** (`npm test`; 120 v1 + 4 v2 + 5 v3).
 - Foundry fuzz tests: **14 fuzz tests × 1,000 runs** across LockVault and
   PositionLock.
-- Foundry invariant tests: **4 invariants, 128 runs × 64 depth**, with a handler
-  that calls create/claim/revoke/edit/transfer/renounce from the right and wrong
-  callers on a monotonic chain clock.
-- Solidity coverage (Hardhat, viaIR for instrumentation):
+- Foundry invariant tests: **two suites of 4 invariants** — a frozen v1 suite and
+  the **unconstrained v3 suite** (128 runs × 64 depth), with a handler that calls
+  create/claim/revoke/edit/transfer/renounce from the right and wrong callers on a
+  monotonic chain clock. The v3 suite is documented to fail when pointed at v2.
+- Foundry total: **20 tests** (14 fuzz, 2 invariant suites, 1 reentrancy PoC,
+  3 v2 regressions).
+- Solidity coverage (Hardhat, viaIR for instrumentation), reported per version:
   - **v1 product contracts: 99.58% statements · 99.82% lines · 100% functions;
     branch 73.38%** — the figure the >95% gate refers to;
   - including mocks: 86.31% statements / 87.00% lines (the mock tokens used by
     refusal tests are intentionally only partly exercised);
-  - **v2 (the deployed fork): 54.55% statements · 55.70% lines · 40% functions ·
-    35.29% branches.** v2 is a byte-for-byte copy of v1 plus a reentrancy guard
-    and an ETH refund, so the v1 suite describes the shared code; the v2-specific
-    paths (guard revert, refund with value) are covered by `test/V2.test.ts` (4
-    Hardhat tests) and `test/foundry/V2Fixes.t.sol` (3 Foundry tests). The
-    coverage number is reported separately rather than blended into v1's.
-  - branch coverage is reported separately; a branch-coverage pass on both
+  - **v2: 54.55% statements · 55.70% lines · 40% functions · 35.29% branches**;
+  - **v3: 54.77% statements · 55.90% lines · 40% functions · 36.05% branches**
+    (`LockVaultV3.sol`: 69.72% / 68.22% / 72.22% / 45.37%). v2 and v3 are v1 plus
+    small diffs, so the v1 suite describes the shared code; their own paths are
+    covered by the versioned Hardhat and Foundry tests. The numbers are reported
+    separately rather than blended into v1's.
+  - branch coverage is reported separately; a branch-coverage pass on all
     versions remains on the audit-readiness list.
 
 ### Run it yourself
@@ -76,13 +92,14 @@ must not be presented as covered by an EVM audit.
 cd contracts
 npm ci
 
-npm test                     # Hardhat (124 tests)
+npm test                     # Hardhat (129 tests)
 npm run coverage             # solidity-coverage, uses hardhat.coverage.config.ts
 
 # Foundry (install forge first: https://book.getfoundry.sh/)
-forge test --match-path "test/foundry/*"        # fuzz + invariant
+forge test --match-path "test/foundry/*"        # 20 tests: fuzz + invariants + PoC
 forge test --match-path test/foundry/LockVaultFuzz.t.sol -vvv
 forge test --match-path test/foundry/LockVaultInvariant.t.sol -vvv
+forge test --match-path test/foundry/LockVaultV3Invariant.t.sol -vvv
 ```
 
 The Foundry suite lives in `test/foundry/`; `lib/forge-std` is vendored for
@@ -102,9 +119,12 @@ in the normal suite and in `check.js`.
 4. **The vault is solvent.** For a single token, the vault balance always covers
    the sum of `amount - claimed` across all locks; there is no privilege that can
    move tokens out except the lock’s own claim/revoke/edit rules.
-5. **Revoke splits exactly.** `refund + vestedAtRevoke == credited`; after the
-   revoke, the schedule is frozen and the beneficiary can still claim the vested
-   part unless renounced.
+5. **Revoke splits exactly.** In v3, `revoke()` freezes at
+   `frozen = max(vestedAtRevoke, claimed)` and refunds `credited - frozen`; after
+   the revoke, the schedule is frozen and the beneficiary can still claim the
+   vested part unless renounced. v1/v2 froze at `vestedAtRevoke` alone, which the
+   edit-down sequence below could push below `claimed` — that is SR-04, fixed in
+   v3.
 6. **Edit cannot erase history.** A shrink below `claimed` reverts; a shrink pays
    the beneficiary, never the caller; a grow credits the balance delta.
 7. **Plain locks are the degenerate case.** `start == cliff == end` releases
@@ -143,10 +163,15 @@ auditor rather than hidden in a test.
 - **Bonds are a different product** with admin/Timelock/NAV risk. Locks are
   ownerless. Reading one as the other is a user-interface bug, not a contract
   bug.
-- **SR-01 / SR-02 are fixed in v2 only.** v1 is immutable and still holds
-  pre-2026-10-23 locks; a token with a transfer callback can re-enter it. The
-  creation form warns against transfer-hook (ERC-777-style) tokens. v2 makes the
-  re-entrant path revert and returns attached ETH; see `V2.md`.
+- **SR-01 / SR-02 are fixed in v2 (and inherited by v3).** v1 is immutable and
+  still holds pre-2026-10-23 locks; a token with a transfer callback can re-enter
+  it. The creation form warns against transfer-hook (ERC-777-style) tokens. v2
+  makes the re-entrant path revert and returns attached ETH; see `V2.md`.
+- **SR-04 is fixed in v3 only.** v1 and v2 allow a revocable lock to be claimed,
+  edited down and then revoked in a way that refunds from other locks of the same
+  token. v3 clamps the frozen amount at `max(vested, claimed)`. Neither v1 nor v2
+  can be patched in place; the site now creates new locks and launches through
+  v3. See `V3.md`.
 - **Solana:** the OAKEN Solana lock program is deployed on mainnet
   (`Co9ZnAVxX2siGThhjTpPgXPHYrCev1nrXFyGB1VcZcQW`, upgrade authority revoked) and
   passed a 25-check E2E on a local validator. Jupiter Lock remains available as

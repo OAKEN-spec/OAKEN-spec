@@ -219,9 +219,10 @@
     $('rows').innerHTML = list.map((u) => {
       const c = live.find((x) => Number(x.id) === Number(u.chain_id));
       const slug = c ? c.slug : '';
-      const href = slug && u.lockId ? `/locks/${esc(slug)}/record/${esc(u.lockId)}${u.vault === 'v2' ? '?vault=v2' : ''}` : '/locks';
+      const ver = u.vault && u.vault !== 'v1' ? String(u.vault) : '';
+      const href = slug && u.lockId ? `/locks/${esc(slug)}/record/${esc(u.lockId)}${ver ? '?vault=' + esc(ver) : ''}` : '/locks';
       return `<tr>
-        <td class="mono">#${esc(u.lockId)}${u.vault === 'v2' ? ' <span class="pill">v2</span>' : ''}</td>
+        <td class="mono">#${esc(u.lockId)}${ver ? ` <span class="pill">${esc(ver)}</span>` : ''}</td>
         <td>${esc(c ? c.name : u.chain_id)}</td>
         <td>${esc(u.symbol || '—')}</td>
         <td>${esc(num(u.current))} <span class="muted" style="font-size:11px">${esc(u.symbol || '')}</span></td>

@@ -77,9 +77,10 @@
     onChainSwitch(() => { /* 什么都不用做（见上） */ });
   const m = /^\/locks\/([^/]+)\/record\/([^/]+)\/?$/.exec(location.pathname);
   const id = m && m[2];
-  /* `?vault=v2` selects the v2 contracts. Without it the page stays on v1 so
+  /* `?vault=v2|v3` selects that generation. Without it the page stays on v1 so
      every old record URL keeps reading the vault that actually holds the lock. */
-  const VAULT_VER = new URLSearchParams(location.search).get('vault') === 'v2' ? 'v2' : 'v1';
+  const _vq = new URLSearchParams(location.search).get('vault');
+  const VAULT_VER = _vq === 'v2' || _vq === 'v3' ? _vq : 'v1';
   const SET = contractSet(VAULT_VER);
   const root = document.getElementById('root');
   let activeChain = null;   // 解析出来的链；重画时用它，别把 null 传回 load()
@@ -461,7 +462,7 @@
       <div class="head-grid ark-rings">
         ${l.steps ? ringCalendar(l, now) : ring(pct, done ? '100%' : Math.round(pct * 100) + '%', done ? 'released' : c.text)}
         <div>
-          <h2 class="sec">${l.symbol} lock <span class="mono">#${l.id}</span>${VAULT_VER === 'v2' ? ' <span class="pill" title="read from the v2 vault">v2</span>' : ''}</h2>
+          <h2 class="sec">${l.symbol} lock <span class="mono">#${l.id}</span>${VAULT_VER !== 'v1' ? ` <span class="pill" title="read from the ${VAULT_VER} vault">${VAULT_VER}</span>` : ''}</h2>
           <p class="muted" style="margin-top:10px">${l.description && l.description !== '{}' ? l.description : 'No title was set for this lock.'}</p>
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
             <button class="btn btn-s" id="sharelock" type="button">Share this lock</button>
@@ -554,7 +555,7 @@
 
     const shareBtn = document.getElementById('sharelock');
     if (shareBtn) shareBtn.onclick = async () => {
-      const url = location.origin + location.pathname + (VAULT_VER === 'v2' ? '?vault=v2' : '');
+      const url = location.origin + location.pathname + (VAULT_VER !== 'v1' ? '?vault=' + VAULT_VER : '');
       const title = `${l.symbol} lock #${l.id} · OAKEN`;
       try {
         if (navigator.share) { await navigator.share({ title, url }); return; }

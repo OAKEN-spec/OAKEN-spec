@@ -37,12 +37,15 @@
 <style>
   body.sol-page #gas-chip, body.sol-page #connect { display: none !important; }
   .flow { display: grid; grid-template-columns: 1fr 1.15fr; gap: 26px; align-items: start; }
+  /* Grid items default to min-width:auto, so a wide row (input + button) sets the
+     track's min-content and widens the whole layout viewport at 390px. */
+  .flow > div { min-width: 0; }
   .panel .body { display: grid; gap: 13px; }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .hint { color: var(--muted); font-size: 12.5px; line-height: 1.55; }
   .warnline { color: #e0a85f; }
   .okline { color: var(--ok, #6fbf73); }
-  .lab { display: flex; align-items: baseline; gap: 10px; }
+  .lab { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .secretline { font-size: 23px; letter-spacing: .12em; color: var(--gold); margin-top: 8px; }
   input.i, select.i, textarea.i { width: 100%; box-sizing: border-box; }
   .walletrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
