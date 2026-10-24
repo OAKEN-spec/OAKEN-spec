@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Security &amp; audit status · OAKEN</title>
-<meta name="description" content="OAKEN's security and audit status: no third-party audit yet, no bug bounty yet, the ownerless lock boundary, test and invariant coverage, and how to verify everything yourself.">
+<meta name="description" content="OAKEN's security and audit status: no third-party audit yet, no bug bounty yet, the lock trust boundary (v1–v3 immutable; v4 2-of-3 + 48h), test and invariant coverage, and how to verify everything yourself.">
 <link rel="icon" href="/favicon.png">
 <link rel="stylesheet" href="/app/oaken.css">
 <!-- oaken-boot-gate -->
@@ -57,7 +57,7 @@
     <div class="eyebrow reveal">Security &amp; audit status</div>
     <h1 class="reveal">No audit claim.<br>Here is what we can show.</h1>
     <p class="ph-lede reveal">Verification is not an audit. This page states what has and has not been
-      done, which contracts are ownerless, what the tests pin down, and how to check all of it yourself.</p>
+      done, which contracts have no operator, what the tests pin down, and how to check all of it yourself.</p>
   </div>
 </section>
 
@@ -78,40 +78,42 @@
     <h2 class="sec" style="font-size:28px">We looked, with tools. It is still not an audit.</h2>
     <div class="grid2" style="margin-top:18px">
       <div class="card"><h3>What was run</h3><p>Slither 0.11.6 over the product contracts (107 findings,
-        17 High/Medium before triage), the 124 Hardhat tests, the Foundry fuzz/invariant suites, and a
+        17 High/Medium before triage), the 138 Hardhat tests, the 20-test Foundry fuzz/invariant suite, and a
         reentrancy proof-of-concept. Halmos did not run on this Foundry toolchain; no symbolic result is
         claimed. <a href="https://github.com/OAKEN-spec/OAKEN-spec/blob/master/contracts/SELF-REVIEW.md"
         target="_blank" rel="noopener">Full self-review →</a></p></div>
-      <div class="card"><h3>What it found</h3><p>One <b>High, conditional</b>: a token with a transfer
-        callback can re-enter <span class="mono">createLock</span>/<span class="mono">editLock</span> and
-        over-credit a lock, at the expense of another lock of the same token. The deployed contracts are
-        immutable; the creation form now warns against transfer-hook (ERC-777-style) tokens. One
-        <b>Low</b>: the adapter accepts ETH it cannot return. The rest were informational or false
-        positives, each with a reason in the report.</p></div>
+      <div class="card"><h3>What it found</h3><p>Two <b>conditional High</b> findings: (SR-01) a token with a
+        transfer callback can re-enter <span class="mono">createLock</span>/<span class="mono">editLock</span>
+        and over-credit a lock, at the expense of another lock of the same token; and (SR-04) a revocable lock
+        that is partially claimed, edited down and then revoked could refund more than the vault held for it.
+        SR-01 is fixed in v2; SR-04 is fixed in v4. One <b>Low</b>: the v1 adapter accepts ETH it cannot return
+        (fixed in v2). The rest were informational or false positives, each with a reason in the report.</p></div>
     </div>
     <p class="hint" style="max-width:84ch;margin-top:14px">This is not an independent review. The code was
       reviewed by the same person who wrote it, with public tools and a reproducible command list. Treat it
       as evidence of method, not as an audit opinion.</p>
-    <p class="hint" style="max-width:84ch">A v3 fork is <b>deployed on Robinhood Chain, BNB Chain, Base and
-      Polygon at the same addresses</b>. New locks and new launches go through v3; v2 and v1 remain live for the
-      locks created under them, and the site reads all three (the warning above still applies to existing v1
-      locks). v3 is v2 plus a clamp in <span class="mono">revoke()</span>: a revocable lock that was edited down
-      after a partial claim could otherwise refund more than the vault still held for it. The addresses,
+    <p class="hint" style="max-width:84ch">A v4 fork is <b>deployed on Robinhood Chain, BNB Chain, Base and
+      Polygon at the same addresses</b>. New locks and new launches go through v4; v1, v2 and v3 remain live for
+      the locks created under them, and the site reads all four (the warning above still applies to existing v1
+      locks). v4 is v3 behind an ERC1967 proxy, with a 2-of-3 multisig and a 48-hour delayed admin; the upgrade
+      path preserves existing locks (covered by the v4 Hardhat tests and the local upgrade E2E). The addresses,
       deployment records and migration notes are in
       <a href="https://github.com/OAKEN-spec/OAKEN-spec/blob/master/contracts/v3/README.md" target="_blank" rel="noopener">v3/README.md</a>.</p>
 
     <div class="ssplit">
       <div class="scard ownerless">
-        <h3>Ownerless by design</h3>
-        <p>Locks and positions have no owner, no pause, no upgrade and no rescue. The creator of a lock has one
-          power: revoke its own lock, and only if the lock declared itself revocable at creation.</p>
+        <h3>No operator over a lock</h3>
+        <p>No key can move a lock's tokens or change its schedule: no pause, no fee switch, no rescue. The creator
+          of a lock has one power: revoke its own lock, and only if the lock declared itself revocable at creation.</p>
         <ul class="slist">
-          <li>LockVault / PositionLock: no admin key, no proxy.</li>
+          <li>LockVault v1 / v2 / v3: no admin key, no proxy. Immutable.</li>
+          <li>LockVault v4: ERC1967 proxy. A 2-of-3 multisig can replace the implementation after 48h; it cannot move a lock's balance or date directly.</li>
+          <li>PositionLock: no admin key, no proxy.</li>
           <li>TokenFactory: fixed supply; no mint, pause or owner after deployment.</li>
           <li>MultiSender: no storage between calls.</li>
           <li>Airdrop / Presale / Launcher: product-specific creator powers, no upgrade key.</li>
         </ul>
-        <div class="stags"><span class="pill ok">NO OWNER</span><span class="pill ok">NO UPGRADE</span><span class="pill ok">NO RESCUE</span></div>
+        <div class="stags"><span class="pill ok">NO OPERATOR</span><span class="pill ok">v1–v3 IMMUTABLE</span><span class="pill ok">v4 · 2-of-3 + 48h</span></div>
       </div>
       <div class="scard admin">
         <h3>Admin is a different product</h3>
@@ -121,7 +123,7 @@
           <li>Safe: <span class="mono">0x5E8C4c241a29ff7E60c648f378A4AA70053Ee92e</span> · 2-of-3.</li>
           <li>Timelock delay at handoff: <b>86,400 seconds (24h)</b>.</li>
           <li>Changing that number is a governance action through the Safe, not a promise made by this page.</li>
-          <li>Locks: no admin. Bonds: admin, keeper and oracle risk.</li>
+          <li>Locks: no operator over a lock; v4 has a 2-of-3 upgrade key + 48h delay. Bonds: admin, keeper and oracle risk.</li>
         </ul>
         <div class="stags"><span class="pill" style="color:var(--bad);border-color:rgba(224,120,95,.4)">ADMIN PATH</span><span class="pill">TIMELOCK</span><span class="pill">2-OF-3 SAFE</span></div>
       </div>
@@ -137,10 +139,11 @@
     </div>
     <p class="hint" style="max-width:84ch;margin-top:14px">Coverage: <b>v1 product contracts</b>
       <b>99.58% statements · 99.82% lines · 100% functions</b>; branch coverage <b>73.38%</b> and is
-      reported separately rather than rounded up. The deployed <b>v3</b> fork is v2 plus the revoke clamp; v2 is v1 plus a reentrancy guard and
-      an ETH refund; its own paths are covered by 4 Hardhat tests and 3 Foundry tests and its coverage is
-      reported separately, not blended into v1's. The four deterministic-address tests run in the normal suite;
-      the coverage build uses viaIR instrumentation and excludes them.</p>
+      reported separately rather than rounded up. Each fork is reported on its own: v2 is v1 plus a
+      reentrancy guard and an ETH refund; v3 is v2 plus the revoke clamp. v4 is v3 behind an ERC1967 proxy,
+      plus the multisig and delayed-admin path — covered by 9 Hardhat upgrade tests and a local upgrade E2E
+      that preserves existing locks. The four deterministic-address tests run in the normal suite; the
+      coverage build uses viaIR instrumentation and excludes them.</p>
     <div class="hint" style="max-width:84ch">The sanitized public repository is live at
       <a href="https://github.com/OAKEN-spec/OAKEN-spec" target="_blank" rel="noopener">OAKEN-spec/OAKEN-spec</a>
       (contracts, tests, deployment scripts, frontend source, Solana source). Use GitHub's private vulnerability
@@ -172,6 +175,11 @@
           <tr><td>MultiSender</td><td class="mono">0x1f380ef5eFF9113314Ee175dCE4F226DFd75A50C</td><td>none</td></tr>
           <tr><td>OakenAirdrop</td><td class="mono">0x17E9910cDC37BdA5531414012aeA5b0862C22066</td><td>none</td></tr>
           <tr><td>PresaleFactory</td><td class="mono">0xAC070cf2ed45aEcb9f5299d4C670fFfCE6387724</td><td>none</td></tr>
+          <tr><td><b>LockVault · v4 (proxy)</b></td><td class="mono">0x5221A10B772D5e2d51B60E8e3dd5DA9338b04ab0</td><td>2-of-3 + 48h</td></tr>
+          <tr><td><b>PinkLockAdapter · v4 (proxy)</b></td><td class="mono">0xA2898528eb4Aea0bDAf47202A5BA3bA4f58F831c</td><td>2-of-3 + 48h</td></tr>
+          <tr><td><b>OakenLauncher · v4</b></td><td class="mono">0x9600f22d2f629904B44c7dA2d958f5AfB3a1e5Ff</td><td>none</td></tr>
+          <tr><td>Upgrade multisig · v4</td><td class="mono">0xCb847B572352156be50c90FBc752cfd032114666</td><td>2-of-3 owners</td></tr>
+          <tr><td>Delayed proxy admin · v4</td><td class="mono">0xDB998916A34b87c7DA337d922bC1219970FA0319</td><td>48h delay</td></tr>
           <tr><td>LockVault · v3</td><td class="mono">0xd4064d8E73AAB53D7d9efd8A6E8DBE2003d1de4B</td><td>none</td></tr>
           <tr><td>PinkLockAdapter · v3</td><td class="mono">0x6022DA059FAa0673E3058ADECEef375c2Abfb4A1</td><td>none</td></tr>
           <tr><td>OakenLauncher · v3</td><td class="mono">0x4488C369116D0C6FEA84162313c3840976D5A9a5</td><td>none</td></tr>

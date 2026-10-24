@@ -75,7 +75,8 @@
         <div class="card"><h3>Is OAKEN audited?</h3>
           <p>No, and we do not claim it. There is no audit badge on this site. Verification means the published
             source compiles to the deployed bytecode; it does not mean someone reviewed every failure mode.
-            The contracts are deliberately short and have no owner — read them, or have someone you trust read them.
+            The contracts are deliberately short and no operator can move a lock — read them, or have someone
+            you trust read them. The v4 vault has a 2-of-3 upgrade key with a 48-hour delay; v1–v3 are immutable.
             The full status, test/invariant coverage and disclosure policy are on the
             <a href="/security">Security page</a>. <b>No bug bounty is live yet</b> — the scope and reporting route are on the <a href="/security/bug-bounty">bug bounty page</a>.</p></div>
         <div class="card"><h3>How do I verify a contract?</h3>
@@ -83,9 +84,17 @@
             the chain's explorer. All eight contracts are exact matches on all four chains. The
             <a href="/verify">Verify page</a> has the addresses, the status table and copy-paste eth_call recipes.</p></div>
         <div class="card"><h3>Who owns OAKEN?</h3>
-          <p>The lock contracts have no owner, no admin and no upgrade path. The Bonds contracts have an admin —
-            a 2-of-3 Safe behind a 24h Timelock — and that boundary is stated on every Bonds page. The website is
-            a reader; it is not the vault.</p></div>
+          <p>No operator can move a lock or change its schedule. <b>v4 is upgradeable:</b> a 2-of-3 multisig can
+            schedule a new vault implementation, and every upgrade waits 48 hours on-chain. v1, v2 and v3 have
+            no owner and no upgrade path. The Bonds contracts have an admin — a 2-of-3 Safe behind a 24h
+            Timelock — and that boundary is stated on every Bonds page. The website is a reader; it is not the
+            vault.</p></div>
+        <div class="card"><h3>Can the lock contract be upgraded?</h3>
+          <p><b>v4: yes, slowly.</b> The vault and adapter are ERC1967 proxies. A 2-of-3 multisig (the same
+            owners as the Safe) can call <span class="mono">scheduleUpgrade</span>; the new implementation can
+            only be activated after 48 hours, can be cancelled in between, and emits an event. v1, v2 and v3
+            are immutable, and locks in them cannot be moved to v4 or upgraded. The lock-level rules do not
+            change: no pause, no fee switch, no rescue, and only the lock's creator can revoke a revocable lock.</p></div>
         <div class="card"><h3>What if this website disappears?</h3>
           <p>Locks still release. The schedule is stored in the contracts on four chains, and anyone can pay the
             gas to send a due lock to its beneficiary. You do not need this site, our servers or our permission.</p></div>
@@ -107,8 +116,10 @@
         <h2 class="sec">How the vault behaves.</h2><div class="sec-rule"></div></div>
       <div class="grid2" data-stagger style="margin-top:26px">
         <div class="card"><h3>Can anyone take my locked tokens early?</h3>
-          <p>No. The vault releases only to the beneficiary, only at or after the schedule. There is no admin,
-            no pause and no rescue path. A renounced lock is permanent — that is the point of the button.</p></div>
+          <p>No. The vault releases only to the beneficiary, only at or after the schedule. No admin can move or
+            pause a lock, and there is no rescue path. The v4 upgrade key can only replace the vault code after
+            a 48-hour delay; v1–v3 have no upgrade path. A renounced lock is permanent — that is the point of
+            the button.</p></div>
         <div class="card"><h3>Who can claim a lock?</h3>
           <p>Only the beneficiary receives the tokens. <b>Anyone</b> may pay the gas to submit the release —
             the vault checks who is being paid, not who is paying. This is why the Claim button is visible
@@ -124,8 +135,8 @@
         <div class="card"><h3>What tokens can I lock?</h3>
           <p>Standard ERC-20s, including LP tokens. <b>Not rebase tokens</b> — a balance that changes on its own
             breaks the arithmetic. Fee-on-transfer, max-transaction and blacklist tokens need care: exclude the
-            adapter <span class="mono">0xDBE1f3dc…</span> and the vault <span class="mono">0xbC511F31…</span>
-            (the v3 pair every new lock uses) from fees and limits first, because the vault only counts what
+            adapter <span class="mono">0xA2898528…</span> and the vault <span class="mono">0x5221A10B…</span>
+            (the v4 pair every new lock uses) from fees and limits first, because the vault only counts what
             actually arrives. Locks created before 2026-10-23 live in the v1 pair — the adapter
             <span class="mono">0x16e02A10…</span> and the vault <span class="mono">0xe410d0a2…</span> — so use
             those addresses when you are changing one of those older locks.</p></div>
@@ -142,7 +153,7 @@
       <div class="reveal"><div class="eyebrow">BONDS</div>
         <h2 class="sec">A different product, with a different admin.</h2><div class="sec-rule"></div></div>
       <div class="grid2" data-stagger style="margin-top:26px">
-        <div class="card"><h3>Why do Bonds have an admin if Locks do not?</h3>
+        <div class="card"><h3>Why do Bonds have an admin if Locks have no operator?</h3>
           <p>aOAKEN needs a NAV feed, fee parameters and a reward stream. Those are governance variables, so
             they sit behind a 2-of-3 Safe and a 24h Timelock. The Safe cannot move vault reserves, mint aOAKEN
             without USDG, or force a redemption. Locks and Bonds are separate products with separate trust

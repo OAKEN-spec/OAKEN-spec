@@ -52,7 +52,7 @@
 <script src="/app/vendor/ethers.umd.min.js" defer></script>
 <script type="module">
   import { shell, locksForToken, readLock, readLocks, tokenLocksPage, tokenMeta, fmtAmount, fmtDate, short, countdown, explorer,
-    chainBySlug, currentChain, copyBtn, safeRead, showReadFail, ADAPTER, ADAPTER_V2, ADAPTER_V3, LOCK_VERSIONS, onChainSwitch} from '/app/oaken.js';
+    chainBySlug, currentChain, copyBtn, safeRead, showReadFail, ADAPTER, ADAPTER_V2, ADAPTER_V3, ADAPTER_V4, LOCK_VERSIONS, onChainSwitch} from '/app/oaken.js';
   shell();
 
     /* 同记录页：链来自 URL（/locks/<链>/<代币>），钱包换链不影响这一页。 */
@@ -79,7 +79,7 @@
      * 快路径：**两轮 Multicall** 把整页读完（枚举+元数据一轮，金库/标记一轮）。
      * 这条链没有 Multicall3 或批读失败时，退回 `tokenMeta` + 逐把读。
      */
-    /* v1/v2/v3 have separate id spaces and separate adapters. Read them all; each
+    /* v1–v4 have separate id spaces and separate adapters. Read them all; each
        row carries its version so the record link can select the right vault. */
     const pages = [];
     for (const v of LOCK_VERSIONS) {
@@ -180,8 +180,9 @@
         <span class="pill lock">${fmtAmount(held, decimals)} ${symbol} still in the vault</span>
         <a class="pill" target="_blank" rel="noopener" href="${explorer('/token/' + token, chain)}">explorer ↗</a>
         <a class="pill ok" target="_blank" rel="noopener" title="the lock contracts are exact matches on Sourcify"
-           href="https://sourcify.dev/#/lookup/${rows.some((r) => r.version === 'v3') ? ADAPTER_V3 : rows.some((r) => r.version === 'v2') ? ADAPTER_V2 : ADAPTER}">source verified ↗</a>
+           href="https://sourcify.dev/#/lookup/${rows.some((r) => r.version === 'v4') ? ADAPTER_V4 : rows.some((r) => r.version === 'v3') ? ADAPTER_V3 : rows.some((r) => r.version === 'v2') ? ADAPTER_V2 : ADAPTER}">source verified ↗</a>
       </div>
+      ${rows.some((r) => r.version === 'v4') ? '<div class="hint" style="margin-top:12px">Some of these locks are in the upgradeable v4 vault: a 2-of-3 multisig can replace the vault code after a public 48-hour delay, but it cannot move a lock\'s tokens or change its schedule directly. Locks in v1–v3 are immutable.</div>' : ''}
       <div class="panel" style="margin-top:26px">
         <table class="list">
           <thead><tr><th>Lock</th><th>Amount</th><th>Owner</th><th>Unlocks</th><th></th></tr></thead>

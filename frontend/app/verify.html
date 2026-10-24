@@ -6,7 +6,7 @@
 <title>Verify · OAKEN</title>
 <meta name="description" content="Verify OAKEN yourself: contract addresses on four chains, Sourcify bytecode checks, copy-paste eth_call recipes, deterministic deployment, and the trust boundary between Locks and Bonds.">
 <meta property="og:title" content="Verify OAKEN — do not trust the page, check it">
-<meta property="og:description" content="Contract addresses, bytecode verification, raw eth_call recipes, and the exact boundary between ownerless Locks and admin-managed Bonds.">
+<meta property="og:description" content="Contract addresses, bytecode verification, raw eth_call recipes, and the exact boundary between the no-operator lock model (v1–v3 immutable; v4 2-of-3 + 48h) and admin-managed Bonds.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://oaken.one/verify">
 <meta property="og:image" content="https://oaken.one/logo512.png">
@@ -57,10 +57,11 @@
 <main class="wrap">
   <section class="band" style="padding-top:40px">
     <p class="muted reveal" style="max-width:72ch">Every number on this site is an <span class="mono">eth_call</span>
-      from your browser to a public node. The contracts have no owner, no upgrade path and no admin key.
-      This page gives you the addresses, the bytecode checks and the raw calls to confirm all of it without
-      going through us. <b>Verification is not an audit</b> — we claim no audit, and a matching bytecode
-      does not mean the code is free of every failure mode.</p>
+      from your browser to a public node. No operator can move a lock, pause it or take a fee. The v4 vault adds
+      one deliberate power: a 2-of-3 multisig can replace the implementation after a 48-hour delay. v1, v2 and
+      v3 are immutable. This page gives you the addresses, the bytecode checks and the raw calls to confirm all
+      of it without going through us. <b>Verification is not an audit</b> — we claim no audit, and a matching
+      bytecode does not mean the code is free of every failure mode.</p>
 
     <div class="note reveal" style="margin-top:22px;border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;color:var(--muted);font-size:13.5px;line-height:1.65">
       <b style="color:var(--parch)">Security &amp; audit status.</b> No third-party audit has been completed; no bug
@@ -82,9 +83,16 @@
             <tr><td>Airdrop</td><td class="mono addr">0x17E9910cDC37BdA5531414012aeA5b0862C22066</td><td></td></tr>
             <tr><td>Presale factory</td><td class="mono addr">0xAC070cf2ed45aEcb9f5299d4C670fFfCE6387724</td><td></td></tr>
             <tr><td>Launcher · v1</td><td class="mono addr">0x1d7561fC331594820382E8dd64582645EbafD873</td><td>legacy launches</td></tr>
-            <tr><td><b>Oaken Lock adapter · v3</b></td><td class="mono addr">0x6022DA059FAa0673E3058ADECEef375c2Abfb4A1</td><td><b>new locks</b></td></tr>
-            <tr><td><b>Vault · v3</b></td><td class="mono addr">0xd4064d8E73AAB53D7d9efd8A6E8DBE2003d1de4B</td><td><b>new locks</b></td></tr>
-            <tr><td><b>Launcher · v3</b></td><td class="mono addr">0x4488C369116D0C6FEA84162313c3840976D5A9a5</td><td><b>new launches</b></td></tr>
+            <tr><td><b>Oaken Lock adapter · v4 (proxy)</b></td><td class="mono addr">0xA2898528eb4Aea0bDAf47202A5BA3bA4f58F831c</td><td><b>new locks · upgradeable</b></td></tr>
+            <tr><td><b>Vault · v4 (proxy)</b></td><td class="mono addr">0x5221A10B772D5e2d51B60E8e3dd5DA9338b04ab0</td><td><b>new locks · upgradeable</b></td></tr>
+            <tr><td><b>Launcher · v4</b></td><td class="mono addr">0x9600f22d2f629904B44c7dA2d958f5AfB3a1e5Ff</td><td><b>new launches</b></td></tr>
+            <tr><td>Multisig · v4 admin (2-of-3)</td><td class="mono addr">0xCb847B572352156be50c90FBc752cfd032114666</td><td>upgrade key</td></tr>
+            <tr><td>Delayed proxy admin · v4</td><td class="mono addr">0xDB998916A34b87c7DA337d922bC1219970FA0319</td><td>48h delay</td></tr>
+            <tr><td>Vault implementation · v4</td><td class="mono addr">0xEead023bEcE7D6A458c1da1F8c22E84be885171e</td><td>implementation, not the proxy</td></tr>
+            <tr><td>Adapter implementation · v4</td><td class="mono addr">0x33cA492931828B5a8E222fB731BBa1Ab5124cCaA</td><td>implementation, not the proxy</td></tr>
+            <tr><td>Oaken Lock adapter · v3</td><td class="mono addr">0x6022DA059FAa0673E3058ADECEef375c2Abfb4A1</td><td>2026-10-24</td></tr>
+            <tr><td>Vault · v3</td><td class="mono addr">0xd4064d8E73AAB53D7d9efd8A6E8DBE2003d1de4B</td><td>2026-10-24</td></tr>
+            <tr><td>Launcher · v3</td><td class="mono addr">0x4488C369116D0C6FEA84162313c3840976D5A9a5</td><td>2026-10-24</td></tr>
             <tr><td><b>Oaken Lock adapter · v2</b></td><td class="mono addr">0xDBE1f3dc1d6E6759355E1B164231748f0589cb41</td><td>2026-10-23 to 2026-10-24</td></tr>
             <tr><td><b>Vault · v2</b></td><td class="mono addr">0xbC511F31967D9EBF775d203661a2BEfF6AA42615</td><td>2026-10-23 to 2026-10-24</td></tr>
             <tr><td><b>Launcher · v2</b></td><td class="mono addr">0x0d7cCEA7BabC5e3b4849267740D8fBBe6C4FDa58</td><td>2026-10-23 to 2026-10-24</td></tr>
@@ -93,11 +101,13 @@
         <div class="hint" style="margin-top:14px">Chains: Robinhood Chain (4663), BNB Chain (56), Base (8453),
           Polygon (137). The deterministic salt derives the address from the bytecode, so the same address is
           the same contract on each chain — not a copy with different rules.
-          <b>v1, v2 and v3 are all live.</b> v1 holds locks created before 2026-10-23; v2 holds locks from
-          2026-10-23 to 2026-10-24 (reentrancy guard + ETH refund); v3 is what new locks and launches use
-          (v2 plus the revoke clamp). The safeguards are described in
+          <b>v1, v2, v3 and v4 are all live.</b> v1 holds locks created before 2026-10-23; v2 holds
+          2026-10-23 to 2026-10-24 (reentrancy guard + ETH refund); v3 holds 2026-10-24 (v2 plus the revoke
+          clamp). <b>v4 is what new locks and launches use, and it is upgradeable:</b> the vault and adapter are
+          ERC1967 proxies, and a 2-of-3 multisig can schedule a new implementation after a 48-hour delay.
+          v1, v2 and v3 are immutable. The safeguards and the upgrade model are described in
           <a href="https://github.com/OAKEN-spec/OAKEN-spec/blob/master/contracts/SELF-REVIEW.md" target="_blank" rel="noopener">the self-review</a>.
-          Old record URLs stay on v1; newer ones carry <span class="mono">?vault=v2</span> or <span class="mono">?vault=v3</span>.</div>
+          Old record URLs stay on v1; newer ones carry <span class="mono">?vault=v2</span>, <span class="mono">?vault=v3</span> or <span class="mono">?vault=v4</span>.</div>
       </div>
     </div>
 
@@ -171,7 +181,7 @@
         <table class="list">
           <thead><tr><th>Contract</th><th>4663</th><th>56</th><th>8453</th><th>137</th><th>Source</th></tr></thead>
           <tbody>
-            <tr><td>All contracts above (v1, v2 and v3)</td><td class="ok">exact</td><td class="ok">exact</td><td class="ok">exact</td><td class="ok">exact</td>
+            <tr><td>All contracts above (v1, v2, v3 and v4)</td><td class="ok">exact</td><td class="ok">exact</td><td class="ok">exact</td><td class="ok">exact</td>
               <td><a href="https://sourcify.dev" target="_blank" rel="noopener">Sourcify</a> · <a href="https://robinhoodchain.blockscout.com/address/0xe410d0a21C1376992874a9bEEeE0d623A50D4a34#code" target="_blank" rel="noopener">Blockscout</a></td></tr>
           </tbody>
         </table>
@@ -258,11 +268,12 @@
   <section class="band" id="bonds-boundary">
     <div class="wrap">
       <div class="reveal"><div class="eyebrow">THE TRUST BOUNDARY</div>
-        <h2 class="sec">"No owner" applies to Locks, not Bonds.</h2><div class="sec-rule"></div></div>
+        <h2 class="sec">The lock boundary is "no operator". Bonds have an admin.</h2><div class="sec-rule"></div></div>
       <div class="grid2" data-stagger style="margin-top:26px">
         <div class="panel"><div class="head"><h3>Locks &amp; tools</h3></div><div class="body">
           <ul style="list-style:none;display:grid;gap:12px;color:var(--muted);font-size:14.5px">
-            <li><b style="color:var(--parch)">No admin, no pause, no upgrade.</b> The schedule is fixed once the lock lands.</li>
+            <li><b style="color:var(--parch)">No operator over a lock.</b> The schedule is fixed once the lock
+              lands. The v4 vault has a 2-of-3 upgrade key with a 48h delay; v1–v3 are immutable.</li>
             <li><b style="color:var(--parch)">No protocol fee.</b> You pay gas only.</li>
             <li><b style="color:var(--parch)">Anyone can pay gas</b> to release a due lock; the vault pays only the beneficiary.</li>
           </ul>

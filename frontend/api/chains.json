@@ -20,7 +20,9 @@
       "v2DeployBlock": null,
       "v2LauncherBlock": null,
       "v3DeployBlock": null,
-      "v3LauncherBlock": null
+      "v3LauncherBlock": null,
+      "v4DeployBlock": null,
+      "v4LauncherBlock": null
     },
     {
       "chainId": 10,
@@ -42,7 +44,9 @@
       "v2DeployBlock": null,
       "v2LauncherBlock": null,
       "v3DeployBlock": null,
-      "v3LauncherBlock": null
+      "v3LauncherBlock": null,
+      "v4DeployBlock": null,
+      "v4LauncherBlock": null
     },
     {
       "chainId": 56,
@@ -65,7 +69,9 @@
       "v2DeployBlock": 129300000,
       "v2LauncherBlock": 129320444,
       "v3DeployBlock": 129458213,
-      "v3LauncherBlock": 129458552
+      "v3LauncherBlock": 129458552,
+      "v4DeployBlock": 129531824,
+      "v4LauncherBlock": 129531843
     },
     {
       "chainId": 137,
@@ -88,7 +94,9 @@
       "v2DeployBlock": 96030000,
       "v2LauncherBlock": 96034606,
       "v3DeployBlock": 96076469,
-      "v3LauncherBlock": 96076479
+      "v3LauncherBlock": 96076479,
+      "v4DeployBlock": 96098480,
+      "v4LauncherBlock": 96098493
     },
     {
       "chainId": 4663,
@@ -109,7 +117,9 @@
       "v2DeployBlock": 95928044,
       "v2LauncherBlock": 95928269,
       "v3DeployBlock": 96526267,
-      "v3LauncherBlock": 96526362
+      "v3LauncherBlock": 96526362,
+      "v4DeployBlock": 96839270,
+      "v4LauncherBlock": 96840156
     },
     {
       "chainId": 8453,
@@ -132,7 +142,9 @@
       "v2DeployBlock": 52980000,
       "v2LauncherBlock": 52983949,
       "v3DeployBlock": 53015255,
-      "v3LauncherBlock": 53015262
+      "v3LauncherBlock": 53015262,
+      "v4DeployBlock": 53031907,
+      "v4LauncherBlock": 53031915
     },
     {
       "chainId": 42161,
@@ -154,7 +166,9 @@
       "v2DeployBlock": null,
       "v2LauncherBlock": null,
       "v3DeployBlock": null,
-      "v3LauncherBlock": null
+      "v3LauncherBlock": null,
+      "v4DeployBlock": null,
+      "v4LauncherBlock": null
     },
     {
       "chainId": 43114,
@@ -176,7 +190,9 @@
       "v2DeployBlock": null,
       "v2LauncherBlock": null,
       "v3DeployBlock": null,
-      "v3LauncherBlock": null
+      "v3LauncherBlock": null,
+      "v4DeployBlock": null,
+      "v4LauncherBlock": null
     }
   ]
 }

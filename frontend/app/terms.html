@@ -74,8 +74,9 @@
         <div class="head"><h3>1 · What OAKEN is</h3></div>
         <div class="body">
           <p class="muted" style="font-size:14.5px">OAKEN is a set of public smart contracts and a website that
-            reads them. The lock, launch and tool contracts have no owner, no upgrade path and no admin key.
-            The Bonds contracts have a disclosed admin (a 2-of-3 Safe behind a 24h Timelock). The website is a
+            reads them. No operator can move a lock, pause it or take a fee. The v4 vault has one deliberate
+            power: a 2-of-3 multisig can replace the vault code after a public 48-hour delay. v1, v2 and v3 are
+            immutable. The Bonds contracts have a disclosed admin (a 2-of-3 Safe behind a 24h Timelock). The website is a
             reader and an interface; it is not the vault and is not required for a lock to release.</p>
         </div>
       </div>
@@ -129,7 +130,11 @@
             or liquid. Prices can go to zero. A locked position can be worth less than when it was locked.</li>
           <li><b style="color:var(--parch)">Third-party risk.</b> Pons, Flap, Genius, Clanker and four.meme are
             independent services with their own contracts, backends and upgrade rights. Their rules, fees and
-            hooks can change. A third-party launch is not covered by OAKEN's “no owner” statement.</li>
+            hooks can change. A third-party launch is not covered by OAKEN's lock model.</li>
+          <li><b style="color:var(--parch)">Upgrade risk (v4).</b> A 2-of-3 multisig can replace the v4 vault
+            implementation after a 48-hour delay. That can fix a bug, but it can also change behaviour, and a
+            compromised quorum could upgrade to code you did not expect. The delay is visible on-chain and an
+            upgrade can be cancelled before it executes. Locks in v1–v3 cannot be upgraded.</li>
           <li><b style="color:var(--parch)">Bonds risk.</b> aOAKEN is a separate product with an admin (2-of-3
             Safe + 24h Timelock). Redemptions depend on vault reserves and can be limited by them. There is no
             external yield promise, no aOAKEN market on this site, and OAKEN emissions are not a dollar yield.</li>

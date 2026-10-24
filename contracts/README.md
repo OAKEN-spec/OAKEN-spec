@@ -28,7 +28,7 @@ scripts/              deterministic addresses and deployment helpers
 
 ```bash
 npm ci
-npm test                       # Hardhat: 129 tests
+npm test                       # Hardhat: 138 tests
 npm run typecheck
 npm run build                  # compile
 
@@ -87,6 +87,16 @@ dual-read contract.
 
 `contracts/v3/` fixes SR-04: after a downward edit, `revoke()` in v1/v2 could
 freeze the amount below `claimed` and refund from another lock's tokens. v3 sets
-`frozen = max(vestedNow, claimed)`. **New locks and new launches use v3**; v1 and
-v2 stay live and readable for earlier locks. Read `V3.md` for the failing
+`frozen = max(vestedNow, claimed)`. v3 holds the locks created on 2026-10-24; v1
+and v2 stay live and readable for earlier locks. Read `V3.md` for the failing
 sequence, regression tests, addresses, blocks and the multi-read migration.
+
+## v4 (deployed 2026-10-24)
+
+`contracts/v4/` is the upgradeable continuation: **v3 behind an ERC1967 proxy**.
+A 2-of-3 multisig owns a delayed proxy admin; an upgrade must be scheduled, waits
+48 hours on-chain and can be cancelled. The admin cannot move a lock's tokens,
+change a schedule, pause the vault, take a fee or rescue funds. **New locks and
+new launches use v4**; v1–v3 are immutable and stay readable for their locks. The
+storage layout, upgrade procedure, addresses and the honest risk statement are in
+`V4.md`, `v4/README.md` and `test/V4.test.ts`.

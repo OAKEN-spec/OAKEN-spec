@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Create a lock · OAKEN</title>
-<meta name="description" content="Lock ERC-20 tokens or LP with a schedule written once. No owner, no upgrade, no protocol fee — gas only.">
+<meta name="description" content="Lock ERC-20 tokens or LP with a schedule written once. No operator can move the lock. New locks use v4: a 2-of-3 multisig can upgrade the vault only after 48 hours; v1–v3 are immutable. No protocol fee — gas only.">
 <meta property="og:title" content="Create a lock · OAKEN">
-<meta property="og:description" content="Lock ERC-20 tokens or LP with a schedule written once. No owner, no upgrade, no protocol fee — gas only.">
+<meta property="og:description" content="Lock ERC-20 tokens or LP with a schedule written once. No operator can move the lock. New locks use v4 (2-of-3 upgrade key, 48-hour delay); v1–v3 are immutable. No protocol fee — gas only.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://oaken.one/locks/create">
 <meta property="og:image" content="https://oaken.one/logo512.png">
@@ -127,6 +127,11 @@
     <div class="flow" style="margin-top:30px">
       <div class="panel">
         <div class="head"><h3>Details</h3><span class="steps-mini" style="margin-left:auto" id="modehint"></span></div>
+        <div class="warnbox" style="margin:0 0 14px">
+          <b>New locks go to the v4 vault.</b> A 2-of-3 multisig can replace the vault code, but only after a
+          public 48-hour delay; no key can move a lock's tokens or change its schedule directly. v1–v3 locks are
+          immutable. <a href="/about">Upgrade model →</a>
+        </div>
         <div class="body">
           <div class="progress-steps" id="progresssteps" aria-hidden="true"><i class="ps"></i><i class="ps"></i><i class="ps"></i><i class="ps"></i><i class="ps"></i></div>
           <label class="f">Chain</label>
@@ -203,10 +208,10 @@
 
           <div class="warnbox">
             <b>Fee or limit tokens?</b> Exclude our lock contracts —
-            adapter <span class="mono">0x6022DA059FAa0673E3058ADECEef375c2Abfb4A1</span>
-            <button class="copybtn" type="button" data-copy="0x6022DA059FAa0673E3058ADECEef375c2Abfb4A1">copy</button>,
-            vault <span class="mono">0xd4064d8E73AAB53D7d9efd8A6E8DBE2003d1de4B</span>
-            <button class="copybtn" type="button" data-copy="0xd4064d8E73AAB53D7d9efd8A6E8DBE2003d1de4B">copy</button>
+            adapter <span class="mono">0xA2898528eb4Aea0bDAf47202A5BA3bA4f58F831c</span>
+            <button class="copybtn" type="button" data-copy="0xA2898528eb4Aea0bDAf47202A5BA3bA4f58F831c">copy</button>,
+            vault <span class="mono">0x5221A10B772D5e2d51B60E8e3dd5DA9338b04ab0</span>
+            <button class="copybtn" type="button" data-copy="0x5221A10B772D5e2d51B60E8e3dd5DA9338b04ab0">copy</button>
             — from fees, rewards and max-transaction limits <b>before</b> locking, or the transfer can be taxed or
             blocked and the lock will hold less than you asked. The same addresses exist on every chain we deploy to.
             <b>We don't support rebase tokens.</b> <b>Tokens with transfer hooks/callbacks (ERC-777-style) are not
@@ -262,14 +267,14 @@
 <!-- defer：不让 514 KB 的 ethers 挡住首屏；顺序仍在我们自己的模块之前（模块默认 deferred） -->
 <script src="/app/vendor/ethers.umd.min.js" defer></script>
 <script type="module">
-  import { shell, wallet, erc20, adapter, ADAPTER_V3, NEW_VERSION, tokenMeta, fmtAmount, fmtDate, toast, explorerHref, short,
+  import { shell, wallet, erc20, adapter, ADAPTER_V4, NEW_VERSION, tokenMeta, fmtAmount, fmtDate, toast, explorerHref, short,
     chains, currentChain, provider, nativeBalance, isV2Pair, lockCreatedFromReceipt, storedTitle,
     humanizeTxError, safeRead, showReadFail, txNotice, onWallet, showChainSegFailed , mountDatePicker,
     onChainSwitch, setSiteChain, sealMoment, chainNow, chainIcon } from '/app/oaken.js';
   shell({ active: 'create' });
   /* New locks go to the v3 adapter (v2 + the revoke clamp). Older vaults stay
-     readable for the locks they hold; the record link carries ?vault=v3. */
-  const LOCK_ADAPTER = ADAPTER_V3;
+     readable for the locks they hold; the record link carries ?vault=v4. */
+  const LOCK_ADAPTER = ADAPTER_V4;
   // 英文 / 美式的时间选择器（原生 datetime-local 跟浏览器语言走，改不动）
   mountDatePicker(document.getElementById('date'));
   mountDatePicker(document.getElementById('tge'));

@@ -13,8 +13,13 @@ commit here before engagement.
 | P0 | PinkLockAdapter (“Oaken Lock Adapter”) | `contracts/PinkLockAdapter.sol` (513) | Third-party-compatible write path into LockVault; indexing views |
 | P0 | **LockVaultV2** | `contracts/v2/LockVaultV2.sol` (772) | Deployed 2026-10-23; holds that day's locks. v1 plus `nonReentrant` on create/claim/revoke/edit |
 | P0 | **PinkLockAdapterV2** | `contracts/v2/PinkLockAdapterV2.sol` (544) | Deployed 2026-10-23; v1 plus the guard and the ETH refund |
-| P0 | **LockVaultV3** | `contracts/v3/LockVaultV3.sol` (786) | **Deployed; every new lock uses it.** v2 plus `frozen = max(vestedNow, claimed)` in `revoke()` |
-| P0 | **PinkLockAdapterV3** | `contracts/v3/PinkLockAdapterV3.sol` (544) | **Deployed; every new lock uses it.** Same source as the v2 adapter, pointed at the v3 vault |
+| P0 | **LockVaultV3** | `contracts/v3/LockVaultV3.sol` (786) | Deployed 2026-10-24; v2 plus `frozen = max(vestedNow, claimed)` in `revoke()` |
+| P0 | **PinkLockAdapterV3** | `contracts/v3/PinkLockAdapterV3.sol` (544) | Deployed 2026-10-24; same source as the v2 adapter, pointed at the v3 vault |
+| P0 | **LockVaultV4** (implementation) | `contracts/v4/LockVaultV4.sol` (810) | **Current path; every new lock uses the v4 proxy.** v3 accounting plus proxy init |
+| P0 | **PinkLockAdapterV4** (implementation) | `contracts/v4/PinkLockAdapterV4.sol` (568) | **Current path.** v3 adapter with the vault in storage |
+| P0 | **ERC1967Proxy** | `contracts/v4/ERC1967Proxy.sol` (145) | Holds every v4 lock's tokens; transparent admin path |
+| P0 | **DelayedProxyAdmin** | `contracts/v4/DelayedProxyAdmin.sol` (108) | Schedules/executes upgrades after 48h; owner = multisig |
+| P0 | **OakenMultisig** | `contracts/v4/OakenMultisig.sol` (155) | 2-of-3 owner of the delayed admin |
 | P1 | OakenLauncher | `contracts/OakenLauncher.sol` (200) | Deploys a token and locks supply in one transaction |
 | P1 | TokenFactory / OakenToken | `TokenFactory.sol` (95), `OakenToken.sol` (108) | Creates fixed-supply tokens; no mint after deployment |
 | P1 | MultiSender | `MultiSender.sol` (167) | Moves arbitrary amounts to many recipients; batch atomicity |
@@ -25,11 +30,13 @@ commit here before engagement.
 ## Addresses and trust boundaries
 
 The lock-family addresses are deterministic and identical across chains
-(`tools`/`src/chains.mjs`). **v1, v2 and v3 are all deployed on all four chains**:
+(`tools`/`src/chains.mjs`). **v1, v2, v3 and v4 are all deployed on all four chains**:
 v1 holds every lock created before 2026-10-23, v2 holds 2026-10-23 → 2026-10-24,
-and v3 is what new locks and launches use. v1 and v2 have no admin and no
-migration function, so the three vaults are read side by side (see `V2.md` and
-`V3.md`). The Timelock and Safe are Robinhood Chain (4663) deployments.
+v3 holds 2026-10-24, and **v4 is what new locks and launches use**. v1–v3 have no
+admin and no migration function; v4 is an ERC1967 proxy whose implementation can
+be replaced by a 2-of-3 multisig after 48 hours. The four vaults are read side by
+side (see `V2.md`, `V3.md` and `V4.md`). The Timelock and Safe are Robinhood
+Chain (4663) deployments.
 
 | Item | Value |
 |---|---|
@@ -43,6 +50,13 @@ migration function, so the three vaults are read side by side (see `V2.md` and
 | **LockVaultV3** | `0xd4064d8E73AAB53D7d9efd8A6E8DBE2003d1de4B` |
 | **PinkLockAdapterV3** | `0x6022DA059FAa0673E3058ADECEef375c2Abfb4A1` |
 | **OakenLauncherV3** | `0x4488C369116D0C6FEA84162313c3840976D5A9a5` |
+| **Vault proxy · v4** | `0x5221A10B772D5e2d51B60E8e3dd5DA9338b04ab0` |
+| **PinkLockAdapter proxy · v4** | `0xA2898528eb4Aea0bDAf47202A5BA3bA4f58F831c` |
+| **OakenLauncherV4** | `0x9600f22d2f629904B44c7dA2d958f5AfB3a1e5Ff` |
+| **Upgrade multisig · v4 (2-of-3)** | `0xCb847B572352156be50c90FBc752cfd032114666` |
+| **DelayedProxyAdmin · v4 (48h)** | `0xDB998916A34b87c7DA337d922bC1219970FA0319` |
+| **LockVaultV4 implementation** | `0xEead023bEcE7D6A458c1da1F8c22E84be885171e` |
+| **PinkLockAdapterV4 implementation** | `0x33cA492931828B5a8E222fB731BBa1Ab5124cCaA` |
 | TokenFactory | `0xc0A3AD1428EeB70cAF88bb89c3B17D0191E1Bd34` |
 | MultiSender | `0x1f380ef5eFF9113314Ee175dCE4F226DFd75A50C` |
 | OakenAirdrop | `0x17E9910cDC37BdA5531414012aeA5b0862C22066` |
@@ -99,6 +113,24 @@ migration function, so the three vaults are read side by side (see `V2.md` and
    `test/foundry/LockVaultV3Invariant.t.sol`, and is the rest byte-identical to
    v2? The invariant suite is documented to fail when pointed at v2.
 
+### Proxy, multisig and upgrade model (v4)
+
+1. Can the proxy's admin path be reached by a non-admin, or can an admin call
+   fall through to implementation code with an unexpected selector?
+2. Can `DelayedProxyAdmin.executeUpgrade` run before the 48h eta, after a
+   cancellation, twice, or re-entrantly? Can a scheduled upgrade be replaced
+   without resetting the eta?
+3. Can the multisig execute with fewer than two distinct owners, double-count a
+   confirmation, or re-enter its own `execute`?
+4. Does an implementation upgrade preserve the vault's locks, `nextLockId` and
+   reentrancy guard, and the adapter's `vault` and indexes? Is the storage layout
+   documented in `contracts/v4/README.md` actually what the code uses?
+5. Can the implementation be initialized directly, or a proxy initialized twice?
+6. What exactly can a compromised 2-of-3 quorum do after 48h, and what can the
+   admin never do (move a lock, change a schedule, pause, take a fee)?
+7. Is the 48h delay a real exit window (events, pending state, cancellation) or
+   only a number in a document?
+
 ### PositionLock
 
 1. Can a position be locked without owner approval, or locked twice?
@@ -153,22 +185,29 @@ migration function, so the three vaults are read side by side (see `V2.md` and
 ## Readiness checklist
 
 - [x] Exact file list and addresses above.
-- [x] Hardhat unit/integration suite (129 passing: 120 v1 + 4 v2 + 5 v3).
+- [x] Hardhat unit/integration suite (138 passing: 120 v1 + 4 v2 + 5 v3 + 9 v4).
 - [x] Foundry fuzz (14 tests × 1,000 runs), two invariant suites of 4 invariants
       each (v1 and **v3**, the latter unconstrained), the reentrancy PoC and 3
-      v2 regressions — 20 Foundry tests in total.
+      v2 regressions — 20 Foundry tests in total. The v4 accounting is v3; the
+      proxy/admin layer is covered by the 9 v4 Hardhat tests and the local
+      upgrade E2E.
 - [x] Coverage, reported per version, not blended: **v1 product contracts**
       99.58% statements / 99.82% lines / 100% functions (branch 73.38% — a
       branch-coverage pass remains). **v2** 54.55% / 55.70% / 40% / 35.29%
       branch. **v3** 54.77% / 55.90% / 40% / 36.05% branch
       (`LockVaultV3.sol`: 69.72% statements / 68.22% lines / 72.22% functions /
-      45.37% branch). v2/v3 are the v1 code plus small diffs, so the v1 suite
+      45.37% branch). v2/v3/v4 are the v1 code plus small diffs, so the v1 suite
       describes the shared code; their own paths are covered by the versioned
-      Hardhat and Foundry tests.
+      Hardhat and Foundry tests. v4 is reported per file: `LockVaultV4`
+      36.04/35.82/61.90/23.64, `PinkLockAdapterV4` 38.71/43.81/29.55/23.53,
+      `ERC1967Proxy` 52.17/58.06/69.23/31.25, `DelayedProxyAdmin`
+      78.26/78.26/77.78/43.33, `OakenMultisig` 71.43/75.00/63.64/45.83
+      (statements / lines / functions / branch).
 - [x] Written invariants, known limitations, and monotonic-time assumption.
 - [x] Frozen tags and bundle hashes: `audit-2026-10-23` (v1), `audit-2026-10-23-v2`
-      (v2 + self-review + PoC) and `audit-2026-10-24-v3` (v3 + the revoke-clamp
-      regression); `audit/SHA256SUMS` covers all three bundles.
+      (v2 + self-review + PoC), `audit-2026-10-24-v3` (v3 + the revoke-clamp
+      regression) and `audit-2026-10-24-v4` (v4 + proxy/multisig/admin);
+      `audit/SHA256SUMS` covers all four bundles.
 - [ ] Third-party audit engagement.
 - [ ] Public report link and “Audited by … on …” badge (only after the report).
 - [ ] Public bug bounty program (separate owner/platform decision).

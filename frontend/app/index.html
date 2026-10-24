@@ -4,18 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OAKEN — token &amp; LP locks, read live from the chain</title>
-<meta name="description" content="Oaken Lock — token and LP locks on the chains we deploy to. No owner. No upgrade. Every number read live from the chain it sits on.">
+<meta name="description" content="OAKEN — token and LP locks on four chains. No operator can move a lock. The v4 vault upgrades only by a 2-of-3 multisig after a 48-hour delay; v1–v3 are immutable.">
 <link rel="icon" href="/favicon.png">
 <meta property="og:title" content="OAKEN — Some things should not move.">
-<meta property="og:description" content="Token and LP locks. No owner, no upgrade, every number read live from the chain it sits on.">
+<meta property="og:description" content="Token and LP locks. No operator can move a lock; the v4 vault upgrades only after a 2-of-3 multisig and a 48-hour delay. Every number read live from chain.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://oaken.one/">
 <meta property="og:image" content="https://oaken.one/logo512.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="OAKEN — Some things should not move.">
-<meta name="twitter:description" content="Ownerless token and LP locks on four chains. Every number read live from the chain. Verification, not an audit claim.">
+<meta name="twitter:description" content="Token and LP locks on four chains. No operator can move a lock. The v4 vault upgrades only by a 2-of-3 multisig, after a 48-hour delay. Verification, not an audit claim.">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"Organization","name":"OAKEN","url":"https://oaken.one/","sameAs":["https://x.com/oakenhood","https://github.com/OAKEN-spec/OAKEN-spec"],"description":"Ownerless token and LP locks, a fixed-supply token factory, airdrop, multisender and presale tools on Robinhood Chain, BNB Chain, Base and Polygon. No owner, no upgrade, no protocol fee."}
+{"@context":"https://schema.org","@type":"Organization","name":"OAKEN","url":"https://oaken.one/","sameAs":["https://x.com/oakenhood","https://github.com/OAKEN-spec/OAKEN-spec"],"description":"Token and LP locks, a fixed-supply token factory, airdrop, multisender and presale tools on Robinhood Chain, BNB Chain, Base and Polygon. No operator can move a lock; the v4 vault upgrades by a 2-of-3 multisig after a 48-hour delay; v1–v3 are immutable."}
 </script>
 <link rel="stylesheet" href="/app/oaken.css">
 <!-- oaken-boot-gate -->
@@ -65,9 +65,10 @@
         <span class="mask"><span>Some things</span></span>
         <span class="mask"><span>should <em>not</em> move.</span></span>
       </h1>
-      <p class="lead reveal">Oaken Lock keeps tokens and liquidity where they were put. No owner,
-        no upgrade, no admin key — the schedule is written once, and every number on this site
-        is read live from the chain it sits on.</p>
+      <p class="lead reveal">Oaken Lock keeps tokens and liquidity where they were put. No operator can
+        move them, and no one can rewrite a lock's schedule. The current vault (v4) is upgradeable only
+        by a 2-of-3 multisig, after a public 48-hour delay; v1–v3 locks are immutable. Every number on
+        this site is read live from the chain it sits on.</p>
       <!-- The reserved home for the official Robinhood Chain CA. Empty until launch (see OAKEN_CA in the module below). -->
       <div class="ca-slot reveal" id="ca" aria-live="polite">
         <span class="ca-badge">ROBINHOOD CHAIN · CA</span>
@@ -89,7 +90,7 @@
         <div class="stat"><span class="live-dot"></span><b id="h-locks">—</b><span>locks on chain</span></div>
         <div class="stat"><b id="h-tokens">—</b><span>distinct tokens</span></div>
         <div class="stat"><b id="h-chains">—</b><span>chains deployed</span></div>
-        <div class="stat static"><b>0</b><span>owners · no upgrade</span></div>
+        <div class="stat static"><b>2-of-3</b><span>48h upgrade delay</span></div>
       </div>
       <div class="hint" id="h-stats-loading" style="margin-top:10px;font-size:13px">Reading the chain…</div>
       <p class="hint reveal" style="margin-top:8px;font-size:13px"><a href="/dashboard">Public dashboard — upcoming unlocks by chain →</a></p>
@@ -106,8 +107,8 @@
   <!-- ══ 2 · 跑马灯：链条 + 合约 + 那三句"我们没有的" ══════════════════ -->
   <div class="ticker" aria-hidden="true"><div class="ticker-track" id="ticker-track">
     <span class="tk"><span class="live-dot"></span><b>SAME ADDRESS ON EVERY CHAIN</b></span><span class="sep">◆</span>
-    <span class="tk"><b>NO OWNER</b><span>nothing to renounce</span></span><span class="sep">◆</span>
-    <span class="tk"><b>NO UPGRADE</b><span>the vault cannot be replaced</span></span><span class="sep">◆</span>
+    <span class="tk"><b>NO OWNER</b><span>no operator over your lock</span></span><span class="sep">◆</span>
+    <span class="tk"><b>48H DELAY</b><span>before any vault upgrade</span></span><span class="sep">◆</span>
     <span class="tk"><b>READ LIVE FROM CHAIN</b><span class="mono" id="tk-adapter">0x…</span></span><span class="sep">◆</span>
   </div></div>
 
@@ -122,19 +123,22 @@
     <div class="wrap" style="position:relative;z-index:2">
       <div class="reveal">
         <div class="eyebrow">WHAT IS NOT HERE</div>
-        <h2 class="sec">No owner. No upgrade. No audit.</h2>
+        <h2 class="sec">No operator. A 48-hour upgrade delay. No audit.</h2>
         <div class="sec-rule"></div>
-        <p class="muted" style="margin-top:18px;max-width:62ch">Anything an operator <em>can</em> do is
-          something you eventually have to trust them about. So none of it was built. The vault is a
-          dead end by construction — there is no function for anyone to call.</p>
+        <p class="muted" style="margin-top:18px;max-width:62ch">No one can move your tokens or rewrite a
+          lock's schedule. The v4 vault is upgradeable — but only by a 2-of-3 multisig, and only after a
+          public 48-hour delay. v1–v3 are immutable. That is the trade: a fix path, with a visible warning
+          before it is used.</p>
       </div>
       <div class="zeros" data-stagger>
         <div class="zero"><span class="stamp">no owner</span>
-          <span class="n">0</span><h3>Owner keys</h3>
-          <p>Nothing to renounce, because nothing was kept. No admin, no pause, no rescue function.</p></div>
-        <div class="zero"><span class="stamp">no upgrade</span>
-          <span class="n">0</span><h3>Upgrade paths</h3>
-          <p>The contract that holds your tokens cannot be replaced, patched or pointed elsewhere.</p></div>
+          <span class="n">0</span><h3>Operator keys</h3>
+          <p>No operator key can move a lock's tokens or change its schedule. The v4 vault has an upgrade
+            admin; it cannot touch a balance or a date directly.</p></div>
+        <div class="zero"><span class="stamp">48h delay</span>
+          <span class="n">48h</span><h3>Warning first</h3>
+          <p>A 2-of-3 multisig can schedule a new vault implementation. It waits 48 hours on-chain, can be
+            cancelled, and every upgrade emits an event.</p></div>
         <div class="zero"><span class="stamp">no audit</span>
           <span class="n">0</span><h3>Audits claimed</h3>
           <p>We do not claim one. The contract is short and public — read it instead of trusting a badge.</p></div>
@@ -147,19 +151,21 @@
     <div class="wrap">
       <div class="grid2" data-stagger>
         <div class="panel">
-          <div class="head"><h3>Why no owner?</h3></div>
+          <div class="head"><h3>Who can change the vault?</h3></div>
           <div class="body">
-            <p class="muted" style="font-size:14.5px">An owner key is a promise that someone can change the
-              rules later. We removed the key instead of asking you to trust the promise.</p>
+            <p class="muted" style="font-size:14.5px">No operator key can move your tokens or edit a schedule.
+              The v4 vault can be upgraded — that is the one power we kept, and it is deliberately slow and
+              public.</p>
             <ul style="list-style:none;display:grid;gap:12px;color:var(--muted);font-size:14.5px;margin-top:14px">
-              <li><b style="color:var(--parch)">No upgrade path.</b> The contract holding your tokens cannot be
-                replaced, patched or pointed elsewhere.</li>
-              <li><b style="color:var(--parch)">No rescue function.</b> That cuts both ways: we cannot recover a
-                mistake, and nobody else can either.</li>
-              <li><b style="color:var(--parch)">Nothing to renounce.</b> There is no key to renounce, because
-                none was kept.</li>
+              <li><b style="color:var(--parch)">2-of-3, not one key.</b> The upgrade admin is a 2-of-3
+                multisig, and every upgrade waits 48 hours on-chain before it can execute.</li>
+              <li><b style="color:var(--parch)">v1–v3 are immutable.</b> Locks created before v4 stay in the
+                vault that holds them; no admin can upgrade those.</li>
+              <li><b style="color:var(--parch)">No pause, no fee switch, no rescue.</b> Even the upgrade path
+                cannot move a lock's tokens or change its schedule directly — it can only replace the vault
+                code, after the delay.</li>
             </ul>
-            <p style="margin-top:16px"><a class="btn btn-s" href="/about">What we kept, what we removed →</a></p>
+            <p style="margin-top:16px"><a class="btn btn-s" href="/about">The upgrade model →</a></p>
           </div>
         </div>
         <div class="panel">
@@ -327,18 +333,19 @@
     <div class="wrap">
       <div class="reveal">
         <div class="eyebrow">THE LINE WE DO NOT BLUR</div>
-        <h2 class="sec">Locks are ownerless. Bonds are not.</h2>
+        <h2 class="sec">Locks have no operator. Bonds have an admin.</h2>
         <div class="sec-rule"></div>
         <p class="muted" style="margin-top:18px;max-width:70ch"><b>Do not read “no owner” and assume it applies
-          to every product.</b> Locks and Bonds have different trust assumptions, and every page says which is
-          which.</p>
+          to every product.</b> Locks v1–v3 are immutable; v4 adds a 2-of-3 upgrade key with a 48h delay.
+          Bonds have a Timelock admin. Every page says which is which.</p>
       </div>
       <div class="grid2" data-stagger style="margin-top:26px">
         <div class="panel">
           <div class="head"><h3>Locks · vault, positions, tools</h3></div>
           <div class="body">
             <ul style="list-style:none;display:grid;gap:12px;color:var(--muted);font-size:14.5px">
-              <li><b style="color:var(--parch)">No admin, no pause, no upgrade.</b> The schedule is fixed once the lock lands.</li>
+              <li><b style="color:var(--parch)">No operator over a lock.</b> The schedule is fixed once the
+                lock lands. The v4 vault has a 2-of-3, 48h-delayed upgrade key; v1–v3 are immutable.</li>
               <li><b style="color:var(--parch)">Anyone can pay the gas</b> to release a due lock; the vault pays only the beneficiary.</li>
               <li><b style="color:var(--parch)">No protocol fee.</b> You pay gas only.</li>
             </ul>
@@ -408,11 +415,13 @@
           <div class="head"><h3>Contracts — one address, every chain</h3></div>
           <div class="body">
             <dl class="kv">
-              <dt>Oaken Lock (adapter) · v3</dt>
+              <dt>Oaken Lock (adapter) · v4 (proxy)</dt>
               <dd class="mono" id="addr-adapter">—</dd>
-              <dt>Vault · v3</dt>
+              <dt>Vault · v4 (proxy)</dt>
               <dd class="mono" id="addr-vault">—</dd>
-              <dt>Legacy v2 / v1 pairs</dt>
+              <dt>Upgrade admin · v4</dt>
+              <dd class="mono" style="font-size:12.5px">2-of-3 multisig · 48-hour delay</dd>
+              <dt>Earlier v3 / v2 / v1 pairs</dt>
               <dd class="mono" id="addr-v1" style="font-size:12.5px;line-height:1.7">—</dd>
               <dt>Chains</dt>
               <dd id="addr-chains">Same address on every chain we deploy to.</dd>
@@ -427,9 +436,9 @@
                  **逐条如实写** —— 验证过的说验证过，没验的不蹭。 -->
             <div class="hint" style="margin-top:14px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
               <span class="pill ok">source verified</span>
-              <span><b>All fourteen contracts, on all four chains</b> — the v1, v2 and v3 lock sets, the position lock,
-                the four tools and both launchers — are <b>exact matches</b> on
-                <a href="https://sourcify.dev/#/lookup/0xd4064d8E73AAB53D7d9efd8A6E8DBE2003d1de4B" target="_blank" rel="noopener">Sourcify</a>
+              <span><b>All lock-family contracts, on all four chains</b> — v1–v4, the position lock, the tools and
+                the launchers, plus the v4 multisig, delayed admin and both proxies — are <b>exact matches</b> on
+                <a href="https://sourcify.dev/#/lookup/0x5221A10B772D5e2d51B60E8e3dd5DA9338b04ab0" target="_blank" rel="noopener">Sourcify</a>
                 (the three lock contracts also published on
                 <a href="https://robinhoodchain.blockscout.com/address/0xe410d0a21C1376992874a9bEEeE0d623A50D4a34#code" target="_blank" rel="noopener">Blockscout</a>).
                 Verification is not an audit — we still claim none. Read the code.</span>
@@ -511,7 +520,7 @@
 <!-- defer：不让 514 KB 的 ethers 挡住首屏；顺序仍在我们自己的模块之前（模块默认 deferred） -->
 <script src="/app/vendor/ethers.umd.min.js" defer></script>
 <script type="module">
-  import { shell, reveal, emberField, countTo, ADAPTER, VAULT, ADAPTER_V2, VAULT_V2, ADAPTER_V3, VAULT_V3, readLock, totalLocks,
+  import { shell, reveal, emberField, countTo, ADAPTER, VAULT, ADAPTER_V2, VAULT_V2, ADAPTER_V3, VAULT_V3, ADAPTER_V4, VAULT_V4, readLock, totalLocks,
     lockedTokenAddresses, short, fmtAmount, countdown, chains, rotateRpc, chainIcon,
     safeRead, cachedRead, cacheDrop, copyBtn, LOCK_VERSIONS , onChainSwitch} from '/app/oaken.js';
   import { icon } from '/app/icons.js';   // ⚠ icon 在 icons.js 里，不在 oaken.js（import 错会整页不执行）
@@ -548,20 +557,21 @@
     /* 这一页的字都是**跨链**统计出来的（/api/stats + 每条链各数一遍），
        钱包换链不改变这里的任何一块 —— 登记一个空的处理器，省掉那次没意义的重载。 */
     onChainSwitch(() => { /* 什么都不用做（见上） */ });
-  document.getElementById('addr-adapter').textContent = ADAPTER_V3;
-  document.getElementById('addr-vault').textContent = VAULT_V3;
-  document.getElementById('addr-v1').textContent = 'v2 adapter ' + ADAPTER_V2 + ' · vault ' + VAULT_V2
+  document.getElementById('addr-adapter').textContent = ADAPTER_V4;
+  document.getElementById('addr-vault').textContent = VAULT_V4;
+  document.getElementById('addr-v1').textContent = 'v3 adapter ' + ADAPTER_V3 + ' · vault ' + VAULT_V3
+    + ' · v2 adapter ' + ADAPTER_V2 + ' · vault ' + VAULT_V2
     + ' · v1 adapter ' + ADAPTER + ' · vault ' + VAULT;
-  document.getElementById('tk-adapter').textContent = ADAPTER_V3.slice(0, 10) + '…' + ADAPTER_V3.slice(-4);
+  document.getElementById('tk-adapter').textContent = ADAPTER_V4.slice(0, 10) + '…' + ADAPTER_V4.slice(-4);
   /* 复制按钮 + 一键去验证（Sourcify 的 lookup 页接受任意链的地址）——
      清单第 2 条：地址要能复制，旁边要有验证/浏览器的去处。
-     新锁走 v3，所以面板和按钮都以 v3 为主；v2 / v1 只用于它们之前建的锁。 */
+     新锁走 v4（可升级代理），所以面板和按钮都以 v4 为主；v3 / v2 / v1 只用于它们之前建的锁。 */
   document.getElementById('addr-btns').innerHTML =
-    copyBtn(ADAPTER_V3, 'copy adapter') + copyBtn(VAULT_V3, 'copy vault')
+    copyBtn(ADAPTER_V4, 'copy adapter') + copyBtn(VAULT_V4, 'copy vault')
     + '<a class="btn btn-s" style="padding:5px 12px;font-size:12.5px" target="_blank" rel="noopener"'
-    + ' href="https://sourcify.dev/#/lookup/' + VAULT_V3 + '">Verify on Sourcify ↗</a>'
+    + ' href="https://sourcify.dev/#/lookup/' + VAULT_V4 + '">Verify on Sourcify ↗</a>'
     + '<a class="btn btn-s" style="padding:5px 12px;font-size:12.5px" target="_blank" rel="noopener"'
-    + ' href="https://robinhoodchain.blockscout.com/address/' + VAULT_V3 + '#code">Read the source ↗</a>';
+    + ' href="https://robinhoodchain.blockscout.com/address/' + VAULT_V4 + '#code">Read the source ↗</a>';
 
   /* 工具卡的图标（icons.js 现画，不挂外链） */
   for (const el of document.querySelectorAll('[data-ic]')) el.innerHTML = icon(el.dataset.ic, 19);

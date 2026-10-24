@@ -57,8 +57,9 @@
 <main class="wrap">
   <section class="band" style="padding-top:40px">
     <p class="muted reveal" style="max-width:70ch">OAKEN is a lock service and a small launchpad. On the EVM
-      chains we deploy to, tokens and liquidity go into contracts that have <b>no owner, no upgrade path and no
-      admin key</b> — nothing to renounce, because nothing was kept. Solana locks: OAKEN's own program is
+      chains we deploy to, tokens and liquidity go into contracts where <b>no operator can move a lock, pause it
+      or take a fee</b>. <b>v4 keeps one power deliberately:</b> a 2-of-3 multisig can replace the vault code,
+      and every upgrade waits 48 hours on-chain. v1, v2 and v3 are immutable. Solana locks: OAKEN's own program is
       <b>live on mainnet with its upgrade authority revoked</b>; <b>Jupiter Lock</b> remains a third-party,
       upgradeable option — the Solana section below says exactly what is live.
       Everything this site shows is read from the chain it sits on; the site is a window, not the vault.
@@ -92,6 +93,11 @@
         <div class="head"><h3>Contracts — same address on every chain</h3></div>
         <div class="body">
           <dl class="kv">
+            <dt><b>Oaken Lock (adapter) · v4 (proxy)</b></dt><dd class="mono">0xA2898528eb4Aea0bDAf47202A5BA3bA4f58F831c</dd>
+            <dt><b>Vault · v4 (proxy)</b></dt><dd class="mono">0x5221A10B772D5e2d51B60E8e3dd5DA9338b04ab0</dd>
+            <dt><b>Launcher · v4</b></dt><dd class="mono">0x9600f22d2f629904B44c7dA2d958f5AfB3a1e5Ff</dd>
+            <dt>Upgrade multisig · v4 (2-of-3)</dt><dd class="mono">0xCb847B572352156be50c90FBc752cfd032114666</dd>
+            <dt>Delayed proxy admin · v4 (48h)</dt><dd class="mono">0xDB998916A34b87c7DA337d922bC1219970FA0319</dd>
             <dt>Oaken Lock (adapter) · v3</dt><dd class="mono">0x6022DA059FAa0673E3058ADECEef375c2Abfb4A1</dd>
             <dt>Vault · v3</dt><dd class="mono">0xd4064d8E73AAB53D7d9efd8A6E8DBE2003d1de4B</dd>
             <dt>Launcher · v3</dt><dd class="mono">0x4488C369116D0C6FEA84162313c3840976D5A9a5</dd>
@@ -107,12 +113,13 @@
             <dt>Airdrop</dt><dd class="mono">0x17E9910cDC37BdA5531414012aeA5b0862C22066</dd>
             <dt>Presale factory</dt><dd class="mono">0xAC070cf2ed45aEcb9f5299d4C670fFfCE6387724</dd>
           </dl>
-          <div class="hint" style="margin-top:14px">v3 is what new locks and new launches use (v2 plus the revoke
-            clamp); v2 and v1 stay live for the locks created under them, and the site reads all three.
-            Same addresses on every chain we deploy to.</div>
+          <div class="hint" style="margin-top:14px"><b>v4 is what new locks and new launches use.</b> The vault
+            and adapter are ERC1967 proxies; a 2-of-3 multisig can replace the implementation after a 48-hour
+            delay. v1, v2 and v3 are immutable and stay live for the locks created under them; the site reads
+            all four. Same addresses on every chain we deploy to.</div>
           <div class="hint" style="margin-top:14px"><span class="pill ok">source verified</span>
-            <b>All fourteen contracts, on all four chains</b> are exact matches on
-            <a href="https://sourcify.dev/#/lookup/0xd4064d8E73AAB53D7d9efd8A6E8DBE2003d1de4B" target="_blank" rel="noopener">Sourcify</a>
+            <b>All lock-family contracts, on all four chains</b> are exact matches on
+            <a href="https://sourcify.dev/#/lookup/0x5221A10B772D5e2d51B60E8e3dd5DA9338b04ab0" target="_blank" rel="noopener">Sourcify</a>
             (the lock contracts are also published on
             <a href="https://robinhoodchain.blockscout.com/address/0xe410d0a21C1376992874a9bEEeE0d623A50D4a34#code" target="_blank" rel="noopener">Blockscout</a>).
             Paste any address above into Sourcify to compare it byte for byte.
@@ -182,10 +189,11 @@
         <ul style="list-style:none;display:grid;gap:13px;color:var(--muted);font-size:14.5px">
           <li><b style="color:var(--parch)">No rebase tokens.</b> A balance that changes on its own breaks the
             arithmetic of "how much is in there" — the lock would be wrong the moment it lands.</li>
-          <li><b style="color:var(--parch)">Fee-on-transfer and max-tx tokens need care.</b> Exclude the adapter
-            <span class="mono">0x16e02A10…</span> and the vault <span class="mono">0xe410d0a2…</span> from fees,
-            limits and blacklists first. The vault measures what actually arrived, so a taxed transfer locks
-            less than you sent — the record page will say so.</li>
+          <li><b style="color:var(--parch)">Fee-on-transfer and max-tx tokens need care.</b> Exclude the v4 adapter
+            <span class="mono">0xA2898528…</span> and the vault <span class="mono">0x5221A10B…</span> from fees,
+            limits and blacklists first. Locks created earlier live in the v1–v3 pairs (listed above) — use those
+            addresses when changing an older lock. The vault measures what actually arrived, so a taxed transfer
+            locks less than you sent — the record page will say so.</li>
           <li><b style="color:var(--parch)">A renounced lock is permanent.</b> There is no un-renounce —
             that is the point — so it is offered only when the schedule is already what you want.</li>
           <li><b style="color:var(--parch)">Position locks hold ERC-721s.</b> Their strength is the NFT's own:

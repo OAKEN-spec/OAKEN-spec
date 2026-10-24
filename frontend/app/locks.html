@@ -365,6 +365,8 @@
        Rows marked live are read from the chain this second — the rest come from the index snapshot that ships
        with this build, so a lock created seconds ago still shows up. Every chain we have deployed to is listed
        above; a chain we have not deployed to has no locks to show, and asking it would be asking an empty address.
+       New locks use the v4 vault: a 2-of-3 multisig can replace the vault code after a public 48-hour delay;
+       v1–v3 are immutable.
        Last index pass: ${new Date().toISOString().slice(0, 16)} UTC.`;
   }
 

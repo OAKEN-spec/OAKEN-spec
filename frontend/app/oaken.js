@@ -28,12 +28,23 @@ export const OAKEN_LAUNCHER_V2 = '0x0d7cCEA7BabC5e3b4849267740D8fBBe6C4FDa58';
 export const ADAPTER_V3 = '0x6022DA059FAa0673E3058ADECEef375c2Abfb4A1';
 export const VAULT_V3 = '0xd4064d8E73AAB53D7d9efd8A6E8DBE2003d1de4B';
 export const OAKEN_LAUNCHER_V3 = '0x4488C369116D0C6FEA84162313c3840976D5A9a5';
+/**
+ * v4 (2026-10-24). The upgradeable continuation: these are ERC1967 **proxy**
+ * addresses, not implementations. New locks and launches use v4. The admin is a
+ * 2-of-3 multisig with a 48h delay; v1–v3 remain immutable and readable.
+ */
+export const ADAPTER_V4 = '0xA2898528eb4Aea0bDAf47202A5BA3bA4f58F831c';
+export const VAULT_V4 = '0x5221A10B772D5e2d51B60E8e3dd5DA9338b04ab0';
+export const OAKEN_LAUNCHER_V4 = '0x9600f22d2f629904B44c7dA2d958f5AfB3a1e5Ff';
+export const V4_MULTISIG = '0xCb847B572352156be50c90FBc752cfd032114666';
+export const V4_PROXY_ADMIN = '0xDB998916A34b87c7DA337d922bC1219970FA0319';
 /** Every vault generation, oldest first. Lists and per-owner reads cover all three. */
-export const LOCK_VERSIONS = ['v1', 'v2', 'v3'];
+export const LOCK_VERSIONS = ['v1', 'v2', 'v3', 'v4'];
 /** Where new locks and launches go. */
-export const NEW_VERSION = 'v3';
+export const NEW_VERSION = 'v4';
 /** Resolve a contract set. v1 is the default so old URLs keep working. */
 export function contractSet(version = 'v1') {
+  if (version === 'v4') return { adapter: ADAPTER_V4, vault: VAULT_V4, launcher: OAKEN_LAUNCHER_V4 };
   if (version === 'v3') return { adapter: ADAPTER_V3, vault: VAULT_V3, launcher: OAKEN_LAUNCHER_V3 };
   if (version === 'v2') return { adapter: ADAPTER_V2, vault: VAULT_V2, launcher: OAKEN_LAUNCHER_V2 };
   return { adapter: ADAPTER, vault: VAULT, launcher: OAKEN_LAUNCHER };
@@ -256,7 +267,7 @@ export async function launchesByCreator(chain, address, { lookback = 1_000_000, 
    * 早于它的区间不可能有 `Launched` —— 从创世或"一年前"扫，纯属白烧 RPC。
    * 注册表没给（老接口）才退回固定回看窗口。
    */
-  const launcherStart = version === 'v3' ? chain?.v3LauncherBlock : version === 'v2' ? chain?.v2LauncherBlock : chain?.launcherBlock
+  const launcherStart = version === 'v4' ? chain?.v4LauncherBlock : version === 'v3' ? chain?.v3LauncherBlock : version === 'v2' ? chain?.v2LauncherBlock : chain?.launcherBlock
   const floor = launcherStart != null ? Math.max(0, launcherStart) : Math.max(0, head - lookback)
   const topic = window.ethers.id('Launched(address,address,address,uint256,uint256,uint256,uint64,string,string)')
   const who = window.ethers.zeroPadValue(String(address).toLowerCase(), 32)
@@ -1498,10 +1509,29 @@ window.dispatchEvent(new Event('eip6963:requestProvider'));
 function scanLegacy() {
   const okx = window.okxwallet;
   if (okx) addWallet(okx.request ? okx : okx.ethereum, { key: 'okx', name: 'OKX Wallet' });
+  /**
+   * **Phantom 的 EVM provider 在 `window.phantom.ethereum`**（Phantom 文档的检测方式）。
+   *
+   * ⚠ 它的 `window.ethereum` 是个**兼容壳**：录制的 Phantom 26.32.0 里
+   * `isMetaMask: true, isPhantom: false`，而 EIP-6963 公告的是**另一个对象**
+   * （`sameAsInjected: false`）。只按旗标认，只装 Phantom 的人会在面板里看到一行
+   * 根本不存在的 "MetaMask"。
+   *
+   * 判据：`window.ethereum` 自称 MetaMask、页面上又有 Phantom、而且**没有任何 6963
+   * 公告认领这个对象** ⇒ 它是 Phantom 的兼容壳，不当成另一把钱包（否则只装 Phantom
+   * 的人会看到两行）。真 MetaMask 会公告**同一个对象**（`sameAsInjected: true`），
+   * 照旧按 MetaMask 列。
+   */
+  const ph = window.phantom && window.phantom.ethereum;
+  const phOk = !!(ph && typeof ph.request === 'function');
+  if (phOk) addWallet(ph, { key: 'phantom', name: 'Phantom' });
   const eth = window.ethereum;
   if (eth && typeof eth.request === 'function') {
-    const name = eth.isOkxWallet ? 'OKX Wallet' : eth.isMetaMask ? 'MetaMask' : eth.isRabby ? 'Rabby' : 'Browser wallet';
-    addWallet(eth, { key: eth.isOkxWallet ? 'okx' : eth.isMetaMask ? 'metamask' : 'injected', name });
+    const phantomCompat = phOk && !!eth.isMetaMask && !eth.isPhantom && !_seenProviders.has(eth);
+    if (!phantomCompat) {
+      const name = eth.isOkxWallet ? 'OKX Wallet' : eth.isPhantom ? 'Phantom' : eth.isMetaMask ? 'MetaMask' : eth.isRabby ? 'Rabby' : 'Browser wallet';
+      addWallet(eth, { key: eth.isOkxWallet ? 'okx' : eth.isMetaMask ? 'metamask' : 'injected', name });
+    }
   }
 }
 scanLegacy();
@@ -1552,11 +1582,48 @@ const setWalletOff = (on) => { try { on ? localStorage.setItem(WALLET_LS + '.off
 export function humanizeWalletError(e) {
   const code = e && (e.code ?? (e.info && e.info.error && e.info.error.code));
   const msg = String((e && (e.shortMessage || e.message)) || e || '');
+  /* 我们自己写过的那句"下一步怎么做"（见 chainRefusedError）别再翻一遍 —— 翻掉就没了 */
+  if (e && e.friendly) return msg;
   if (code === 4001 || /user rejected|user denied|rejected the request/i.test(msg)) return 'Request rejected in your wallet.';
   if (code === -32002 || /already pending|already has a pending/i.test(msg)) return 'Your wallet already has a pending request — open the extension and approve or dismiss it.';
   if (code === 4902 || /Unrecognized chain/i.test(msg)) return 'That chain is not in your wallet yet.';
+  if (code === 4901 || /not connected to the requested chain/i.test(msg)) return 'Your wallet would not switch networks. Switch to the network this page uses in your wallet, then try again.';
   if (/no wallet/i.test(msg)) return msg;
   return msg || 'The wallet did not complete the request.';
+}
+
+/**
+ * 失败的是不是"钱包不肯挪到这条链上"（而不是用户拒绝/断网）。
+ *
+ * 为什么要单独判：Phantom **不允许 dapp 加网络**（录制档案：wallet_addEthereumChain
+ * 一律回 4901 "The Provider is not connected to the requested chain."），而且只有用户在
+ * Settings → Active Networks 里打开过 Robinhood Chain，切链才会成功。这类失败以前会
+ * 把整次连接判死，用户只看到 Phantom 的日志口吻原话。
+ */
+function chainRefused(e) {
+  const code = e && (e.code ?? (e.info && e.info.error && e.info.error.code));
+  const msg = String((e && (e.shortMessage || e.message)) || '');
+  return code === 4901 || code === 4902 || code === -32603
+    || /not connected to the requested chain|Unrecognized chain|unsupported chain/i.test(msg);
+}
+
+/** 把"钱包不肯切链"写成用户能照着做的一步（Phantom 要用户自己在 Active Networks 里打开）。 */
+function chainRefusedError(want, e) {
+  const w = chosenWallet();
+  const p = w && w.provider;
+  const phantom = !!(w && /phantom/i.test(w.name || ''))
+    || !!(p && p.isPhantom)
+    || !!(window.phantom && p && p === window.phantom.ethereum);
+  const declined = !!(e && (e.code === 4001 || /user rejected|user denied|rejected the request/i.test(String(e.message || ''))));
+  const err = new Error(declined
+    ? `You declined the switch to ${want.name}. You are connected — switch networks in your wallet (or click the network chip) before sending a transaction.`
+    : phantom
+      ? `Phantom will not switch networks for this site. Open Phantom → Settings → Active Networks, turn on ${want.name} (update Phantom if it is not listed), then reload this page and connect again.`
+      : `Your wallet did not switch to ${want.name}. Switch to ${want.name} in your wallet, then try again.`);
+  err.code = (e && e.code) || 4901;
+  err.friendly = true;      // humanizeWalletError 原样放行
+  err.chainRefused = true;  // activate() 据此"连接照连，只是链没对上"
+  return err;
 }
 
 /* ── 连接面板：WalletConnect + 已装/未装的钱包 ────────────────────────────
@@ -1737,14 +1804,21 @@ function walletPanel() {
      */
     (async () => {
       try {
-        const wid = await wallet.chainId();
+        const wk = await wallet.chainId();
         const live = await chains();
-        if (!wid || !live.length || live.some((c) => c.id === wid)) return;
+        if (!wk || !live.length || live.some((c) => c.id === wk)) return;
         const body = el.querySelector('.wp-body');
         if (!body || done) return;
         const note = document.createElement('div');
         note.className = 'wp-note';
-        note.textContent = `Your wallet is on network ${wid}. OAKEN runs on ${CHAIN.name} — connecting will ask it to switch.`;
+        /**
+         * Phantom 不会替站点加网络：它只认用户在 Settings → Active Networks 里
+         * 打开过的链（录制档案：wallet_addEthereumChain 一律 4901）。在这里先说一句，
+         * 比连完之后再报错强。
+         */
+        const phantom = installed.some((w) => /phantom/i.test(w.name || ''));
+        note.textContent = `Your wallet is on network ${wk}. OAKEN runs on ${CHAIN.name} — connecting will ask it to switch.`
+          + (phantom ? ` Phantom only offers ${CHAIN.name} after you turn it on: Settings → Active Networks.` : '');
         const secs = body.querySelectorAll('.wp-sec');
         const anchor = secs[secs.length - 1];
         body.insertBefore(note, anchor || null);
@@ -1971,13 +2045,32 @@ async function activate(w, chain = null) {
   bindProvider(w.provider);
   try { localStorage.setItem(WALLET_LS, w.key); } catch { /* 隐私模式 */ }
   setWalletOff(false);                       // 用户明确连了一次 —— 断开记号作废
-  await wallet.ensureChain(chain);
+  /**
+   * 切链失败**不等于连接失败**（2026-10-24 Phantom）：
+   * Phantom 不允许 dapp 加网络，用户没在 Settings → Active Networks 里打开过
+   * Robinhood Chain 时会回 4901。以前这里直接抛，整次连接被判死 —— 用户看到的是
+   * 一句钱包日志口吻的原话，按钮退回 Connect。现在：连接照连，把"钱包还停在哪条链"
+   * 如实说清楚（顶栏胶囊会变成 Switch to …）；写入路径各自都会先 ensureChain，
+   * 所以在错链上仍然发不出交易。
+   * 其它错误（用户拒绝授权、断网…）照旧抛。
+   */
+  let chainErr = null;
+  try { await wallet.ensureChain(chain); }
+  catch (e) {
+    if (!e || !e.chainRefused) throw e;
+    chainErr = e;
+  }
   /**
    * 连上之后**自己广播一次**。不广播的话：从「门」按钮（/me）或工具页连上的时候，
    * 顶栏那个按钮还停在 Connect —— 真钱包此时会补发 accountsChanged，而
    * 「补发」不是标准要求的，有的钱包不发（面板选的 OKX 这一路就没人发）。
    */
   _subs.accounts.forEach((f) => f(accounts && accounts[0]));
+  if (chainErr) {
+    /* 顶栏的自动请切（wireChain 里"一次会话问一次"）已经没必要再问一遍 —— 这里已经说清了 */
+    try { sessionStorage.setItem('oaken.chainasked', '1'); } catch { /* 隐私模式 */ }
+    toast(chainErr.message, 'bad', { ms: 14000 });
+  }
   return accounts[0];
 }
 
@@ -2153,16 +2246,22 @@ export const wallet = {
     } catch (e) {
       // 4902 = 钱包里没有这条链 —— 加上再切。加上之后钱包通常会自己切过去。
       if (e && (e.code === 4902 || /Unrecognized chain/i.test(String(e.message)))) {
-        await eth.request({
-          method: 'wallet_addEthereumChain',
-          params: [{
-            chainId: want.hex, chainName: want.name,
-            nativeCurrency: { name: want.native === 'ETH' ? 'Ether' : want.native, symbol: want.native || 'ETH', decimals: 18 },
-            rpcUrls: want.rpcs || [want.rpc],
-            blockExplorerUrls: want.explorer ? [want.explorer] : [],
-          }],
-        });
-      } else throw e;
+        try {
+          await eth.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: want.hex, chainName: want.name,
+              nativeCurrency: { name: want.native === 'ETH' ? 'Ether' : want.native, symbol: want.native || 'ETH', decimals: 18 },
+              rpcUrls: want.rpcs || [want.rpc],
+              blockExplorerUrls: want.explorer ? [want.explorer] : [],
+            }],
+          });
+        } catch (e2) {
+          /* Phantom 就是走到这里：它不支持加自定义网络，回 4901。 */
+          throw chainRefusedError(want, chainRefused(e2) ? e2 : e);
+        }
+      } else if (chainRefused(e)) throw chainRefusedError(want, e);
+      else throw e;
     }
   },
   signer() {
@@ -2529,7 +2628,14 @@ async function wireWallet() {
   onWallet('phase', (busy) => {
     if (busy && !btn.dataset.addr) btn.innerHTML = `${icon('wallet', 16)}<span>Check your wallet…</span>`;
   });
-  onWallet('accounts', (addr) => { if (addr) setWalletOff(false); paint(addr); });
+  onWallet('accounts', (addr) => {
+    if (addr) setWalletOff(false);
+    paint(addr);
+    /* 连上/断开之后顶栏那颗网络胶囊也要跟着钱包的链画一次 —— 切链失败时它要变成
+       "Switch to …"（activate 不再因为切链失败而中断连接，见那里的注释）。
+       事件路径把地址原样传进去，wireChain 不会回查账户（防自激）。 */
+    wireChain({ fromEvent: true, account: addr });
+  });
   /**
    * ⚠ **只有真的换到"我们认的另一条链"才重载**。
    *
@@ -2585,7 +2691,7 @@ function showChainMenu(chip, html) {
 function solHref() { return location.pathname.startsWith('/launch') ? '/launch/solana' : '/locks/solana'; }
 function evmHref() { return location.pathname.startsWith('/launch') ? '/launch' : '/locks'; }
 
-async function wireChain() {
+async function wireChain(opts = {}) {
   const chip = document.getElementById('chain-chip');
   if (!chip) return;
   /* Solana 页：顶栏显示 Solana；菜单里仍然能回 EVM 页面。
@@ -2615,7 +2721,25 @@ async function wireChain() {
   }
   const live = await chains();
   const active = await currentChain();
-  const walletId = await wallet.chainId();
+  /**
+   * **"钱包停在哪条链"只在真的连着的时候才看**（2026-10-24）。
+   *
+   * 钱包扩展在**没授权**时也会答 `eth_chainId` —— 以前这里直接读，于是任何装了
+   * Phantom/MetaMask、从没连过本站的人，一打开页面就被顶栏 prompt 一次切链；
+   * Phantom 还会回 4901，屏幕上先弹一条红字。
+   *
+   * ⚠ **不能无条件在这里调 `wallet.accounts()`**：这个函数会在 accountsChanged 里被调用，
+   * 而假钱包（以及部分真钱包）每次 eth_accounts 之后都补发事件 —— 会自激
+   * （见 [[dapp-multi-wallet-discovery]]）。所以事件那条路**直接用载荷里的地址**，
+   * 绝不回查；只有启动/换链这类非事件路径才问一次。
+   */
+  let connected;
+  if (opts.fromEvent) connected = opts.account != null && !walletOff();
+  else {
+    try { connected = !!((await wallet.accounts())[0]) && !walletOff(); }
+    catch { connected = false; }
+  }
+  const walletId = connected ? await wallet.chainId() : null;
   const foreign = walletId !== null && live.length && !live.some((c) => c.id === walletId);
   /**
    * 记下"**这套 UI 是按哪条链渲染的**" —— 钱包切链时用它判要不要整个重来。

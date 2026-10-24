@@ -1,4 +1,4 @@
-# OAKEN contracts — internal self-review (2026-10-23; v3 addendum 2026-10-24)
+# OAKEN contracts — internal self-review (2026-10-23; v3/v4 addendum 2026-10-24)
 
 **This is not an audit.** It is a reproducible internal review: static analysis,
 the existing fuzz/invariant suites, a hand triage of every High/Medium result,
@@ -6,27 +6,28 @@ and one proof-of-concept for the only High finding. No independent reviewer has
 seen this code. Do not describe it as audited.
 
 Scope: the EVM contracts in `contracts/contracts/` (11 product contracts), **the
-deployed v2 fork in `contracts/v2/`** (`LockVaultV2`, `PinkLockAdapterV2`) and
-**the deployed v3 fork in `contracts/v3/`** (`LockVaultV3`,
-`PinkLockAdapterV3`), with the deployed bytecode at the deterministic addresses
-on 4663 / 56 / 8453 / 137.
+deployed v2 fork in `contracts/v2/`** (`LockVaultV2`, `PinkLockAdapterV2`), **the
+deployed v3 fork in `contracts/v3/`** (`LockVaultV3`, `PinkLockAdapterV3`) and
+**the deployed v4 upgradeable stack in `contracts/v4/`** (`LockVaultV4`,
+`PinkLockAdapterV4`, `ERC1967Proxy`, `DelayedProxyAdmin`, `OakenMultisig`), with
+the deployed bytecode at the deterministic addresses on 4663 / 56 / 8453 / 137.
 Solana is covered separately in `solana/README.md` and the CI E2E; it was not
 run through an EVM analyzer.
 
 Frozen code: v1 at tag `audit-2026-10-23` (contracts commit `de736d3`); the v2
-fork and this self-review at tag `audit-2026-10-23-v2`; the v3 fork and this
-addendum at tag `audit-2026-10-24-v3`. The three bundles and their SHA-256 hashes
-are listed in `audit/README.md`.
+fork and this self-review at tag `audit-2026-10-23-v2`; the v3 fork at tag
+`audit-2026-10-24-v3`; the v4 stack and addendum at tag `audit-2026-10-24-v4`.
+The four bundles and their SHA-256 hashes are listed in `audit/README.md`.
 
 ## Tools and commands
 
 | What | Command | Result |
 |---|---|---|
-| Hardhat unit/refusal tests | `npm test` | 129 passing (120 v1 + 4 v2 + 5 v3) |
+| Hardhat unit/refusal tests | `npm test` | 138 passing (120 v1 + 4 v2 + 5 v3 + 9 v4) |
 | Foundry fuzz + invariant | `forge test --match-path "test/foundry/*"` | 14 fuzz tests, two 4-invariant suites (v1 and v3), 20 tests in total (including the PoC and v2 regressions) |
 | Reentrancy PoC | `forge test --match-contract ReentrancyPoC -vv` | passes — demonstrates SR-01 |
 | Slither 0.11.6 | `slither . --compile-force-framework hardhat --filter-paths "mocks\|test\|lib\|node_modules" --json audit/slither-product.json` | 107 findings, 17 High/Medium before triage. **Run predates v3** (v1/v2 only); SR-04 was found by the invariant suite, not Slither |
-| Aggregated checks | `node check.js` | 129 contract + 63 JS tests, v1/v2/v3 address and topic checks |
+| Aggregated checks | `node check.js` | 138 contract + 63 JS tests, v1/v2/v3/v4 address and topic checks |
 | Halmos 0.3.3 | `halmos --forge-build-out foundry-out --contract LockVaultSymbolic --function check_` | **not executed**: tool fails on this Foundry 1.8.6 artifact format (`Unsupported cheat code: deployCode(string)`); no symbolic result is claimed |
 
 Solc 0.8.24 (solc-select) was used by Slither. The Slither JSON is kept at
@@ -121,13 +122,36 @@ Found on 2026-10-24 by the unconstrained invariant suite, not by Slither:
 No revocable locks existed on chain when this was found; the create form could
 still make one.
 
-**Fixed in v3 (deployed on all four chains on 2026-10-24; new locks and launches
-use v3, v1 and v2 stay live for earlier locks):**
+**Fixed in v3 (deployed on all four chains on 2026-10-24; inherited by v4,
+which is what new locks and launches use; v1 and v2 stay live for earlier
+locks):**
 `contracts/v3/LockVaultV3.sol` sets `frozen = max(vestedNow, claimed)` and
 refunds `amount - frozen`. `test/V3.test.ts` (5 Hardhat tests) pins the sequence
 and the normal paths; `test/foundry/LockVaultV3Invariant.t.sol` is the
 unconstrained suite and is documented to fail when pointed at v2. The deployment
 and multi-read migration are in `contracts/V3.md`.
+
+### v4 — the upgrade path introduced because v1–v3 cannot be repaired — **design change, not a finding**
+
+The SR-04 fix had to be deployed beside the immutable vaults; that made the
+absence of a repair path the next problem. v4 keeps the v3 accounting and puts it
+behind an ERC1967 proxy:
+
+- `OakenMultisig` is a 2-of-3 with the existing Safe owners;
+- it owns `DelayedProxyAdmin`, which requires `scheduleUpgrade`, then a **48-hour
+  wait**, then `executeUpgrade`; the owner can cancel in between;
+- the admin cannot move a lock's tokens, change a schedule, pause the vault, take
+  a fee or rescue funds — it can only replace the vault/adapter implementation;
+- `test/V4.test.ts` (9 tests) covers proxy wiring, one-shot initialization,
+  non-admin refusal, lock/claim through the adapter proxy, the 2-of-3 + 48h path,
+  cancellation, non-owner refusal, a vault upgrade that preserves locks, an
+  adapter upgrade that preserves indexes, and the launcher through the proxy;
+- `_look/v4-upgrade-e2e.cjs` repeats the real path on a local chain with two
+  impersonated owners and checks that a lock survives the implementation swap.
+
+The risk this introduces is stated in `V4.md`: a compromised 2-of-3 quorum plus
+the 48h delay can replace the code. The delay is the exit window, not a vote.
+v1–v3 remain immutable and cannot be moved into v4.
 
 ## Solana
 

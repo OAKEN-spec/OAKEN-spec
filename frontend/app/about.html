@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>About · OAKEN</title>
-<meta name="description" content="Why OAKEN exists: ownerless token and LP locks, the same address on four chains, every number read live from the chain — and a plain statement of where that promise stops.">
+<meta name="description" content="Why OAKEN exists: token and LP locks where no operator can move a lock, the same address on four chains, every number read live from the chain — and the v4 2-of-3, 48-hour upgrade model.">
 <meta property="og:title" content="About OAKEN — what we kept, and what we removed">
-<meta property="og:description" content="No owner, no upgrade, no admin key. The same lock address on four chains. And a clear line between Locks and Bonds.">
+<meta property="og:description" content="No operator can move a lock. The same lock address on four chains. v4 upgrades only by a 2-of-3 multisig after 48 hours; v1–v3 are immutable.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://oaken.one/about">
 <meta property="og:image" content="https://oaken.one/logo512.png">
@@ -58,23 +58,24 @@
   <section class="band" style="padding-top:40px">
     <p class="muted reveal" style="max-width:72ch">OAKEN is a small set of contracts that hold tokens and
       liquidity, and a website that reads them. The product decision was not "add more features" — it was
-      to remove the parts that create a reason to trust an operator: no owner, no upgrade path, no admin key,
-      no protocol fee, no custody of your wallet. What remains is a schedule written once, on a contract
-      anyone can call.</p>
+      to remove the parts that create a reason to trust an operator: no operator can move a lock, no pause,
+      no protocol fee, no custody of your wallet. v4 keeps one power deliberately: a 2-of-3 multisig can
+      replace the vault code, after a public 48-hour delay. v1–v3 are immutable. What remains is a schedule
+      written once, on a contract anyone can call.</p>
 
     <div class="grid2" data-stagger style="margin-top:34px">
       <div class="panel">
-        <div class="head"><h3>Why no owner?</h3></div>
+        <div class="head"><h3>Who can change the vault?</h3></div>
         <div class="body">
           <ul style="list-style:none;display:grid;gap:14px;color:var(--muted);font-size:14.5px">
-            <li><b style="color:var(--parch)">An owner key is a promise.</b> It says "someone can change the rules
-              later". We did not want the product to depend on that promise being kept.</li>
-            <li><b style="color:var(--parch)">No upgrade path.</b> The contract that holds your tokens cannot be
-              replaced, patched, paused or pointed somewhere else. What is deployed is what runs.</li>
-            <li><b style="color:var(--parch)">No rescue function.</b> That cuts both ways: we cannot recover a
-              mistake, and nobody else can either. Read the schedule before you sign it.</li>
-            <li><b style="color:var(--parch)">Nothing to renounce.</b> Renouncing an owner key is still a promise
-              that the key existed. Here there is no key to renounce.</li>
+            <li><b style="color:var(--parch)">No operator over a lock.</b> No key can move a lock's tokens or
+              change its schedule directly — not ours, not anyone's.</li>
+            <li><b style="color:var(--parch)">v4 is upgradeable, slowly.</b> A 2-of-3 multisig can schedule a
+              new vault implementation. It waits 48 hours on-chain, can be cancelled, and emits an event.</li>
+            <li><b style="color:var(--parch)">v1–v3 are immutable.</b> Locks created in those vaults stay in
+              them; no admin can upgrade or rescue them.</li>
+            <li><b style="color:var(--parch)">No pause, no fee switch, no rescue.</b> Even the upgrade path
+              cannot pause a lock, take a fee, or move a balance — it can only replace the code after the delay.</li>
           </ul>
         </div>
       </div>
@@ -99,7 +100,7 @@
         <table class="list">
           <thead><tr><th>Question</th><th>Typical locker</th><th>OAKEN locks</th></tr></thead>
           <tbody>
-            <tr><td>Can an operator change the lock later?</td><td>Often yes — owner or upgrade proxy</td><td><b>No owner, no upgrade</b></td></tr>
+            <tr><td>Can the contract be upgraded later?</td><td>Often yes — owner or upgrade proxy</td><td><b>v4: 2-of-3 + 48h delay. v1–v3: no.</b></td></tr>
             <tr><td>Where does the number on the page come from?</td><td>Their database</td><td><b>eth_call from your browser</b></td></tr>
             <tr><td>What does it cost?</td><td>A locking fee or a token percentage</td><td><b>0 protocol fee — gas only</b></td></tr>
             <tr><td>Do you have to trust the website to stay up?</td><td>Often yes</td><td><b>No — the schedule lives in the contract</b></td></tr>
@@ -133,18 +134,19 @@
     <div class="wrap">
       <div class="reveal">
         <div class="eyebrow">THE LINE WE DO NOT BLUR</div>
-        <h2 class="sec">Locks are ownerless. Bonds are not.</h2>
+        <h2 class="sec">Locks have no operator. Bonds have an admin.</h2>
         <div class="sec-rule"></div>
         <p class="muted" style="margin-top:18px;max-width:70ch"><b>Do not read "no owner" on this site and assume
-          it applies to every product.</b> Locks and Bonds have different trust assumptions, and we say which
-          is which on every page.</p>
+          it applies to every product.</b> Locks v1–v3 are immutable; v4 has a 2-of-3 upgrade key with a 48h
+          delay. Bonds have a Timelock admin. We say which is which on every page.</p>
       </div>
       <div class="grid2" data-stagger style="margin-top:26px">
         <div class="panel">
           <div class="head"><h3>Locks · vault, positions, tools</h3></div>
           <div class="body">
             <ul style="list-style:none;display:grid;gap:12px;color:var(--muted);font-size:14.5px">
-              <li><b style="color:var(--parch)">No admin, no pause, no upgrade.</b> The schedule is fixed when the lock lands.</li>
+              <li><b style="color:var(--parch)">No operator over a lock.</b> The schedule is fixed when the lock
+                lands. v4 has a 2-of-3, 48h-delayed upgrade key; v1–v3 are immutable.</li>
               <li><b style="color:var(--parch)">Anybody can pay the gas</b> to release a due lock; the vault pays the beneficiary and nobody else.</li>
               <li><b style="color:var(--parch)">The tools are ownerless too</b> — fixed-supply token factory, MultiSender, Merkle airdrop, presale with refunds.</li>
             </ul>
@@ -176,8 +178,8 @@
         <div class="sec-rule"></div>
         <p class="muted" style="margin-top:18px;max-width:70ch">Verification means the published source compiles
           to the bytecode running at that address. It does not mean the code was reviewed for every way it can
-          fail. We claim no audit. What we do claim is smaller and checkable: the contracts are short, they have
-          no owner, and every number on this site is read from them.</p>
+          fail. We claim no audit. What we do claim is smaller and checkable: the contracts are short, no
+          operator can move a lock, and every number on this site is read from them.</p>
       </div>
       <div class="grid3" data-stagger style="margin-top:26px">
         <a class="card" href="/verify"><span class="n">01</span><h3>Verify the bytecode</h3>

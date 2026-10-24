@@ -68,7 +68,7 @@
 <script type="module">
   import { shell, readLock, countdown, fmtAmount, fmtDate, short, explorerHref, contractSet, wallet, adapter, vault, provider,
     toast, reveal, chainBySlug, currentChain, onWallet, humanizeTxError, erc20, storedTitle, copyBtn, copy,
-    safeRead, showReadFail, txNotice, cachedRead, cacheDrop, onChainSwitch} from '/app/oaken.js';
+    safeRead, showReadFail, txNotice, cachedRead, cacheDrop, onChainSwitch, LOCK_VERSIONS} from '/app/oaken.js';
   import { icon } from '/app/icons.js';
   shell();
 
@@ -77,10 +77,10 @@
     onChainSwitch(() => { /* 什么都不用做（见上） */ });
   const m = /^\/locks\/([^/]+)\/record\/([^/]+)\/?$/.exec(location.pathname);
   const id = m && m[2];
-  /* `?vault=v2|v3` selects that generation. Without it the page stays on v1 so
+  /* `?vault=v2|v3|v4` selects that generation. Without it the page stays on v1 so
      every old record URL keeps reading the vault that actually holds the lock. */
   const _vq = new URLSearchParams(location.search).get('vault');
-  const VAULT_VER = _vq === 'v2' || _vq === 'v3' ? _vq : 'v1';
+  const VAULT_VER = LOCK_VERSIONS.includes(_vq) ? _vq : 'v1';
   const SET = contractSet(VAULT_VER);
   const root = document.getElementById('root');
   let activeChain = null;   // 解析出来的链；重画时用它，别把 null 传回 load()
@@ -464,6 +464,9 @@
         <div>
           <h2 class="sec">${l.symbol} lock <span class="mono">#${l.id}</span>${VAULT_VER !== 'v1' ? ` <span class="pill" title="read from the ${VAULT_VER} vault">${VAULT_VER}</span>` : ''}</h2>
           <p class="muted" style="margin-top:10px">${l.description && l.description !== '{}' ? l.description : 'No title was set for this lock.'}</p>
+          ${VAULT_VER === 'v4'
+            ? '<div class="warnbox" style="margin-top:14px;font-size:13.5px"><b>Upgradeable vault.</b> A 2-of-3 multisig can replace the v4 vault code after a public 48-hour delay. It cannot move this lock\'s tokens or change its schedule directly. <a href="/about">Upgrade model →</a></div>'
+            : '<div class="hint" style="margin-top:14px;font-size:13px">This lock lives in the immutable ' + VAULT_VER + ' vault. It cannot be upgraded or moved to another vault.</div>'}
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
             <button class="btn btn-s" id="sharelock" type="button">Share this lock</button>
             <span class="pill ${c.done ? 'ok' : 'lock'}">${done ? 'Fully released ' + fmtDate(l.endTime)

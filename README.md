@@ -27,7 +27,7 @@ THIRD-PARTY-NOTICES.md  Licenses of the bundled libraries and fonts
 ```bash
 cd contracts
 npm ci
-npm test                         # Hardhat: 129 tests
+npm test                         # Hardhat: 138 tests
 forge test --match-path "test/foundry/*"   # Foundry: 20 tests (fuzz + invariants + PoC)
 npm run coverage                 # solidity-coverage (viaIR instrumentation)
 ```
@@ -35,20 +35,22 @@ npm run coverage                 # solidity-coverage (viaIR instrumentation)
 Coverage (2026-10-24), reported per version: **v1 product contracts 99.58%
 statements · 99.82% lines · 100% functions**; branch 73.38% (reported
 separately). **v2** 54.55 / 55.70 / 40 / 35.29 branch; **v3** 54.77 / 55.90 / 40 /
-36.05 branch. v2 and v3 are v1 plus small diffs; their paths are covered by the
-versioned tests. See [contracts/SECURITY.md](contracts/SECURITY.md) for the
+36.05 branch. v2, v3 and v4 are v1 plus small diffs; their paths are covered by
+the versioned tests. See [contracts/SECURITY.md](contracts/SECURITY.md) for the
 invariant list and known limitations.
 
 The lock-family contracts are deployed at deterministic, identical addresses on
 each supported EVM chain. Addresses live in `contracts/scripts/deterministic-addresses.ts`
 and the site registry; the tests compare both.
 
-**v1, v2 and v3 are deployed.** v1 holds every lock created before 2026-10-23;
-v2 holds 2026-10-23 → 2026-10-24 (reentrancy guard + ETH refund); **v3 is what
-new locks and launches use** and adds the `revoke()` clamp
-(`frozen = max(vestedNow, claimed)`). The site reads all three. Addresses, blocks
-and the multi-read contract are in [contracts/V2.md](contracts/V2.md) and
-[contracts/V3.md](contracts/V3.md).
+**v1, v2, v3 and v4 are deployed.** v1 holds every lock created before
+2026-10-23; v2 holds 2026-10-23 → 2026-10-24; v3 holds 2026-10-24; **v4 is what
+new locks and launches use** and puts the v3 accounting behind an ERC1967 proxy.
+A 2-of-3 multisig can replace the v4 implementation after a 48-hour delay; the
+admin cannot move a lock's tokens or change its schedule. v1–v3 are immutable.
+The site reads all four. Addresses, blocks and the upgrade model are in
+[contracts/V2.md](contracts/V2.md), [contracts/V3.md](contracts/V3.md) and
+[contracts/V4.md](contracts/V4.md).
 
 ## Frontend
 

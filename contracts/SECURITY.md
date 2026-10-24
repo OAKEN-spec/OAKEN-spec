@@ -28,8 +28,9 @@ on every chain where they are deployed.
 the ETH-refund fix (SR-02) live in a fork, at new deterministic addresses on all
 four chains. v2 holds the locks created 2026-10-23 → 2026-10-24; v1 stays live
 for everything created before that. **v3 (deployed 2026-10-24)** adds the
-revoke-clamp fix (SR-03, found by the unconstrained invariant suite) and is what
-new locks and launches use.
+revoke-clamp fix (SR-04, found by the unconstrained invariant suite). **v4
+(deployed 2026-10-24)** is v3 behind an ERC1967 proxy with a 2-of-3 multisig and
+a 48-hour delayed admin; it is what new locks and launches use.
 
 v2 contracts (deployed 2026-10-23; hold the locks created 2026-10-23 → 2026-10-24):
 
@@ -39,7 +40,7 @@ v2 contracts (deployed 2026-10-23; hold the locks created 2026-10-23 → 2026-10
 | PinkLockAdapterV2 | `contracts/v2/PinkLockAdapterV2.sol` | `0xDBE1f3dc1d6E6759355E1B164231748f0589cb41` | same guard; returns attached ETH to the caller |
 | OakenLauncherV2 | `contracts/OakenLauncher.sol` (same source) | `0x0d7cCEA7BabC5e3b4849267740D8fBBe6C4FDa58` | constructor points at PinkLockAdapterV2 |
 
-v3 contracts (deployed 2026-10-24; **what new locks and launches use**):
+v3 contracts (deployed 2026-10-24; hold the locks created on that day):
 
 | Contract | File | Address (same on every chain) | Change from v2 |
 |---|---|---|---|
@@ -47,9 +48,22 @@ v3 contracts (deployed 2026-10-24; **what new locks and launches use**):
 | PinkLockAdapterV3 | `contracts/v3/PinkLockAdapterV3.sol` | `0x6022DA059FAa0673E3058ADECEef375c2Abfb4A1` | same source as the v2 adapter, pointed at the v3 vault |
 | OakenLauncherV3 | `contracts/OakenLauncher.sol` (same source) | `0x4488C369116D0C6FEA84162313c3840976D5A9a5` | constructor points at PinkLockAdapterV3 |
 
-See `contracts/V2.md` and `contracts/V3.md` for the failing sequences, regression
-tests, deployment blocks and the multi-read migration. v1, v2 and v3 are all
-Sourcify exact matches on all four chains.
+v4 contracts (deployed 2026-10-24; **what new locks and launches use**):
+
+| Contract | File | Address (same on every chain) | Change from v3 |
+|---|---|---|---|
+| **Vault proxy** | `contracts/v4/ERC1967Proxy.sol` | `0x5221A10B772D5e2d51B60E8e3dd5DA9338b04ab0` | transparent ERC1967 proxy; implementation can be replaced after 48h |
+| **Adapter proxy** | `contracts/v4/ERC1967Proxy.sol` | `0xA2898528eb4Aea0bDAf47202A5BA3bA4f58F831c` | same, for the adapter |
+| LockVaultV4 implementation | `contracts/v4/LockVaultV4.sol` | `0xEead023bEcE7D6A458c1da1F8c22E84be885171e` | v3 accounting + proxy init |
+| PinkLockAdapterV4 implementation | `contracts/v4/PinkLockAdapterV4.sol` | `0x33cA492931828B5a8E222fB731BBa1Ab5124cCaA` | v3 adapter with the vault in storage |
+| DelayedProxyAdmin | `contracts/v4/DelayedProxyAdmin.sol` | `0xDB998916A34b87c7DA337d922bC1219970FA0319` | schedule/execute upgrades after 48h |
+| OakenMultisig (2-of-3) | `contracts/v4/OakenMultisig.sol` | `0xCb847B572352156be50c90FBc752cfd032114666` | owns the delayed admin |
+| OakenLauncherV4 | `contracts/OakenLauncher.sol` (same source) | `0x9600f22d2f629904B44c7dA2d958f5AfB3a1e5Ff` | constructor points at the adapter proxy |
+
+See `contracts/V2.md`, `contracts/V3.md` and `contracts/V4.md` for the failing
+sequences, regression tests, the upgrade model, deployment blocks and the
+multi-read migration. v1, v2, v3 and v4 are all Sourcify exact matches on all four
+chains (including the v4 proxies, multisig and delayed admin).
 
 The Safe that proposes through the Timelock is a 2-of-3 at
 `0x5E8C4c241a29ff7E60c648f378A4AA70053Ee92e`. It is a different trust boundary
@@ -63,7 +77,7 @@ must not be presented as covered by an EVM audit.
 
 ## What the tests pin
 
-- Hardhat unit + integration tests: **129 passing** (`npm test`; 120 v1 + 4 v2 + 5 v3).
+- Hardhat unit + integration tests: **138 passing** (`npm test`; 120 v1 + 4 v2 + 5 v3 + 9 v4).
 - Foundry fuzz tests: **14 fuzz tests × 1,000 runs** across LockVault and
   PositionLock.
 - Foundry invariant tests: **two suites of 4 invariants** — a frozen v1 suite and
@@ -83,6 +97,12 @@ must not be presented as covered by an EVM audit.
     small diffs, so the v1 suite describes the shared code; their own paths are
     covered by the versioned Hardhat and Foundry tests. The numbers are reported
     separately rather than blended into v1's.
+  - **v4** is reported per file (the accounting is v3; the proxy/admin layer has
+    its own tests): `LockVaultV4` 36.04% / 35.82% / 61.90% / 23.64% branch;
+    `PinkLockAdapterV4` 38.71% / 43.81% / 29.55% / 23.53%;
+    `ERC1967Proxy` 52.17% / 58.06% / 69.23% / 31.25%;
+    `DelayedProxyAdmin` 78.26% / 78.26% / 77.78% / 43.33%;
+    `OakenMultisig` 71.43% / 75.00% / 63.64% / 45.83%.
   - branch coverage is reported separately; a branch-coverage pass on all
     versions remains on the audit-readiness list.
 
@@ -167,11 +187,16 @@ auditor rather than hidden in a test.
   still holds pre-2026-10-23 locks; a token with a transfer callback can re-enter
   it. The creation form warns against transfer-hook (ERC-777-style) tokens. v2
   makes the re-entrant path revert and returns attached ETH; see `V2.md`.
-- **SR-04 is fixed in v3 only.** v1 and v2 allow a revocable lock to be claimed,
-  edited down and then revoked in a way that refunds from other locks of the same
-  token. v3 clamps the frozen amount at `max(vested, claimed)`. Neither v1 nor v2
-  can be patched in place; the site now creates new locks and launches through
-  v3. See `V3.md`.
+- **SR-04 is fixed in v3 and inherited by v4.** v1 and v2 allow a revocable lock
+  to be claimed, edited down and then revoked in a way that refunds from other
+  locks of the same token. v3 clamps the frozen amount at `max(vested, claimed)`.
+  Neither v1 nor v2 can be patched in place; the site creates new locks and
+  launches through v4. See `V3.md` and `V4.md`.
+- **v4 upgrade risk.** The v4 vault and adapter are ERC1967 proxies. A 2-of-3
+  multisig can schedule a new implementation and execute it after 48 hours; a
+  compromised quorum could replace the code. The delay is public and cancellable,
+  and the admin cannot move a lock's tokens, change a schedule, pause the vault,
+  take a fee or rescue funds. v1–v3 have no upgrade path.
 - **Solana:** the OAKEN Solana lock program is deployed on mainnet
   (`Co9ZnAVxX2siGThhjTpPgXPHYrCev1nrXFyGB1VcZcQW`, upgrade authority revoked) and
   passed a 25-check E2E on a local validator. Jupiter Lock remains available as

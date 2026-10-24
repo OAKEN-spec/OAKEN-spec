@@ -19,6 +19,10 @@ BNB Chain (56), Base (8453) and Polygon (137).
   plus the revoke-clamp regression and the unconstrained invariant suite. v3 is
   v2 plus one line of substance in `revoke()`: `frozen = max(vestedNow, claimed)`.
   Resolve it with `git rev-parse audit-2026-10-24-v3`.
+- **v4 addendum:** tag `audit-2026-10-24-v4` — the upgradeable stack: v4 vault and
+  adapter behind ERC1967 proxies, the 2-of-3 multisig, the 48h DelayedProxyAdmin,
+  and the upgrade-path tests. v4 is v3 accounting plus the proxy/admin layer.
+  Resolve it with `git rev-parse audit-2026-10-24-v4`.
 - Language: Solidity 0.8.24, no OpenZeppelin in the lock family.
 - Licenses: Apache-2.0 for our contracts; vendored forge-std keeps its own.
 
@@ -31,12 +35,15 @@ Full detail, per-contract questions and out-of-scope notes are in
 |---|---|---|---|
 | P0 | LockVault, PositionLock, PinkLockAdapter | 1,556 | Hold user tokens / ERC-721 positions; vesting and release arithmetic |
 | P0 | **LockVaultV2, PinkLockAdapterV2** (`contracts/v2/`) | 1,316 | Deployed 2026-10-23; holds that day's locks. v1 plus the reentrancy guard and ETH refund |
-| P0 | **LockVaultV3, PinkLockAdapterV3** (`contracts/v3/`) | 1,330 | **Deployed 2026-10-24; every new lock and launch uses v3.** v2 plus the `revoke()` clamp; this diff is the current review surface |
-| P1 | OakenLauncher, TokenFactory + OakenToken, MultiSender, OakenAirdrop, PresaleFactory + Presale | 1,315 | Deploy, escrow, batch transfer, Merkle claims, refunds (OakenLauncherV2/V3 are the same source with the versioned adapter as a constructor argument) |
+| P0 | **LockVaultV3, PinkLockAdapterV3** (`contracts/v3/`) | 1,330 | Deployed 2026-10-24; holds that day's locks. v2 plus the `revoke()` clamp |
+| P0 | **LockVaultV4, PinkLockAdapterV4** (`contracts/v4/`) | 1,378 | **Current path; every new lock and launch uses the v4 proxies.** v3 accounting behind ERC1967 |
+| P0 | **ERC1967Proxy, DelayedProxyAdmin, OakenMultisig** (`contracts/v4/`) | 408 | The upgrade layer: transparent proxy, 48h delayed admin, 2-of-3 owner. This is the new trust surface |
+| P1 | OakenLauncher, TokenFactory + OakenToken, MultiSender, OakenAirdrop, PresaleFactory + Presale | 1,315 | Deploy, escrow, batch transfer, Merkle claims, refunds (OakenLauncherV2/V3/V4 are the same source with the versioned adapter as a constructor argument) |
 | P2 | OakenTimelock (Bonds admin path only) | 140 | Governance path; separate trust boundary |
 
-Total: 15 Solidity files, 5,657 lines (including comments): 3,011 lines of v1,
-1,316 lines of v2 and 1,330 lines of v3.
+Total: 20 Solidity files, 7,443 lines (including comments): 3,011 lines of v1,
+1,316 of v2, 1,330 of v3 and 1,786 of v4 (vault, adapter, proxy, delayed admin,
+multisig).
 
 **Out of scope:** frontend, indexer/API, deployment scripts, the Bonds NAV
 keeper, third-party launchpad contracts (Pons, Genius, Flap, Clanker,
@@ -59,7 +66,7 @@ We are happy with either of these formats — quote both if you can:
 
 ## Existing assurance (not a substitute for an audit)
 
-- 129 Hardhat tests (120 v1 + 4 v2 + 5 v3), including refusal paths and empty-state reverts.
+- 138 Hardhat tests (120 v1 + 4 v2 + 5 v3 + 9 v4), including refusal paths, empty-state reverts and the full upgrade path (schedule, 48h, execute, cancel, state preservation).
 - Foundry: 20 tests — 14 fuzz tests × 1,000 runs, two invariant suites of 4
   invariants each (v1 and the **unconstrained v3** suite), the reentrancy PoC and
   three v2 regressions (one of which sends real ETH through the refund path).
@@ -73,7 +80,7 @@ We are happy with either of these formats — quote both if you can:
   are covered by the versioned Hardhat and Foundry tests.
 - Deterministic deployment test: a real CREATE2 deployment through the canonical proxy,
   compared against the published addresses; `node check.js` also compares the address
-  scripts with `src/chains.mjs` (v1, v2 and v3).
+  scripts with `src/chains.mjs` (v1, v2, v3 and v4, including the proxy and admin addresses).
 - Source verified byte-for-byte on Sourcify; verification is **not** an audit.
 
 ## Logistics

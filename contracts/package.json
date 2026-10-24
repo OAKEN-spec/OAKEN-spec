@@ -2,7 +2,7 @@
   "name": "lock-contracts",
   "version": "0.1.0",
   "private": true,
-  "description": "LockVault and PositionLock: non-upgradeable token and LP-lock escrows designed to deploy at one identical address on every EVM chain. Self-contained Hardhat project.",
+  "description": "LockVault and PositionLock: token and LP-lock escrows. v1-v3 are non-upgradeable; v4 is an ERC1967 proxy with a 2-of-3, 48h-delayed upgrade admin. Self-contained Hardhat project.",
   "license": "Apache-2.0",
   "scripts": {
     "build": "hardhat compile --config hardhat.config.ts",
@@ -14,7 +14,8 @@
     "test:invariant": "forge test --match-path test/foundry/LockVaultInvariant.t.sol",
     "coverage:foundry": "forge coverage --ir-minimum",
     "addresses:v2": "hardhat run scripts/deterministic-addresses-v2.ts",
-    "addresses:v3": "hardhat run scripts/deterministic-addresses-v3.ts"
+    "addresses:v3": "hardhat run scripts/deterministic-addresses-v3.ts",
+    "addresses:v4": "hardhat run scripts/deterministic-addresses-v4.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.1.2",
