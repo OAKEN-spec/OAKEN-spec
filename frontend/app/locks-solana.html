@@ -186,8 +186,9 @@
           <div id="otherwrap" class="hide">
             <div>
               <label class="f" for="benef">Beneficiary</label>
-              <input class="i" id="benef" placeholder="Solana address that can claim" autocomplete="off" spellcheck="false">
-              <div class="hint">They will be the only one who can claim, transfer or renounce this lock.</div>
+              <input class="i" id="benef" placeholder="Solana address or name.sns" autocomplete="off" spellcheck="false">
+              <div class="hint" id="benefhint">They will be the only one who can claim, transfer or renounce this lock.
+                A <span class="mono">.sns</span> name works too — it resolves to its owner before you sign.</div>
             </div>
           </div>
 
@@ -397,6 +398,31 @@
     b.onclick = () => { if (b.disabled) return; state.backend = b.dataset.b; paintBackends(); };
   }
   $('useother').onchange = () => { $('otherwrap').classList.toggle('hide', !$('useother').checked); update(); };
+
+  /* Beneficiary can be typed as a .sns name; resolve it to the address before
+     validation/signing. The field is replaced (not hidden), so the user sees
+     exactly which address the lock will pay. */
+  let benefResolving = false;
+  async function resolveBenef() {
+    const raw = $('benef').value.trim();
+    if (!/\.(sns|sol)$/i.test(raw) || benefResolving) return null;
+    benefResolving = true;
+    $('benefhint').textContent = 'Resolving ' + raw + '…';
+    try {
+      const r = await SOL.resolveName(raw);
+      if (!r) { $('benefhint').textContent = 'That does not look like a Solana name.'; return null; }
+      $('benef').value = r.address;
+      $('benefhint').innerHTML = 'Resolved <b>' + esc(r.name) + '.sns</b> → <span class="mono">' + esc(r.address) + '</span>'
+        + (r.tokenized ? ' (tokenized name; owner is the NFT holder)' : '') + '.';
+      update();
+      return r;
+    } catch (e) {
+      $('benefhint').textContent = SOL.humanize(e);
+      return null;
+    } finally { benefResolving = false; }
+  }
+  $('benef').addEventListener('blur', () => { resolveBenef().catch((e) => { $('benefhint').textContent = SOL.humanize(e); }); });
+
   for (const id of ['amount', 'date', 'benef', 'label', 'revocable']) {
     $(id).addEventListener('input', update);
     $(id).addEventListener('change', update);
@@ -464,6 +490,10 @@
       if (!list.length) { err('No Solana wallet found. Install Phantom or Solflare, then reload.'); return; }
       try { await SOL.connect(list[0].key); await afterConnect(); } catch (e) { err(SOL.humanize(e)); }
       return;
+    }
+    if ($('useother').checked && /\.(sns|sol)$/i.test($('benef').value.trim())) {
+      const r = await resolveBenef();
+      if (!r) { err('Beneficiary: that name could not be resolved. Check it and try again.'); return; }
     }
     const errs = validate();
     if (errs.length) { err(errs.slice(0, 3).join(' ')); return; }
@@ -660,8 +690,16 @@
               const sig = await SOL.revokeLock(id);
               toast('Lock revoked', 'ok', { href: SOL.SOLSCAN_TX(sig), label: 'View ↗' });
             } else if (act === 'transfer') {
-              const to = prompt('New beneficiary Solana address:');
+              let to = prompt('New beneficiary Solana address or .sns name:');
               if (!to) return;
+              to = to.trim();
+              if (/\.(sns|sol)$/i.test(to)) {
+                try {
+                  const r = await SOL.resolveName(to);
+                  if (!r) throw new Error('That is not a Solana name.');
+                  to = r.address;
+                } catch (e) { err(SOL.humanize(e)); return; }
+              }
               b.disabled = true;
               const sig = await SOL.transferLock(id, to);
               toast('Beneficiary transferred', 'ok', { href: SOL.SOLSCAN_TX(sig), label: 'View ↗' });

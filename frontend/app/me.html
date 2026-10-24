@@ -150,6 +150,12 @@
   }
 
   const el = (id) => document.getElementById(id);
+  /* A hung public RPC must not hold the page hostage: every read below is
+     bounded, and a timeout is treated as "could not read", not as "no locks". */
+  const withTimeout = (p, ms) => Promise.race([
+    p,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('read timed out after ' + ms + 'ms')), ms)),
+  ]);
   const rowsHtml = (rows) => `<div class="feed">${rows.join('')}</div>`;
   const emptyRow = (text) => `<div class="body"><span class="muted">${text}</span></div>`;
 
@@ -171,6 +177,11 @@
 
   async function boot() {
     const [addr] = await wallet.accounts();
+    /* Some wallets (and our dev wallet historically) emit `accountsChanged`
+       from `eth_accounts` itself. Re-running boot() on that event would call
+       eth_accounts again and loop forever; only a real address change re-boots. */
+    if (addr && addr === window.__meBootAddr) return;
+    window.__meBootAddr = addr || null;
     if (!addr) return gate();
     el('gate').innerHTML = '';
     el('dash').classList.remove('hide');
@@ -187,14 +198,28 @@
      * 链读不到（ethers 没下来 / RPC 不通）才退回索引，并且在标题旁**说明这是退回的**。
      */
     (async () => {
-      const live = await chains();
+      let live = await chains();
       const rows = [];
       let source = '';
+      let failed = '';
       try {
+        /* The API can miss once through a slow link; retry before declaring the
+           chain list empty. A false "no locks" is worse than a slow page. */
+        if (!live.length) { await new Promise((r) => setTimeout(r, 1200)); live = await chains(); }
         await loadEthers();
-        /* 四条链**并行**读：原来是串行 for-await，2.3 秒里一半是链与链之间排队。 */
+        /* 四条链**并行**读；每条链的四个版本**顺序**读 —— 16 个并发调用会被公共 RPC
+           当成滥用，表现正是"每个版本都抛错、页面却说读到了"（假的空列表）。 */
+        let failures = 0;
         const groups = await Promise.all(live.map(async (c) => {
-          const lists = await Promise.all(LOCK_VERSIONS.map((v) => locksForOwner(c, addr, v).catch(() => [])));
+          const lists = [];
+          for (const v of LOCK_VERSIONS) {
+            let got = null;
+            for (let attempt = 0; attempt < 2 && got === null; attempt++) {
+              try { got = await withTimeout(locksForOwner(c, addr, v), 7000); }
+              catch (e) { if (attempt === 0) await new Promise((r) => setTimeout(r, 400)); }
+            }
+            if (got === null) { failures++; lists.push([]); } else lists.push(got);
+          }
           return lists.flat().map((l) => ({
             id: l.id, vault: l.version || 'v1', chain: c, symbol: l.symbol || short(l.token), decimals: l.decimals,
             remaining: BigInt(l.amount) - BigInt(l.claimed || 0),
@@ -203,18 +228,25 @@
           }));
         }));
         for (const g of groups) rows.push(...g);
-        /* 新金库的锁首先列出（v3 → v2 → v1，号各自从 1 起），再按 id 倒序 ——
+        /* 新金库的锁首先列出（v4 → v3 → v2 → v1，号各自从 1 起），再按 id 倒序 ——
            只按 id 排会把"今天刚锁的那把"排到最下面。 */
         rows.sort((a, b) =>
           (LOCK_VERSIONS.indexOf(b.vault || 'v1') - LOCK_VERSIONS.indexOf(a.vault || 'v1')) || Number(b.id) - Number(a.id));
         /* ⚠ 链表为空时不能写 "read live from 0 chains"（假数据，且和空状态叠在一起像"你没有锁"）。
            链表拿不到 → 后面那条 catch 分支会如实说"这次读不到链"。 */
         if (!live.length) throw new Error('the chain list did not load');
-        source = 'read live from ' + live.length + ' chain' + (live.length === 1 ? '' : 's');
+        if (failures === live.length * LOCK_VERSIONS.length) throw new Error('no chain answered the lock read');
+        source = 'read live from ' + live.length + ' chain' + (live.length === 1 ? '' : 's')
+          + (failures ? ' · ' + failures + ' read(s) failed' : '');
       } catch (e) {
+        failed = String((e && (e.shortMessage || e.message)) || e).slice(0, 140);
         let indexed = 0;
-        const docsPer = await Promise.all(live.map((c) => ownLocks({ limit: 200, chain: c }).catch(() => [])));
-        live.forEach((c, ci) => {
+        /* Even when the chain list did not answer, one more try lets the index
+           fallback still name the chain; never map over an empty list silently. */
+        let chainList = live;
+        if (!chainList.length) { try { chainList = await chains(); } catch { /* stay empty */ } }
+        const docsPer = await Promise.all(chainList.map((c) => ownLocks({ limit: 200, chain: c }).catch(() => [])));
+        chainList.forEach((c, ci) => {
           const docs = docsPer[ci];
           indexed += docs.length;
           for (const d of docs) {
@@ -228,8 +260,8 @@
           }
         });
         source = indexed
-          ? 'from ' + indexed + ' indexed — the chain was unreachable from this browser, so this may lag'
-          : 'the chain was unreachable from this browser';
+          ? 'from ' + indexed + ' indexed — the chain read failed (' + failed + '), so this may lag'
+          : 'could not read your locks (' + failed + ')';
       }
       el('s-locks').textContent = String(rows.length);
       el('lock-note').textContent = source;
@@ -247,7 +279,11 @@
           <span>${state}</span>
           <a href="/locks/${esc(r.chain.slug)}/record/${esc(r.id)}${r.vault && r.vault !== 'v1' ? '?vault=' + r.vault : ''}">View →</a>
         </div>`;
-      })) : emptyRow('No locks are held for this address on any chain we are on. If you just created one, reload — this list is read from the chain, not from a cache.');
+      })) : (failed
+        ? `<div class="row"><span class="muted" style="flex:1 1 auto">Could not read your locks this time — nothing is being shown as zero. <span style="font-size:12px">(${esc(failed)})</span></span><button class="btn btn-s" id="locksretry" type="button">Retry</button></div>`
+        : emptyRow('No locks are held for this address on any chain we are on. If you just created one, reload — this list is read from the chain, not from a cache.'));
+      const lr = document.getElementById('locksretry');
+      if (lr) lr.onclick = () => { lr.disabled = true; location.reload(); };
     })();
 
     /**
@@ -258,14 +294,23 @@
      * 这是**区间扫描**不是索引：扫不动就如实说看的是哪一段，不把"没扫到"说成"没有"。
      */
     (async () => {
+      /* Let the lock read finish first: 16 log scans on top of 16 adapter reads
+         at the same moment is how a public RPC starts answering 429s (which the
+         page then used to render as "no locks"). */
+      await new Promise((r) => setTimeout(r, 1500));
       try {
         await loadEthers();
         const live = await chains();      // ⚠ 这一页的 `live` 在①那块自己的作用域里，这里要自己取
         const all = [];
         let complete = true, truncated = false, scanned = 0;
-        /* 四条链的日志扫描也**并行**（每条链自己还有 8 片上限）。 */
+        /* 四条链的日志扫描也**并行**；每条链的四个版本顺序扫，别把 16 个日志区间
+           同时甩给公共端点（限流时表现同样是"没扫到"）。每条链自己还有 8 片上限。 */
         const scannedPer = await Promise.all(live.map(async (c) => {
-          const sets = await Promise.all(LOCK_VERSIONS.map((v) => launchesByCreator(c, addr, { version: v }).catch(() => ({ launches: [], complete: false, truncated: false, scannedBlocks: 0 }))));
+          const sets = [];
+          for (const v of LOCK_VERSIONS) {
+            try { sets.push(await withTimeout(launchesByCreator(c, addr, { version: v, maxChunks: 2, budgetMs: 4000 }), 6000)); }
+            catch { sets.push({ launches: [], complete: false, truncated: false, scannedBlocks: 0 }); }
+          }
           return {
             launches: sets.flatMap((x) => x.launches),
             complete: sets.every((x) => x.complete),

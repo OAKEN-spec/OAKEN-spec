@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Names · OAKEN</title>
-<meta name="description" content="Register a .hood name on Robinhood Chain, point it at your wallet, and make it resolve. Read live from the chain.">
+<meta name="description" content="Register a .hood name on Robinhood Chain or a .sns name on Solana. Every read comes from the registry; every write is signed by your wallet.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="OAKEN">
-<meta property="og:title" content="OAKEN Names — .hood on Robinhood Chain">
-<meta property="og:description" content="Search, register and activate a .hood name. Every read comes from the registry on Robinhood Chain; every write is signed by your wallet.">
+<meta property="og:title" content="OAKEN Names — .hood on Robinhood Chain, .sns on Solana">
+<meta property="og:description" content="Search, register and activate a .hood name, or buy a .sns name on Solana. Every read comes from the chain; every write is signed by your wallet.">
 <meta property="og:url" content="https://oaken.one/names/">
 <meta property="og:image" content="https://oaken.one/logo512.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -316,6 +316,29 @@
   }
   @media (max-width: 760px) { .nrecent { grid-template-columns: 1fr; } }
   @media (max-width: 620px) { .ncards { grid-template-columns: 1fr; } .nart { width: 100%; height: 200px; } }
+  /* ── namespace switcher + .sns extras ───────────────────────────────── */
+  .nsswitch {
+    display: inline-flex; gap: 4px; padding: 4px; margin: 0 0 22px;
+    border: 1px solid var(--line); border-radius: 999px; background: rgba(16, 11, 6, .55);
+  }
+  .nsswitch button {
+    appearance: none; border: 0; background: transparent; color: var(--muted);
+    font: 600 13px/1 "Oaken Text", system-ui, sans-serif; letter-spacing: .02em;
+    padding: 10px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  }
+  .nsswitch button:hover { color: var(--parch); }
+  .nsswitch button.on { background: var(--gold); color: #1a1208; }
+  .nsswitch .mono { font-size: 12.5px; }
+  .nsns-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  #sns-result .panel .head { flex-wrap: wrap; row-gap: 8px; }
+  #sns-result .panel .head h3 { flex: 1 1 100%; }
+  .nrec-edit { display: grid; grid-template-columns: 160px 1fr auto; gap: 10px; align-items: center; }
+  @media (max-width: 820px) { .nsns-cols { grid-template-columns: 1fr !important; } }
+  @media (max-width: 760px) {
+    .nsswitch { width: 100%; display: flex; }
+    .nsswitch button { flex: 1; }
+    .nrec-edit { grid-template-columns: 1fr !important; }
+  }
 </style>
 </head>
 <body>
@@ -327,15 +350,20 @@
   </div>
   <div class="ph-scrim"></div>
   <div class="wrap ph-in">
-    <div class="eyebrow reveal">Names · .hood on Robinhood Chain</div>
-    <h1 class="reveal">A name for your wallet.</h1>
-    <p class="ph-lede reveal">Register a <span class="mono">.hood</span> name, point it at the address you actually use,
+    <div class="eyebrow reveal" id="ph-eyebrow">Names · .hood on Robinhood Chain</div>
+    <h1 class="reveal" id="ph-h1">A name for your wallet.</h1>
+    <p class="ph-lede reveal" id="ph-lede">Register a <span class="mono">.hood</span> name, point it at the address you actually use,
       and let people pay you without copying forty-two characters. Every read below comes from the chain.</p>
   </div>
 </section>
 
 <main class="wrap">
   <section class="band" style="padding-top:40px">
+    <div class="nsswitch" role="tablist" aria-label="Name service">
+      <button type="button" role="tab" data-ns="hood" aria-selected="true">Robinhood · <span class="mono">.hood</span></button>
+      <button type="button" role="tab" data-ns="sns" aria-selected="false">Solana · <span class="mono">.sns</span></button>
+    </div>
+    <div id="ns-hood">
     <div class="nregistry reveal" id="nregistry">
       <div class="nregistry-top">
         <span class="nplate-eyebrow">OAKEN NAMES · THE .HOOD REGISTRY</span>
@@ -433,6 +461,133 @@
         an audit, and a name is not a guarantee of identity.
       </div>
     </section>
+    </div><!-- /ns-hood -->
+
+    <div id="ns-sns" hidden>
+      <div class="nregistry reveal" id="sns-registry">
+        <div class="nregistry-top">
+          <span class="nplate-eyebrow">OAKEN NAMES · THE .SNS REGISTRY ON SOLANA</span>
+          <span class="nplate-status" id="sns-plate-status"><i class="pdot"></i><span id="sns-plate-status-text">Search a name</span></span>
+        </div>
+        <div class="nplate-name" id="sns-plate-name" aria-live="polite">
+          <span id="sns-plate-label">your name</span><i>.sns</i>
+        </div>
+        <div class="nplate-sub" id="sns-plate-sub">Every read comes from the SNS program on Solana. One-off price; no renewal.</div>
+        <div class="nsearch">
+          <div class="field">
+            <input id="sns-q" aria-label="Search for a .sns name" placeholder="Search for a name" autocomplete="off" spellcheck="false" maxlength="80">
+            <span class="suffix">.sns</span>
+          </div>
+          <button class="btn btn-p" id="sns-go" type="button">Search</button>
+        </div>
+        <div class="nplate-foot">
+          <div class="nstat" id="sns-stat">
+            <div><div class="v" id="sns-total">—</div><div class="k">Names in the registry</div></div>
+            <div><div class="v" id="sns-new24">—</div><div class="k">New in the last 24h</div></div>
+            <div><div class="v" id="sns-pricefrom">$20</div><div class="k">5+ characters, one-off</div></div>
+          </div>
+          <div class="nplate-note">
+            <p><span class="mono">.sns</span> is Solana's name service (SNS). The registry is SNS's on-chain program;
+              OAKEN is the front end. We never custody a name and take no fee. Prices are SNS's USD table, paid in SOL
+              at the on-chain Pyth rate. <b style="color:var(--parch)">No renewal and no expiry</b> — you pay once.</p>
+            <div class="nplate-index" id="sns-index-note">Reading the snapshot…</div>
+          </div>
+        </div>
+      </div>
+      <div class="hint nplate-hint" id="sns-hint">One label: lowercase letters, numbers, hyphens, underscores and emoji.
+        Checking is free and needs no wallet. Registration is one transaction, signed by your Solana wallet; a name can
+        be taken between your search and your signature. <b>`.sol` is the legacy suffix</b> — SNS now issues
+        <span class="mono">.sns</span> names, and this page sells those. Names resolve in Phantom, Solflare, Backpack
+        and any app that speaks SNS.</div>
+
+      <div id="sns-result" aria-live="polite" style="margin-top:28px;scroll-margin-top:124px"></div>
+
+      <section id="sns-mynames" style="margin-top:52px">
+        <div class="between" style="margin-bottom:14px">
+          <div>
+            <div class="eyebrow">My names</div>
+            <h2 class="sec" style="margin-top:8px;font-size:26px">What your Solana wallet holds.</h2>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-s" type="button" id="sns-mine-refresh">Refresh</button>
+            <button class="btn btn-p" type="button" id="sns-connect">Connect a Solana wallet</button>
+          </div>
+        </div>
+        <div id="sns-walletpanel"></div>
+        <div id="sns-mine-out" aria-live="polite"></div>
+      </section>
+
+      <section id="sns-recent-wrap" style="margin-top:52px">
+        <div class="between" style="margin-bottom:14px">
+          <div>
+            <div class="eyebrow">The registry</div>
+            <h2 class="sec" style="margin-top:8px;font-size:26px">Recently claimed.</h2>
+          </div>
+          <button class="btn btn-s" type="button" id="sns-recent-refresh">Refresh</button>
+        </div>
+        <div class="nrecent" id="sns-recent"><div class="hint">Reading the snapshot…</div></div>
+        <div class="hint" style="margin-top:12px" id="sns-recent-note">Registrations that went through the .sns registrar,
+          newest first. The registry predates it; older names are in Browse.</div>
+      </section>
+
+      <section id="sns-browse-wrap" style="margin-top:52px">
+        <div class="between" style="margin-bottom:14px">
+          <div>
+            <div class="eyebrow">Browse</div>
+            <h2 class="sec" style="margin-top:8px;font-size:26px">The whole registry.</h2>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-s" type="button" id="sns-random">Surprise me</button>
+            <button class="btn btn-p" type="button" id="sns-browse-open">Load the index</button>
+          </div>
+        </div>
+        <div class="nsearch" style="margin-top:0">
+          <div class="field">
+            <input id="sns-browse-input" placeholder="Load the index first" autocomplete="off" spellcheck="false" disabled>
+            <span class="suffix"></span>
+          </div>
+          <button class="btn btn-s" type="button" id="sns-browse-more" disabled>Load more</button>
+        </div>
+        <div class="nrecent" id="sns-browse-out" style="margin-top:16px"><div class="hint">The index is a snapshot of the
+          reverse-lookup accounts — labels only; owners are read live for the rows shown.</div></div>
+        <div class="hint" style="margin-top:12px" id="sns-browse-note"></div>
+      </section>
+
+      <section style="margin-top:56px">
+        <div class="eyebrow">How it works</div>
+        <h2 class="sec" style="margin-top:8px;font-size:26px">One transaction buys the name. Records are free to add.</h2>
+        <div class="nsteps" style="margin-top:18px">
+          <div class="nstep"><span class="no">01</span><div><b>Search</b><span class="d">Availability, owner and the live SOL quote. No wallet needed.</span></div></div>
+          <div class="nstep"><span class="no">02</span><div><b>Register</b><span class="d">One transaction creates the name and its reverse lookup, owned by your wallet.</span></div></div>
+          <div class="nstep"><span class="no">03</span><div><b>Set it as primary</b><span class="d">Wallets that speak SNS then show the name instead of the address.</span></div></div>
+          <div class="nstep"><span class="no">04</span><div><b>Add records</b><span class="d">Website, avatar, socials, bio — public text stored on your name, one small transaction each.</span></div></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px" class="nsns-cols">
+          <div class="panel"><div class="head"><h3>What the price is</h3></div><div class="body">
+            <table class="nprice">
+              <tr><td>1 character</td><td><b style="color:var(--gold)">$750</b></td></tr>
+              <tr><td>2 characters</td><td><b style="color:var(--gold)">$700</b></td></tr>
+              <tr><td>3 characters</td><td><b style="color:var(--gold)">$640</b></td></tr>
+              <tr><td>4 characters</td><td><b style="color:var(--gold)">$160</b></td></tr>
+              <tr><td>5+ characters</td><td><b style="color:var(--gold)">$20</b></td></tr>
+            </table>
+            <div class="hint" style="margin-top:10px">SNS's public USD table. The registrar converts it at execution using
+              a Pyth price feed, so the SOL amount moves with the market. One-off: no yearly renewal, no expiry.
+              Misleadingly cheap names are not a thing here — shorter names cost more.</div>
+          </div></div>
+          <div class="panel"><div class="head"><h3>What this is not</h3></div><div class="body">
+            <div class="note" style="border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;color:var(--muted);font-size:13.5px;line-height:1.7">
+              OAKEN does not issue <span class="mono">.sns</span> names, cannot freeze them, and cannot recover one for you.
+              The registry is <span class="mono">SNS</span>'s program on Solana; the price is theirs and OAKEN takes $0.
+              <span class="mono">.sns</span> is the current TLD; <span class="mono">.sol</span> is the legacy one and may
+              resolve elsewhere or not at all while SNS migrates it. A name is an account owned by a wallet: whoever holds
+              it can move it. A name is not a guarantee of identity.
+            </div>
+          </div></div>
+        </div>
+      </section>
+    </div><!-- /ns-sns -->
   </section>
 </main>
 
@@ -1839,6 +1994,70 @@
     loadMine().catch(() => {});
     if (state.label) searchFor(state.label, { scroll: false });
   });
+</script>
+<script>
+/* Namespace switch: `.hood` (Robinhood / EVM wallet) and `.sns` (Solana / Solana wallet)
+   live on the same page. The Solana runtime and its wallet library are loaded only
+   when that tab is first opened — a .hood visitor downloads none of it. */
+(function () {
+  const KEY = 'oaken.names.ns';
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  let ns = params.get('ns') === 'sns' ? 'sns'
+    : params.get('ns') === 'hood' ? 'hood'
+      : (localStorage.getItem(KEY) === 'sns' ? 'sns' : 'hood');
+  let loading = null;
+  function loadSns() {
+    if (window.__oakenSns) { window.__oakenSns.activate(); return; }
+    if (loading) return;
+    loading = import('/app/names-sns.js')
+      .then((m) => { window.__oakenSns = m; return m.boot(); })
+      .then(() => window.__oakenSns && window.__oakenSns.activate())
+      .catch((e) => {
+        loading = null;
+        const host = $('sns-result');
+        if (host) {
+          host.innerHTML = '<div class="panel"><div class="body"><b style="color:var(--bad)">The Solana module did not load.</b>'
+            + '<p class="muted" style="margin:10px 0 0">' + String((e && e.message) || e).replace(/[<>&]/g, '') + '</p></div></div>';
+        }
+      });
+  }
+  function apply(next, opts) {
+    const updateUrl = !opts || opts.updateUrl !== false;
+    ns = next === 'sns' ? 'sns' : 'hood';
+    const hood = $('ns-hood');
+    const sns = $('ns-sns');
+    if (hood) hood.hidden = ns !== 'hood';
+    if (sns) sns.hidden = ns !== 'sns';
+    document.querySelectorAll('[data-ns]').forEach((b) => {
+      const on = b.dataset.ns === ns;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    const ey = $('ph-eyebrow');
+    const h = $('ph-h1');
+    const lede = $('ph-lede');
+    if (ns === 'sns') {
+      if (ey) ey.textContent = 'Names · .sns on Solana';
+      if (h) h.textContent = 'A name for your Solana wallet.';
+      if (lede) lede.innerHTML = 'Register a <span class="mono">.sns</span> name — Solana\'s name service — and let wallets show it instead of a long address. One purchase, no renewal. Every read below comes from SNS on Solana.';
+    } else {
+      if (ey) ey.textContent = 'Names · .hood on Robinhood Chain';
+      if (h) h.textContent = 'A name for your wallet.';
+      if (lede) lede.innerHTML = 'Register a <span class="mono">.hood</span> name, point it at the address you actually use, and let people pay you without copying forty-two characters. Every read below comes from the chain.';
+    }
+    try { localStorage.setItem(KEY, ns); } catch (e) { /* private mode */ }
+    if (updateUrl) {
+      const u = new URL(location.href);
+      if (ns === 'sns') u.searchParams.set('ns', 'sns');
+      else u.searchParams.delete('ns');
+      history.replaceState(null, '', u);
+    }
+    if (ns === 'sns') loadSns();
+  }
+  document.querySelectorAll('[data-ns]').forEach((b) => b.addEventListener('click', () => apply(b.dataset.ns)));
+  apply(ns, { updateUrl: false });
+})();
 </script>
 </body>
 </html>

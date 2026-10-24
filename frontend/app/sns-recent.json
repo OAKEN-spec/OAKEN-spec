@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "generatedAt": "2026-10-24T16:03:48.071Z",
+  "source": {
+    "rpc": "https://solana-rpc.publicnode.com",
+    "program": "jCebN34bUfdeUYJT13J1yG16XWQpt5PDx6Mse9GUqhR",
+    "signatures": 18,
+    "scanned": 18,
+    "failed": 0
+  },
+  "names": [
+    {
+      "name": "minehub",
+      "buyer": "MiNEHUBfAJUH9HH7KmWzinkDvUPvfPDTMzyhos2tgg9",
+      "time": 1792836150,
+      "slot": 460809060,
+      "sig": "4zMncWK2dt4JaVa7ZD8iZPLKyqCGriThnfQSW7jsYCMqbsQQqFKmAozWzKKGJ29KkQfFJXQ2BH9jVvr5beyKYqTk"
+    },
+    {
+      "name": "launcha",
+      "buyer": "45J2afbwodWBf9Q2NL2CbGGREfwzdGhu8kXSeGvScBea",
+      "time": 1792812164,
+      "slot": 460696017,
+      "sig": "4BchvtyBwPP64FwgLNF44DbzFPDVUR8eKiVkpvnPJguZfYhmiPzDmS7QaY6h2ftHkAXEge8Don7qFcAit5RjJgN8"
+    },
+    {
+      "name": "godpack_io🌐packs_from_10cents",
+      "buyer": "GSkx5F9HambU5PhyaUW5oNHU7sEMBPN9HA2v8w1CTQTF",
+      "time": 1792804287,
+      "slot": 460658916,
+      "sig": "4iHnVVjzbEmwZMdrx7j4gaonKBcDuRhJ3KB6zoAQ8DN6KtBbABGCL1c8e3SrTixGw9p1gTvekRzGvwo9RtDzNRxV"
+    },
+    {
+      "name": "fairlaunchai",
+      "buyer": "45J2afbwodWBf9Q2NL2CbGGREfwzdGhu8kXSeGvScBea",
+      "time": 1792801341,
+      "slot": 460645060,
+      "sig": "66NpWRhMfozKnU92rTS29AucdPSM8Jn2BECh1p9nCo4o9mLRq4EhwhgJaCHke1e4mBtMZoEAGXvkjmQrvSioDKZZ"
+    },
+    {
+      "name": "hubzzsoljam",
+      "buyer": "3xwq4wdLagonMcZ5AkEZb5LUDanZRgA25K125DqMceDt",
+      "time": 1792795147,
+      "slot": 460615885,
+      "sig": "f4kRqtbhprSmVEP84JxaLqWNMm33dgtssiWAqfo2NTR8LAcxebkCz7L9d4fkWpWEhWCkRmNzN2khcNobGkk5VPq"
+    },
+    {
+      "name": "wxmr",
+      "buyer": "5weo7CqnkYmsBEBw6K5QkGXCDCBm55zvhMPjDGTZpcTd",
+      "time": 1792793801,
+      "slot": 460609550,
+      "sig": "3oqGhWMtJyat8Dd4vMpdysfsNL9PfbfZgDMrZbiaLVbgXYxuoN2aJBn5b8zaUn9FZt2gcS1BkG7FvcwkSGYyxM7h"
+    },
+    {
+      "name": "civilstatus",
+      "buyer": "ExYNKB4qYUDTKWpbfTxAenZ6z7shMG9uBDwUZ3bJcHqS",
+      "time": 1792782629,
+      "slot": 460556963,
+      "sig": "4nwDQ42E1556PjrC6j8vpg1THRZByMRVNxr4myM2CV4ujcrU4HkEHEL16HukhaLWWcZ1Y86EmuDcMZRAZ8UA4iaa"
+    },
+    {
+      "name": "dz213",
+      "buyer": "EhWKBsfRyaSCppyxKp4NzRo5qx31x36Xx1Z4kLktffxS",
+      "time": 1792781230,
+      "slot": 460550354,
+      "sig": "33ABdqGfV4cdxKVW48onhtrokMB47kKD5fj4cFHobXs6YtzwfsJcom3VCnhWAPqCXNFEtQdogCXgFDgyaa36KLYo"
+    },
+    {
+      "name": "openroad",
+      "buyer": "5LZKKHpg9BNmNKbCg49od4rDjgj5tC45WDSfif2A1eM6",
+      "time": 1792777750,
+      "slot": 460533951,
+      "sig": "4j4st8fQuFTxP3ALCCzP6oaJBGDmj8hKZa5rtkSjgdqfD7stHDm8uzrfhf5QCs2XchnWPPmbBu7stP4SU946yfUY"
+    },
+    {
+      "name": "countryroads",
+      "buyer": "5LZKKHpg9BNmNKbCg49od4rDjgj5tC45WDSfif2A1eM6",
+      "time": 1792777646,
+      "slot": 460533457,
+      "sig": "dsEAS71KifyTmAKnus4PzocDGw6HnawF5raagNvakvjriVoChnuzFAMEbun2dRx9qHZyEM6dVDaMNDvFGGzES8z"
+    },
+    {
+      "name": "lakesidecapital",
+      "buyer": "5LZKKHpg9BNmNKbCg49od4rDjgj5tC45WDSfif2A1eM6",
+      "time": 1792777487,
+      "slot": 460532712,
+      "sig": "4N8bMb7JsDhE1zUX9Qv14zncJPxporR28huY4akSbbvjYYk18GE5y7kpXeyMt91FdC25T9cUqHd8PUm3JoVeqVNA"
+    }
+  ]
+}

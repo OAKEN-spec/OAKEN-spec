@@ -17,5 +17,8 @@
     "@streamflow/stream": "^13.4.0",
     "bs58": "^6.0.0",
     "solana-bankrun": "^0.4.0"
+  },
+  "devDependencies": {
+    "@bonfida/spl-name-service": "^4.0.1"
   }
 }

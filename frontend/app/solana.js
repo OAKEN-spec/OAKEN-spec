@@ -11,6 +11,7 @@
 //
 // ⚠ 这里**没有模拟数据**：读不到就回 null / 抛错，页面显示 `—` 或错误行。
 import { makeSolana, OAKEN_PROGRAM_ID, JUP_LOCK_PROGRAM_ID, JUP_ESCROW_LEN } from './solana-build.js';
+import { makeSns, cleanLabel, NAME_TOKENIZER_ID } from './sns-build.js';
 const WEB3 = typeof window !== 'undefined' ? window.solanaWeb3 : null;
 export const SOL = {
   name: 'Solana',
@@ -291,6 +292,58 @@ export async function solPriceUsd() {
     } catch { /* 下一个 */ }
   }
   return null;
+}
+
+/* ── SNS 名字解析 ────────────────────────────────────────────────────────
+ *
+ * 页面上的受益人/接收地址可以直接填 `alice.sns`。顺序照 SNS：
+ * tokenized owner（NFT 持有人）→ SOL record → 注册表 owner。
+ * 只处理 `.sns` / `.sol` 后缀；普通地址返回 `null`，调用方保持原值。
+ */
+export function isSolanaAddress(v) {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(String(v || '').trim());
+}
+
+export async function resolveName(input) {
+  const raw = String(input || '').trim();
+  if (!/\.(sns|sol)$/i.test(raw)) return null;
+  const clean = cleanLabel(raw);
+  if (clean.error) throw new Error(clean.error);
+  const w = web3();
+  const Sn = makeSns(w);
+  const c = await ready();
+  const key = Sn.nameAccount(clean.label);
+  const info = await c.getAccountInfo(key);
+  if (!info) throw new Error('No ' + clean.label + '.sns name is registered.');
+  const reg = Sn.decodeRegistry(info.data);
+  let owner = reg.owner;
+  let tokenized = false;
+  if (owner === NAME_TOKENIZER_ID) {
+    tokenized = true;
+    const mint = Sn.domainMint(key);
+    const mintInfo = await c.getAccountInfo(mint).catch(() => null);
+    if (mintInfo) {
+      const largest = await c.getTokenLargestAccounts(mint).catch(() => null);
+      const acct = largest?.value?.[0]?.address;
+      if (acct) {
+        const ai = await c.getAccountInfo(new w.PublicKey(acct)).catch(() => null);
+        if (ai && ai.data.length >= 64) owner = new w.PublicKey(ai.data.subarray(32, 64)).toBase58();
+      }
+    }
+  }
+  let source = 'registry owner';
+  let address = owner;
+  try {
+    const recInfo = await c.getAccountInfo(Sn.recordAccount(clean.label, 'SOL'));
+    if (recInfo) {
+      const rec = Sn.decodeRecord(recInfo.data);
+      if (rec.content && rec.content.length === 32) {
+        address = new w.PublicKey(rec.content).toBase58();
+        source = 'SOL record';
+      }
+    }
+  } catch { /* no SOL record */ }
+  return { address, name: clean.label, source, owner, tokenized };
 }
 
 export async function programLive() {
