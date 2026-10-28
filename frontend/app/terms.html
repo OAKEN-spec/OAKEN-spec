@@ -76,7 +76,7 @@
           <p class="muted" style="font-size:14.5px">OAKEN is a set of public smart contracts and a website that
             reads them. No operator can move a lock, pause it or take a fee. The v4 vault has one deliberate
             power: a 2-of-3 multisig can replace the vault code after a public 48-hour delay. v1, v2 and v3 are
-            immutable. The Bonds contracts have a disclosed admin (a 2-of-3 Safe behind a 24h Timelock). The website is a
+            immutable. The Bonds contracts have a disclosed admin (a 2-of-3 Safe behind a 48h Timelock). The website is a
             reader and an interface; it is not the vault and is not required for a lock to release.</p>
         </div>
       </div>
@@ -136,7 +136,7 @@
             compromised quorum could upgrade to code you did not expect. The delay is visible on-chain and an
             upgrade can be cancelled before it executes. Locks in v1–v3 cannot be upgraded.</li>
           <li><b style="color:var(--parch)">Bonds risk.</b> aOAKEN is a separate product with an admin (2-of-3
-            Safe + 24h Timelock). Redemptions depend on vault reserves and can be limited by them. There is no
+            Safe + 48h Timelock). Redemptions depend on vault reserves and can be limited by them. There is no
             external yield promise, no aOAKEN market on this site, and OAKEN emissions are not a dollar yield.</li>
           <li><b style="color:var(--parch)">Off-chain metadata.</b> Token images for our own factory are stored
             off-chain. If that host is unavailable, the image may disappear while the token remains on chain.</li>

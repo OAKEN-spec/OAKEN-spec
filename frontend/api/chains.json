@@ -85,8 +85,7 @@
       },
       "rpc": [
         "https://polygon-bor-rpc.publicnode.com",
-        "https://polygon.gateway.tenderly.co",
-        "https://polygon-rpc.com"
+        "https://polygon.gateway.tenderly.co"
       ],
       "explorer": "https://polygonscan.com",
       "live": true,
@@ -109,7 +108,13 @@
         "decimals": 18
       },
       "rpc": [
-        "https://rpc.mainnet.chain.robinhood.com"
+        "https://rpc.mainnet.chain.robinhood.com",
+        "https://robinhood-rpc.publicnode.com",
+        "https://robinhood.drpc.org",
+        "https://api.blockvectra.com/v1/robinhood_mainnet/public",
+        "https://robinhood.daybreak-rpc.network",
+        "https://rpc.ordofi.network",
+        "https://robinhood-mainnet-rpc.blockreq.com/v1/rpc/public"
       ],
       "explorer": "https://robinhoodchain.blockscout.com",
       "live": true,

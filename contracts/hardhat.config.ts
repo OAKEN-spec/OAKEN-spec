@@ -58,6 +58,11 @@ const config: HardhatUserConfig = {
       chainId: 4663,
       accounts: process.env.DEPLOYER_KEY ? [process.env.DEPLOYER_KEY] : [],
     },
+    bsc: {
+      url: process.env.BSC_RPC_URL || 'https://bsc-dataseed.bnbchain.org',
+      chainId: 56,
+      accounts: process.env.DEPLOYER_KEY ? [process.env.DEPLOYER_KEY] : [],
+    },
   },
 }
 

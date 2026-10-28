@@ -2452,6 +2452,7 @@ export function shell({ active } = {}) {
         ${link('/locks', 'Locks', active === 'locks')}
         ${link('/tools', 'Tools', active === 'tools')}
         ${link('/bonds', 'Bonds <span class="pill" style="font-size:10px;padding:2px 6px;margin-left:4px;vertical-align:1px" title="Bonds has a 2-of-3 Safe admin — Locks do not">admin</span>', active === 'bonds')}
+        ${link('/agents', 'Agents', active === 'agents')}
         ${link('/activity', 'Activity', active === 'activity')}
         ${link('/leaderboard', 'Leaderboard', active === 'leaderboard')}
         ${link('/me', 'My OAKEN', active === 'me')}
@@ -4029,4 +4030,138 @@ export async function ownLocks({ limit = 60, chain = CHAIN } = {}) {
     const j = await r.json();
     return Array.isArray(j.docs) ? j.docs : [];
   } catch { return []; }
+}
+
+
+/* ── OAKEN Curve (v5) ─────────────────────────────────────────────────────
+ *
+ * The self-launch curve: fixed supply, no creator allocation, buys/sells on a
+ * bonding curve and a graduation into a locked DEX position. Factory addresses
+ * are filled after deployment; `window.OAKEN_CURVE` overrides them for local
+ * development (`{ 31337: { address, kind: 'pons' | 'flap' } }`).
+ *
+ * The pages treat an empty address as "not configured": no link, no form. That
+ * is deliberate — a button that cannot work is worse than no button.
+ */
+export const CURVE_FACTORIES = {
+  4663: { address: '0x8D59368a7C369bEf20458442027bE0D9aD6C4F5f', kind: 'pons' },
+  56: { address: '0x4983CA331Af98197527F5679721635F7e399f170', kind: 'flap' },
+};
+
+export function oakenCurveSite(chain) {
+  const id = chain && chain.id;
+  if (!id) return null;
+  const custom = (window.OAKEN_CURVE && window.OAKEN_CURVE[id]) || null;
+  const cfg = custom || CURVE_FACTORIES[id] || null;
+  if (!cfg || !cfg.address) return null;
+  return { address: cfg.address, kind: cfg.kind === 'flap' ? 'flap' : 'pons' };
+}
+
+const CURVE_CREATE_PONS = 'function createLaunch((string name,string symbol,address creatorFeeRecipient,uint16 creatorTaxBps,bytes32 salt,address[] snipeTaxExempt) p) payable returns (address token, address curve)';
+const CURVE_CREATE_FLAP = 'function createLaunch((string name,string symbol,address creatorFeeRecipient,uint16 creatorTaxBps,bytes32 salt,address[] snipeTaxExempt,bool tax,(uint16 buyTaxBps,uint16 sellTaxBps,uint64 taxDuration,uint16 marketingBps,uint16 deflationBps,uint16 dividendBps,uint16 liquidityBps,address marketingWallet,address dividendWallet,address liquidityWallet) taxParams) p) payable returns (address token, address curve)';
+const CURVE_EVENT_PONS = 'event LaunchCreated(address indexed token, address indexed curve, address indexed creator, string name, string symbol, address creatorFeeRecipient, uint256 creatorTaxBps)';
+const CURVE_EVENT_FLAP = 'event LaunchCreated(address indexed token, address indexed curve, address indexed creator, bool tax)';
+
+export function oakenCurveFactoryAbi(kind) {
+  return [
+    kind === 'flap' ? CURVE_CREATE_FLAP : CURVE_CREATE_PONS,
+    kind === 'flap' ? CURVE_EVENT_FLAP : CURVE_EVENT_PONS,
+    'function launchFee() view returns (uint256)',
+    'function launchFeeRecipient() view returns (address)',
+  ];
+}
+
+export function oakenCurveFactory(chain, signerOrProvider) {
+  const cfg = oakenCurveSite(chain);
+  if (!cfg || !window.ethers) return null;
+  return new window.ethers.Contract(cfg.address, oakenCurveFactoryAbi(cfg.kind), signerOrProvider || provider(chain));
+}
+
+/** Read the launch the factory just emitted; null if the receipt has no such event. */
+export function oakenCurveLaunchFromReceipt(factory, receipt) {
+  for (const log of (receipt && receipt.logs) || []) {
+    try {
+      const parsed = factory.interface.parseLog(log);
+      if (parsed && parsed.name === 'LaunchCreated') {
+        return {
+          token: parsed.args.token,
+          curve: parsed.args.curve,
+          creator: parsed.args.creator,
+          tax: parsed.args.tax === true,
+        };
+      }
+    } catch { /* not ours */ }
+  }
+  return null;
+}
+
+export const CURVE_ABI = [
+  'function token() view returns (address)',
+  'function creator() view returns (address)',
+  'function creatorFeeRecipient() view returns (address)',
+  'function feeBps() view returns (uint256)',
+  'function creatorTaxBps() view returns (uint256)',
+  'function protocolShareBps() view returns (uint256)',
+  'function snipeTaxStartBps() view returns (uint256)',
+  'function snipeTaxSeconds() view returns (uint256)',
+  'function snipeTaxExempt(address) view returns (bool)',
+  'function currentSnipeTaxBps(address) view returns (uint256)',
+  'function virtualTokens() view returns (uint256)',
+  'function phantomQuote() view returns (uint256)',
+  'function graduationThreshold() view returns (uint256)',
+  'function launchSupply() view returns (uint256)',
+  'function reservedTokens() view returns (uint256)',
+  'function trackedQuote() view returns (uint256)',
+  'function trackedTokens() view returns (uint256)',
+  'function launchedAt() view returns (uint256)',
+  'function graduated() view returns (bool)',
+  'function readyToGraduate() view returns (bool)',
+  'function getReserves() view returns (uint256 quoteReserve, uint256 tokenReserve)',
+  'function sellableTokens() view returns (uint256)',
+  'function pendingCreatorFees() view returns (uint256)',
+  'function protocolFeeBalance() view returns (uint256)',
+  'function creatorFeeBalance() view returns (uint256)',
+  'function creatorTaxBalance() view returns (uint256)',
+  'function snipeTaxBalance() view returns (uint256)',
+  'function buy(uint256 minTokensOut, address recipient) payable returns (uint256)',
+  'function sell(uint256 tokensIn, uint256 minQuoteOut, address recipient) returns (uint256)',
+  'function graduate()',
+  'function sweepCreatorFees()',
+  'function sweepProtocolFees()',
+  'event Bought(address indexed payer, address indexed recipient, uint256 quoteIn, uint256 tokensOut, uint256 fee, uint256 creatorTax, uint256 snipeTax)',
+  'event Sold(address indexed seller, address indexed recipient, uint256 tokensIn, uint256 quoteOut, uint256 fee, uint256 creatorTax)',
+  'event Graduated(address indexed token, uint256 tokensToPool, uint256 quoteToPool)',
+];
+
+export function oakenCurveAt(chain, address, signerOrProvider) {
+  if (!window.ethers || !address) return null;
+  return new window.ethers.Contract(address, CURVE_ABI, signerOrProvider || provider(chain));
+}
+
+export const ERC20_VIEW_ABI = [
+  'function name() view returns (string)',
+  'function symbol() view returns (string)',
+  'function decimals() view returns (uint8)',
+  'function totalSupply() view returns (uint256)',
+  'function balanceOf(address) view returns (uint256)',
+  'function allowance(address,address) view returns (uint256)',
+  'function approve(address,uint256) returns (bool)',
+];
+
+export function oakenTokenAt(chain, address, signerOrProvider) {
+  if (!window.ethers || !address) return null;
+  return new window.ethers.Contract(address, ERC20_VIEW_ABI, signerOrProvider || provider(chain));
+}
+
+export const TAX_TOKEN_ABI = [
+  'function tax() view returns (uint16 buyTaxBps, uint16 sellTaxBps, uint64 taxDuration, uint16 marketingBps, uint16 deflationBps, uint16 dividendBps, uint16 liquidityBps, address marketingWallet, address dividendWallet, address liquidityWallet, address commissionReceiver)',
+  'function taxStart() view returns (uint64)',
+  'function taxActive() view returns (bool)',
+  'function isPool(address) view returns (bool)',
+  'function exempt(address) view returns (bool)',
+];
+
+export function oakenTaxTokenAt(chain, address, signerOrProvider) {
+  if (!window.ethers || !address) return null;
+  return new window.ethers.Contract(address, TAX_TOKEN_ABI, signerOrProvider || provider(chain));
 }

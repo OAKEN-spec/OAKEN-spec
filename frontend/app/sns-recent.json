@@ -1,14 +1,21 @@
 {
   "schema": 1,
-  "generatedAt": "2026-10-24T16:03:48.071Z",
+  "generatedAt": "2026-10-24T18:04:04.692Z",
   "source": {
     "rpc": "https://solana-rpc.publicnode.com",
     "program": "jCebN34bUfdeUYJT13J1yG16XWQpt5PDx6Mse9GUqhR",
-    "signatures": 18,
-    "scanned": 18,
+    "signatures": 15,
+    "scanned": 15,
     "failed": 0
   },
   "names": [
+    {
+      "name": "oaken-sns",
+      "buyer": "6GQkYV92h1YCZSkH5PYqSWMYjGPPYyN7472tQsgNSsfs",
+      "time": 1792864809,
+      "slot": 460944108,
+      "sig": "CCqHZs1B3wnpX4hoa78VASkhHohW6zb5xCtgopAmdcJ1AASBrRw3RshpHuVQVYRkKFnKRSRpKaDrMMKgBvh4BC9"
+    },
     {
       "name": "minehub",
       "buyer": "MiNEHUBfAJUH9HH7KmWzinkDvUPvfPDTMzyhos2tgg9",

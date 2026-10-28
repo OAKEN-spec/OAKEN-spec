@@ -63,6 +63,8 @@
       of it without going through us. <b>Verification is not an audit</b> — we claim no audit, and a matching
       bytecode does not mean the code is free of every failure mode.</p>
 
+    <p class="hint reveal" style="max-width:72ch;margin-top:10px">Want a guided read first? <a href="/agents">Run an agent report →</a> It still shows the block, the addresses and the checks it made.</p>
+
     <div class="note reveal" style="margin-top:22px;border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;color:var(--muted);font-size:13.5px;line-height:1.65">
       <b style="color:var(--parch)">Security &amp; audit status.</b> No third-party audit has been completed; no bug
       bounty is live. The <a href="/security#coverage">test coverage</a> (99.8% lines on the product contracts) and
@@ -108,6 +110,39 @@
           v1, v2 and v3 are immutable. The safeguards and the upgrade model are described in
           <a href="https://github.com/OAKEN-spec/OAKEN-spec/blob/master/contracts/SELF-REVIEW.md" target="_blank" rel="noopener">the self-review</a>.
           Old record URLs stay on v1; newer ones carry <span class="mono">?vault=v2</span>, <span class="mono">?vault=v3</span> or <span class="mono">?vault=v4</span>.</div>
+      </div>
+    </div>
+
+    <div class="panel reveal" style="margin-top:26px">
+      <div class="head"><h3>OAKEN Curve · v5 (2026-10-25)</h3></div>
+      <div class="body">
+        <p class="muted" style="font-size:14px;margin-top:0">The self-launch curve. These are <b>separate
+          deployments per chain</b> — unlike the lock contracts above, they do not share one address. <b>New and not
+          audited.</b> All of them are Sourcify exact matches, so the bytecode at each address can be checked
+          against the source; the known limitations are written down in the repository's
+          <span class="mono">contracts/CURVE-SCOPE.md</span>.</p>
+        <div class="tablewrap">
+        <table class="list">
+          <thead><tr><th>Chain</th><th>Contract</th><th>Address</th></tr></thead>
+          <tbody id="curve-addr-table">
+            <tr><td>Robinhood Chain (4663)</td><td><b>Curve factory</b> · Pons model</td><td class="mono addr">0x8D59368a7C369bEf20458442027bE0D9aD6C4F5f</td></tr>
+            <tr><td>Robinhood Chain (4663)</td><td>V4 graduator · hook 0x2800</td><td class="mono addr">0x62E707d5cfe2cD9f029af2A93B2ADfB66976e800</td></tr>
+            <tr><td>Robinhood Chain (4663)</td><td>CREATE2 deployer used for the graduator</td><td class="mono addr">0xd1617035248f459E05379cDDc993313c96e5E7bf</td></tr>
+            <tr><td>BNB Chain (56)</td><td><b>Curve factory</b> · Flap model</td><td class="mono addr">0x4983CA331Af98197527F5679721635F7e399f170</td></tr>
+            <tr><td>BNB Chain (56)</td><td>Token deployer (standard + tax)</td><td class="mono addr">0x7d2947174067739168F26FeA994aBB5aB2A2698e</td></tr>
+            <tr><td>BNB Chain (56)</td><td>Pancake V2 graduator · tax tokens</td><td class="mono addr">0x7A9eb5427ef8284e37EC13B46b007FEb0ba5125A</td></tr>
+            <tr><td>BNB Chain (56)</td><td>Pancake V3 graduator · standard tokens</td><td class="mono addr">0x5c43895F3a2b40a69Bbaa2DFD85B2e7FA723805B</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="hint" style="margin-top:14px">Each launch deploys its own token and curve; the factory,
+          graduator and token deployer above are the fixed trust surface. Sourcify:
+          <a href="https://sourcify.dev/#/lookup/0x8D59368a7C369bEf20458442027bE0D9aD6C4F5f" target="_blank" rel="noopener">4663 factory</a> ·
+          <a href="https://sourcify.dev/#/lookup/0x62E707d5cfe2cD9f029af2A93B2ADfB66976e800" target="_blank" rel="noopener">4663 graduator</a> ·
+          <a href="https://sourcify.dev/#/lookup/0x4983CA331Af98197527F5679721635F7e399f170" target="_blank" rel="noopener">56 factory</a> ·
+          <a href="https://sourcify.dev/#/lookup/0x7A9eb5427ef8284e37EC13B46b007FEb0ba5125A" target="_blank" rel="noopener">56 V2 graduator</a> ·
+          <a href="https://sourcify.dev/#/lookup/0x5c43895F3a2b40a69Bbaa2DFD85B2e7FA723805B" target="_blank" rel="noopener">56 V3 graduator</a>.
+          The factory's launch fee is 0; the curve fee is 1% (protocol share 0 on 4663, 600 bps of the fee on 56).</div>
       </div>
     </div>
 
@@ -280,7 +315,7 @@
         </div></div>
         <div class="panel"><div class="head"><h3>Bonds (aOAKEN)</h3></div><div class="body">
           <ul style="list-style:none;display:grid;gap:12px;color:var(--muted);font-size:14.5px">
-            <li><b style="color:var(--parch)">Admin = 2-of-3 Safe + 24h Timelock.</b> Parameters can change; that is a governance surface, disclosed on every Bonds page.</li>
+            <li><b style="color:var(--parch)">Admin = 2-of-3 Safe + 48h Timelock.</b> Parameters can change; that is a governance surface, disclosed on every Bonds page.</li>
             <li><b style="color:var(--parch)">Reserves are not the admin's to move.</b> Mint/redeem are paid from USDG reserves; redemption can be limited by them.</li>
             <li><b style="color:var(--parch)">No external yield.</b> OAKEN emissions are emissions, not a market yield; there is no aOAKEN market here.</li>
           </ul>
@@ -306,7 +341,7 @@
 <script type="module">
   import { shell, reveal, copyBtn } from '/app/oaken.js';
   shell();
-  for (const td of document.querySelectorAll('#addr-table td.addr')) {
+  for (const td of document.querySelectorAll('#addr-table td.addr, #curve-addr-table td.addr')) {
     const text = td.textContent.trim();
     td.insertAdjacentHTML('beforeend', ' ' + copyBtn(text, 'copy')
       + ' <a href="https://sourcify.dev/#/lookup/' + text + '" target="_blank" rel="noopener"'

@@ -103,7 +103,8 @@
     <div class="eyebrow reveal">Solana · launch</div>
     <h1 class="reveal">Two doors onto Solana.</h1>
     <p class="lede reveal">OAKEN Factory writes a fixed-supply SPL token with no mint authority and no owner.
-      pump.fun puts it on its bonding curve. Your wallet signs both; OAKEN takes no fee.</p>
+      pump.fun puts it on its bonding curve. Your wallet signs both; OAKEN takes no fee. A third door — OAKEN Curve —
+      is built and tested but not on mainnet yet; its status is listed below rather than hidden.</p>
   </div>
 </section>
 
@@ -151,6 +152,15 @@
               </div>
               <button type="button" class="btn btn-s" data-pick="pump">Use this</button>
             </div>
+            <div class="route" data-route="curve">
+              <div>
+                <b>OAKEN Curve <span class="chip warn" id="curvebadge">Not deployed</span></b>
+                <span class="sub">A 1B-supply bonding curve on OAKEN's own Solana program. Buys and sells go through the
+                  program; graduation puts the remaining tokens and the raise into a permissionless PumpSwap pool whose
+                  LP cannot be moved. The program is built and tested, but it is not on mainnet yet.</span>
+              </div>
+              <button type="button" class="btn btn-s" data-pick="curve">Use this</button>
+            </div>
           </div>
           <div class="hint" id="routehint">OAKEN Factory creates the token directly; pump.fun is a third-party launch service.</div>
         </div>
@@ -192,6 +202,21 @@
             <div class="hint">pump.fun: spend this much SOL on the new curve in the <b>same transaction</b> that
               creates the coin. Required — enter an amount above 0. This is pump.fun's bonding curve, not a market
               OAKEN runs.</div>
+          </div>
+
+          <div id="curvebuyrow" style="display:none">
+            <div class="row2">
+              <div>
+                <label class="f" for="cfee">Creator fee (bps)</label>
+                <input class="i" id="cfee" value="5" inputmode="numeric" autocomplete="off">
+                <div class="hint">0–300 bps of each buy and sell goes to the creator. The protocol's 95 bps is separate.</div>
+              </div>
+              <div>
+                <label class="f" for="cbuy">First buy (SOL, optional)</label>
+                <input class="i" id="cbuy" placeholder="e.g. 0.05" inputmode="decimal" autocomplete="off">
+                <div class="hint">Spend this much SOL on your own curve in the same transaction. Leave it empty to launch with no buy.</div>
+              </div>
+            </div>
           </div>
 
           <div>
@@ -295,7 +320,7 @@
   const $ = (id) => document.getElementById(id);
   const state = {
     route: 'own', addr: null, file: null, fileUrl: '', busy: false, solUsd: null,
-    lastLaunch: null, programLive: false,
+    lastLaunch: null, programLive: false, curveLive: false,
   };
 
   function esc(s) {
@@ -371,8 +396,11 @@
       $('costline').innerHTML = state.route === 'own'
         ? `OAKEN Factory: about <b>${own.toFixed(4)} SOL${usd(own)}</b> for mint + token account + metadata rent and network fees.
            The exact amount is shown by your wallet before signing.`
-        : `pump.fun: the wallet shows the exact rent and network fee before signing; pump.fun's own creation rules apply.
-           OAKEN adds nothing.`;
+        : state.route === 'curve'
+          ? `OAKEN Curve: about <b>${own.toFixed(4)} SOL${usd(own)}</b> for the mint, the curve account, the token vault and
+             metadata rent, plus fees — and the first buy if you enter one. The exact amount is shown by your wallet before signing.`
+          : `pump.fun: the wallet shows the exact rent and network fee before signing; pump.fun's own creation rules apply.
+             OAKEN adds nothing.`;
       if (lam !== null) {
         const have = SOL.lamportsToSol(lam);
         $('balanceLine').textContent = `Wallet balance: ${have.toFixed(4)} SOL${usd(have)}.`;
@@ -393,6 +421,8 @@
       twitter: $('x').value.trim(),
       telegram: $('tg').value.trim(),
       buySol: $('p0buy').value.trim(),
+      curveFee: $('cfee').value.trim(),
+      curveBuySol: $('cbuy').value.trim(),
     };
   }
 
@@ -407,12 +437,23 @@
     if (state.route === 'own') {
       const n = Number(f.supply);
       if (!(n > 0) || !Number.isFinite(n)) out.push('Supply must be a positive number.');
-    } else if (!f.buySol) {
-      out.push('Enter the developer buy amount — it is required on pump.fun.');
+    } else if (state.route === 'pump') {
+      if (!f.buySol) {
+        out.push('Enter the developer buy amount — it is required on pump.fun.');
+      } else {
+        try {
+          if (SOL.solToLamports(f.buySol) <= 0n) out.push('The developer buy must be above 0 SOL.');
+        } catch (e) { out.push('Buy amount: ' + String(e.message || e)); }
+      }
     } else {
-      try {
-        if (SOL.solToLamports(f.buySol) <= 0n) out.push('The developer buy must be above 0 SOL.');
-      } catch (e) { out.push('Buy amount: ' + String(e.message || e)); }
+      if (!state.curveLive) out.push('OAKEN Curve is built but not deployed on mainnet yet; nothing can be launched on it.');
+      const fee = Number(f.curveFee);
+      if (!Number.isInteger(fee) || fee < 0 || fee > 300) out.push('Creator fee must be 0–300 bps.');
+      if (f.curveBuySol) {
+        try {
+          if (SOL.solToLamports(f.curveBuySol) < 0n) out.push('The first buy cannot be negative.');
+        } catch (e) { out.push('First buy: ' + String(e.message || e)); }
+      }
     }
     if (f.imageUrl && !/^https?:\/\//i.test(f.imageUrl)) out.push('The image URL must start with https:// or http://.');
     for (const [v, label] of [[f.website, 'Website'], [f.twitter, 'X'], [f.telegram, 'Telegram']]) {
@@ -426,6 +467,7 @@
     const risks = {
       own: '<b>OAKEN Factory is not a market.</b> It only creates the token. There is no developer buy here — a token with no liquidity cannot be bought or sold. You will need a pool or a launchpad for that. The metadata image is stored off-chain.',
       pump: '<b>pump.fun runs this one.</b> Its program, bonding curve, graduation and fee rules apply. pump.fun can change its program and fees; OAKEN cannot see or move the token after creation.',
+      curve: '<b>OAKEN Curve is not deployed yet.</b> The program is built and tested, but no launch can be sent until it is on mainnet. When it is, buys and sells go through the curve; graduation puts the remaining tokens and the raise into a PumpSwap pool whose LP cannot be moved.',
     };
     $('routeRisk').innerHTML = risks[state.route];
     for (const r of $('routes').querySelectorAll('.route')) {
@@ -436,36 +478,52 @@
     }
     $('ownsrow').style.display = state.route === 'own' ? '' : 'none';
     $('pumpbuyrow').style.display = state.route === 'pump' ? '' : 'none';
+    $('curvebuyrow').style.display = state.route === 'curve' ? '' : 'none';
     $('routehint').textContent = state.route === 'own'
       ? 'OAKEN Factory creates the token directly; pump.fun is a third-party launch service.'
-      : 'pump.fun creates and runs the market; OAKEN only encodes the create transaction.';
+      : state.route === 'pump'
+        ? 'pump.fun creates and runs the market; OAKEN only encodes the create transaction.'
+        : 'OAKEN Curve is our own Solana program. It is built and tested, but not deployed on mainnet yet.';
 
     const n = f.name || '—';
     const s = f.symbol || '—';
     $('preview').style.display = (state.fileUrl || f.imageUrl) ? '' : 'none';
     $('previewimg').src = state.fileUrl || f.imageUrl || '';
     $('previewname').textContent = n;
-    $('previewsym').textContent = s + (state.route === 'own' ? ` · ${f.supply || '—'} supply · ${f.decimals} decimals` : ' · pump.fun');
+    $('previewsym').textContent = s + (state.route === 'own'
+      ? ` · ${f.supply || '—'} supply · ${f.decimals} decimals`
+      : state.route === 'pump' ? ' · pump.fun' : ' · OAKEN Curve');
 
     $('sumtext').innerHTML = f.name && f.symbol
-      ? `Launch <b>${esc(f.name)} (${esc(s)})</b> on Solana through <b>${state.route === 'own' ? 'OAKEN Factory' : 'pump.fun'}</b>.`
+      ? `Launch <b>${esc(f.name)} (${esc(s)})</b> on Solana through <b>${state.route === 'own' ? 'OAKEN Factory' : state.route === 'pump' ? 'pump.fun' : 'OAKEN Curve'}</b>.`
       : 'Connect a wallet and fill the form — the summary appears here.';
     const kv = [];
     kv.push(['Network', 'Solana mainnet-beta']);
-    kv.push(['Route', state.route === 'own' ? 'OAKEN Factory' : 'pump.fun']);
+    kv.push(['Route', state.route === 'own' ? 'OAKEN Factory' : state.route === 'pump' ? 'pump.fun' : 'OAKEN Curve']);
     if (state.route === 'own') {
       kv.push(['Supply', f.supply ? Number(f.supply).toLocaleString('en-US') : '—']);
       kv.push(['Mint authority', 'revoked after metadata']);
-    } else {
+    } else if (state.route === 'pump') {
       kv.push(['Developer buy', f.buySol ? f.buySol + ' SOL' : 'Required']);
+    } else {
+      kv.push(['Supply', '1,000,000,000']);
+      kv.push(['Creator fee', f.curveFee ? f.curveFee + ' bps' : '—']);
+      kv.push(['First buy', f.curveBuySol ? f.curveBuySol + ' SOL' : 'none']);
+      kv.push(['Graduation', 'PumpSwap pool, LP locked']);
     }
     kv.push(['OAKEN fee', '0']);
     kv.push(['Wallet', state.addr ? short(state.addr) : 'not connected']);
     $('sumkv').innerHTML = kv.map(([k, v]) => `<div><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join('');
 
     const errs = validate();
-    $('go').textContent = !state.addr ? 'Connect a Solana wallet' : (state.busy ? 'Working…' : (state.route === 'own' ? 'Launch on Solana' : 'Launch on pump.fun'));
-    $('go').disabled = state.busy || (state.addr && errs.length > 0);
+    $('go').textContent = state.route === 'curve' && !state.curveLive
+      ? 'Not deployed yet'
+      : !state.addr ? 'Connect a Solana wallet'
+        : state.busy ? 'Working…'
+          : state.route === 'own' ? 'Launch on Solana'
+            : state.route === 'pump' ? 'Launch on pump.fun'
+              : 'Launch on OAKEN Curve';
+    $('go').disabled = state.busy || (state.route === 'curve' && !state.curveLive) || (state.addr && errs.length > 0);
   }
 
   /* wallet events */
@@ -497,7 +555,7 @@
     state.fileUrl = f ? URL.createObjectURL(f) : '';
     update();
   };
-  for (const id of ['name', 'symbol', 'supply', 'decimals', 'p0buy', 'desc', 'imgurl', 'web', 'x', 'tg']) {
+  for (const id of ['name', 'symbol', 'supply', 'decimals', 'p0buy', 'cfee', 'cbuy', 'desc', 'imgurl', 'web', 'x', 'tg']) {
     $(id).addEventListener('input', update);
     $(id).addEventListener('change', update);
   }
@@ -558,7 +616,15 @@
       const buyLamports = state.route === 'pump' && f.buySol ? SOL.solToLamports(f.buySol) : 0n;
       const res = state.route === 'own'
         ? await SOL.launchOwn({ ...f, imageFile: state.file, onStep })
-        : await SOL.launchPump({ ...f, imageFile: state.file, buyLamports, onStep });
+        : state.route === 'pump'
+          ? await SOL.launchPump({ ...f, imageFile: state.file, buyLamports, onStep })
+          : await SOL.launchCurve({
+            ...f,
+            imageFile: state.file,
+            creatorFeeBps: Number(f.curveFee || 0),
+            buyLamports: f.curveBuySol ? SOL.solToLamports(f.curveBuySol) : 0n,
+            onStep,
+          });
       state.lastLaunch = res;
       try { setStep('upload', 'done', 'Image and metadata uploaded'); } catch { /* noop */ }
       if (res.metadataError) {
@@ -568,7 +634,7 @@
       try {
         publishLaunch({
           chainId: 0, token: res.mint, name: res.name, symbol: res.symbol,
-          route: res.route === 'own' ? 'OAKEN Solana factory' : 'pump.fun',
+          route: res.route === 'own' ? 'OAKEN Solana factory' : res.route === 'pump' ? 'pump.fun' : 'OAKEN Curve (Solana)',
           creator: SOL.address(), txHash: res.signature,
         });
       } catch { /* 全站发射记录失败不影响发射本身 */ }
@@ -592,18 +658,22 @@
 
   function showDone(res) {
     const isOwn = res.route === 'own';
+    const isCurve = res.route === 'curve';
     /* The mint and the revoke are two transactions. If the second one did not
        land, the creator still holds mint authority — do not print "revoked". */
     const revoked = isOwn && !!res.metadataSignature;
     const links = [
       `<a class="btn btn-s" href="${SOL.SOLSCAN_TOKEN(res.mint)}" target="_blank" rel="noopener">View on Solscan ↗</a>`,
-      isOwn ? '' : `<a class="btn btn-s" href="https://pump.fun/coin/${res.mint}" target="_blank" rel="noopener">Open on pump.fun ↗</a>`,
+      isCurve ? `<a class="btn btn-p" href="/curve/solana/${esc(res.curve || '')}">Open the curve →</a>` : '',
+      res.route === 'pump' ? `<a class="btn btn-s" href="https://pump.fun/coin/${res.mint}" target="_blank" rel="noopener">Open on pump.fun ↗</a>` : '',
       `<a class="btn btn-s" href="/launch/solana">Launch another</a>`,
     ].filter(Boolean).join('');
     $('donebody').innerHTML = `
       <div><b>${esc(res.name || '')}</b> <span class="muted">(${esc(res.symbol || '')})</span> is on Solana.</div>
       <div class="mono">mint ${esc(res.mint)} <button class="copybtn" type="button" data-copy="${esc(res.mint)}">copy</button></div>
-      ${isOwn ? `<div class="hint">Supply ${Number(res.supply || 0).toLocaleString('en-US')} base units · ${res.decimals} decimals · ${revoked ? 'mint authority revoked' : '<b style="color:var(--bad)">mint authority NOT revoked</b>'}</div>` : '<div class="hint">pump.fun owns the market from here.</div>'}
+      ${isOwn ? `<div class="hint">Supply ${Number(res.supply || 0).toLocaleString('en-US')} base units · ${res.decimals} decimals · ${revoked ? 'mint authority revoked' : '<b style="color:var(--bad)">mint authority NOT revoked</b>'}</div>` : ''}
+      ${isCurve ? '<div class="hint">1,000,000,000 supply · mint authority revoked after the metadata · the curve is the market from here. Graduation puts the rest into a PumpSwap pool whose LP cannot be moved.</div>' : ''}
+      ${res.route === 'pump' ? '<div class="hint">pump.fun owns the market from here.</div>' : ''}
       ${res.metadataError ? `<div class="warnline">The token exists, but the metadata/revoke transaction did not land: ${esc(res.metadataError)}. The creator still holds <b>mint authority</b> — the supply is not fixed until that step succeeds.</div>` : ''}
       <div class="btnrow">${links}</div>
       <div class="hint">Locking is a separate page — nothing was locked in this launch. The lock page names the program it will use before you sign.</div>
@@ -616,7 +686,14 @@
     try {
       state.solUsd = await SOL.solPriceUsd();
       await SOL.ready();
-      [state.programLive, state.jupLive] = await Promise.all([SOL.programLive(), SOL.jupLive()]);
+      [state.programLive, state.jupLive, state.curveLive] = await Promise.all([
+        SOL.programLive(), SOL.jupLive(), SOL.solanaCurveLive().catch(() => false),
+      ]);
+      const badge = $('curvebadge');
+      if (badge) {
+        badge.textContent = state.curveLive ? 'Live' : 'Not deployed';
+        badge.className = state.curveLive ? 'pill ok' : 'chip warn';
+      }
       const restored = await SOL.restore();
       state.addr = restored || SOL.address();
       paintWallet();

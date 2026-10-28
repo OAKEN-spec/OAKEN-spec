@@ -1,5 +1,5 @@
 [workspace]
-members = ["program"]
+members = ["program", "curve-program"]
 resolver = "2"
 
 # 部署费按字节付租金。这组 release 档实测反而把 .so 从 48.6 KB 撑到 55.6 KB

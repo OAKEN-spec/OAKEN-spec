@@ -4,7 +4,8 @@
 **Security:** [SECURITY.md](SECURITY.md)
 
 Open-source source code for OAKEN: EVM lock and launch contracts, their tests,
-the static frontend source, and the Solana program source.
+the static frontend source, the Solana lock and curve program sources, and the
+Agent Reports service.
 
 **Security status:** no third-party audit has been completed; no bug bounty is
 live. See [SECURITY.md](SECURITY.md) and
@@ -18,6 +19,9 @@ frontend/app/         Static frontend source (HTML/CSS/JS, media, bonds module)
 frontend/serve-local.mjs  Minimal static server for the exported pages (no indexer)
 frontend/brand/       OAKEN brand assets used by the pages
 solana/               Solana lock program source (deployed on mainnet; keypair not included)
+solana/curve-program/ Solana curve program (built + tested; not deployed on mainnet)
+agent/                Agent Reports service (Worker + local Node service, x402, guarded narrative)
+src/                  Chain registry + RPC fallback list used by the agent service
 docs/                 Frontend/local-development notes
 THIRD-PARTY-NOTICES.md  Licenses of the bundled libraries and fonts
 ```
@@ -82,6 +86,31 @@ encoders. It is **deployed on Solana mainnet with its upgrade authority revoked*
 the on-chain ELF matches the local build (SHA-256 `8de3b7cb…`). GitHub Actions
 builds it with `cargo build-sbf` and runs a five-instruction E2E on a local
 validator (25 checks). Jupiter Lock remains a third-party, upgradeable option.
+
+`solana/curve-program/` is the OAKEN Curve: a fixed 1B supply, a bonding curve,
+and two graduation paths (a vault, or a permissionless PumpSwap pool whose LP
+sits in a data-less authority and cannot be moved). It is **built and tested but
+not deployed on mainnet**: 26 host tests, two in-process integration tests (one
+loads the real PumpSwap ELF, one loads the real Metaplex Token Metadata ELF and
+pins `CreateWithMetadata`), and the SBF artifact is 106,184 bytes, SHA-256
+`cc9ab3c8…`. The deployable artifact is built SBPF v3; the integration tests run
+SBPF v2 because the Solana 2.3 test runtime only supports up to v2. Third-party
+ELF fixtures are not redistributed; `solana/curve-program/README.md` lists the
+fetch commands, and the tests skip when they are absent.
+
+## Agent Reports
+
+`agent/` is the report service behind `https://oaken.one/agents`: a deterministic
+report builder (token + locks, pre-launch review, curve launch, bond health),
+a Worker with a SQLite-backed Durable Object index, and an x402/USDG paid path.
+The model layer is optional and guarded: it may only rephrase numbers that are
+already in the report's fact sheet; an answer with a new number, advice, or a
+claim that contradicts a flag is discarded. No API key is needed to build a
+report; the Worker uses a Workers AI binding for the narrative. Wallet keys,
+the site key, stored reports and deployment secrets are **not** in this repo.
+
+Run the local service with `cd agent && npm install && node server.mjs` (the
+export resolves `ethers` from npm; the production tree uses the vendored copy).
 
 ## License
 

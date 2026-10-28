@@ -480,6 +480,7 @@
             ${claimedNote(l)}
             <span class="pill" title="Last read from the chain">read ${readAt.toISOString().slice(11, 19)} UTC</span>
             <a class="btn btn-s" href="/verify" target="_blank" rel="noopener">Anyone can verify ↗</a>
+            <a class="btn btn-s" href="/agents?token=${l.token}" title="read the token, its locks and its Pons state with the agent">Agent report</a>
             <button class="btn btn-s" id="reread" type="button">Re-read</button>
           </div>
         </div>

@@ -10,7 +10,10 @@
 //      程序读不到时页面退回 Jupiter Lock，并如实说哪条路在用。
 //
 // ⚠ 这里**没有模拟数据**：读不到就回 null / 抛错，页面显示 `—` 或错误行。
-import { makeSolana, OAKEN_PROGRAM_ID, JUP_LOCK_PROGRAM_ID, JUP_ESCROW_LEN } from './solana-build.js';
+import { makeSolana, OAKEN_PROGRAM_ID, JUP_LOCK_PROGRAM_ID, JUP_ESCROW_LEN,
+  CURVE_SELLABLE, CURVE_RESERVED, CURVE_TOTAL_SUPPLY, CURVE_GRADUATION_LAMPORTS,
+  CURVE_PROTOCOL_FEE_RECIPIENT, CURVE_MAX_CREATOR_FEE_BPS, CURVE_TOKEN_DECIMALS,
+} from './solana-build.js';
 import { makeSns, cleanLabel, NAME_TOKENIZER_ID } from './sns-build.js';
 const WEB3 = typeof window !== 'undefined' ? window.solanaWeb3 : null;
 export const SOL = {
@@ -679,6 +682,230 @@ export async function launchPump({
     family: 'solana', route: 'pump', mint: mintKp.publicKey.toBase58(), name: nm, symbol: sy,
     uri, signature: sig, buyLamports: buyLamports.toString(),
   };
+}
+
+/* ── OAKEN Curve（Solana）──────────────────────────────────────────────── */
+
+function curveHuman(raw, decimals = CURVE_TOKEN_DECIMALS, maxFrac = 2) {
+  const n = Number(raw) / 10 ** Number(decimals);
+  if (!Number.isFinite(n)) return '—';
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return n.toLocaleString('en-US', { maximumFractionDigits: maxFrac });
+  return n.toLocaleString('en-US', { maximumFractionDigits: Math.max(maxFrac, 4) });
+}
+
+/** The program is built and tested but not deployed; the page must say so. */
+export async function solanaCurveLive() {
+  try {
+    const c = await ready();
+    return await api().curveProgramLive(c);
+  } catch { return false; }
+}
+
+export async function curveInfo(curveAddress) {
+  const w = web3();
+  const A = api();
+  const c = await ready();
+  const deployed = await A.curveProgramLive(c);
+  if (!deployed) return { deployed: false, address: String(curveAddress || '') };
+  const state = await A.readCurve(c, curveAddress);
+  if (!state) throw new Error('No account at that address on Solana.');
+  const mintKey = new w.PublicKey(state.mint);
+  const [mintInfo, meta] = await Promise.all([
+    A.readMint(c, mintKey).catch(() => null),
+    A.readMetadata(c, mintKey).catch(() => null),
+  ]);
+  const decimals = mintInfo?.decimals ?? CURVE_TOKEN_DECIMALS;
+  const sold = state.realToken <= CURVE_SELLABLE ? CURVE_SELLABLE - state.realToken : 0n;
+  const soldPct = CURVE_SELLABLE > 0n ? Number((sold * 1_000_000n) / CURVE_SELLABLE) / 10_000 : 0;
+  let balance = null;
+  if (_address) {
+    try {
+      const r = await c.getTokenAccountBalance(A.ata(new w.PublicKey(_address), mintKey)[0]);
+      balance = BigInt(r.value.amount);
+    } catch { balance = null; }
+  }
+  const supply = mintInfo?.supply ?? CURVE_TOTAL_SUPPLY;
+  return {
+    deployed: true,
+    ...state,
+    mintInfo,
+    meta,
+    decimals,
+    name: meta?.name || 'OAKEN Curve token',
+    symbol: meta?.symbol || 'TOKEN',
+    totalSupply: supply,
+    totalSupplyHuman: curveHuman(supply, decimals, 2),
+    reservedHuman: curveHuman(CURVE_RESERVED, decimals, 2),
+    sellableHuman: curveHuman(CURVE_SELLABLE, decimals, 2),
+    sold,
+    soldHuman: curveHuman(sold, decimals, 2),
+    soldPct,
+    soldPctFormatted: soldPct.toFixed(2) + '%',
+    raiseSol: Number(state.realSol) / 1e9,
+    raiseSolFormatted: (Number(state.realSol) / 1e9).toLocaleString('en-US', { maximumFractionDigits: 4 }),
+    thresholdSol: Number(CURVE_GRADUATION_LAMPORTS) / 1e9,
+    thresholdSolFormatted: (Number(CURVE_GRADUATION_LAMPORTS) / 1e9).toLocaleString('en-US', { maximumFractionDigits: 4 }),
+    status: state.graduated ? 'graduated' : state.completed ? 'ready' : 'curve',
+    statusLabel: state.graduated ? 'Graduated' : state.completed ? 'Ready to graduate' : 'On the curve',
+    balance,
+    balanceHuman: balance == null ? null : curveHuman(balance, decimals, 4),
+    solVault: A.curveSolVault(mintKey)[0].toBase58(),
+    pumpAuthority: A.curvePumpAuthority(mintKey)[0].toBase58(),
+    owner: _address,
+  };
+}
+
+/** Launch on the OAKEN Curve in one transaction: mint + metadata + optional first buy. */
+export async function launchCurve({
+  name, symbol, description = '', imageUrl = '', imageFile = null,
+  creatorFeeBps = 5, buyLamports = 0n, onStep,
+}) {
+  if (!_address) throw Object.assign(new Error('Connect a Solana wallet first.'), { code: 'NO_WALLET' });
+  const w = web3();
+  const A = api();
+  if (!(await solanaCurveLive())) {
+    throw new Error('The OAKEN Curve program is not deployed on mainnet yet. Nothing was sent.');
+  }
+  const nm = String(name || '').trim();
+  const sy = String(symbol || '').trim().toUpperCase();
+  if (!nm || nm.length > 32) throw new Error('Name must be 1–32 characters.');
+  if (!sy || sy.length > 10) throw new Error('Symbol must be 1–10 characters.');
+  const fee = Number(creatorFeeBps);
+  if (!Number.isInteger(fee) || fee < 0 || fee > CURVE_MAX_CREATOR_FEE_BPS) {
+    throw new Error(`Creator fee must be 0–${CURVE_MAX_CREATOR_FEE_BPS} bps.`);
+  }
+
+  onStep?.('upload');
+  let image = String(imageUrl || '').trim();
+  if (imageFile) image = await uploadImage(imageFile);
+  const { uri } = await uploadMetadata({
+    name: nm, symbol: sy, description: String(description || '').slice(0, 1000),
+    image, showName: true, createdOn: 'oaken.one', standard: 'SPL',
+  });
+
+  const mintKp = w.Keypair.generate();
+  const owner = new w.PublicKey(_address);
+  const protocol = new w.PublicKey(CURVE_PROTOCOL_FEE_RECIPIENT);
+  const ixs = [A.createCurveWithMetadataIx({
+    creator: owner,
+    mint: mintKp.publicKey,
+    protocolFeeRecipient: protocol,
+    creatorFeeRecipient: owner,
+    creatorFeeBps: fee,
+    name: nm,
+    symbol: sy,
+    uri,
+  })];
+  const firstBuy = BigInt(buyLamports || 0n);
+  if (firstBuy > 0n) {
+    const ownerAta = A.ata(owner, mintKp.publicKey)[0];
+    ixs.push(A.createAtaIdempotentIx({
+      payer: owner, address: ownerAta, owner, mint: mintKp.publicKey,
+    }));
+    ixs.push(A.curveBuyIx({
+      buyer: owner,
+      mint: mintKp.publicKey,
+      buyerAta: ownerAta,
+      protocolFeeRecipient: protocol,
+      creatorFeeRecipient: owner,
+      amountIn: firstBuy,
+      minTokensOut: 0n,
+    }));
+  }
+  onStep?.('create');
+  const sig = await send(ixs, {
+    signers: [mintKp],
+    units: firstBuy > 0n ? 800_000 : 600_000,
+    microLamports: 50_000,
+    onStep,
+  });
+  return {
+    family: 'solana', route: 'curve',
+    mint: mintKp.publicKey.toBase58(),
+    curve: A.curvePda(mintKp.publicKey)[0].toBase58(),
+    name: nm, symbol: sy, uri,
+    buyLamports: firstBuy.toString(),
+    signature: sig,
+  };
+}
+
+export async function curveBuy({ curve, lamports, minTokensOut = 0n, onStep }) {
+  if (!_address) throw Object.assign(new Error('Connect a Solana wallet first.'), { code: 'NO_WALLET' });
+  const w = web3();
+  const A = api();
+  const c = await ready();
+  const state = await A.readCurve(c, curve);
+  if (!state) throw new Error('No curve at that address on Solana.');
+  if (state.graduated || state.completed) throw new Error('The curve is complete; there is nothing left to buy.');
+  const amount = BigInt(lamports);
+  if (amount <= 0n) throw new Error('Enter an amount first.');
+  const owner = new w.PublicKey(_address);
+  const mintKey = new w.PublicKey(state.mint);
+  const buyerAta = A.ata(owner, mintKey)[0];
+  return send([
+    A.createAtaIdempotentIx({ payer: owner, address: buyerAta, owner, mint: mintKey }),
+    A.curveBuyIx({
+      buyer: owner,
+      mint: mintKey,
+      buyerAta,
+      protocolFeeRecipient: new w.PublicKey(state.protocolFeeRecipient),
+      creatorFeeRecipient: new w.PublicKey(state.creatorFeeRecipient),
+      amountIn: amount,
+      minTokensOut: BigInt(minTokensOut || 0n),
+    }),
+  ], { units: 350_000, microLamports: 50_000, onStep });
+}
+
+export async function curveSell({ curve, amount, minSolOut = 0n, onStep }) {
+  if (!_address) throw Object.assign(new Error('Connect a Solana wallet first.'), { code: 'NO_WALLET' });
+  const w = web3();
+  const A = api();
+  const c = await ready();
+  const state = await A.readCurve(c, curve);
+  if (!state) throw new Error('No curve at that address on Solana.');
+  if (state.graduated || state.completed) throw new Error('The curve is complete; there is nothing left to sell.');
+  const raw = BigInt(amount);
+  if (raw <= 0n) throw new Error('Enter an amount first.');
+  const owner = new w.PublicKey(_address);
+  const mintKey = new w.PublicKey(state.mint);
+  const sellerAta = A.ata(owner, mintKey)[0];
+  const info = await c.getAccountInfo(sellerAta);
+  if (!info) throw new Error('You do not hold that token in this wallet.');
+  return send([
+    A.curveSellIx({
+      seller: owner,
+      mint: mintKey,
+      sellerAta,
+      protocolFeeRecipient: new w.PublicKey(state.protocolFeeRecipient),
+      creatorFeeRecipient: new w.PublicKey(state.creatorFeeRecipient),
+      amountIn: raw,
+      minSolOut: BigInt(minSolOut || 0n),
+    }),
+  ], { units: 250_000, microLamports: 50_000, onStep });
+}
+
+/** Graduate into PumpSwap (locked LP) by default; the vault path is the fallback. */
+export async function curveGraduate({ curve, pumpSwap = true, onStep }) {
+  if (!_address) throw Object.assign(new Error('Connect a Solana wallet first.'), { code: 'NO_WALLET' });
+  const w = web3();
+  const A = api();
+  const c = await ready();
+  const state = await A.readCurve(c, curve);
+  if (!state) throw new Error('No curve at that address on Solana.');
+  if (state.graduated) throw new Error('This curve has already graduated.');
+  if (!state.completed) throw new Error('The curve is not complete yet.');
+  const owner = new w.PublicKey(_address);
+  const mintKey = new w.PublicKey(state.mint);
+  const ix = pumpSwap
+    ? A.curveGraduatePumpSwapIx({ payer: owner, mint: mintKey })
+    : A.curveGraduateIx({ payer: owner, mint: mintKey });
+  return send([ix], {
+    units: pumpSwap ? 1_200_000 : 400_000,
+    microLamports: 50_000,
+    onStep,
+  });
 }
 
 /* ── Jupiter Lock（第三方；链上已部署）────────────────────────────────────

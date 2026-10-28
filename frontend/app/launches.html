@@ -186,6 +186,7 @@
       + '<td style="text-align:right;white-space:nowrap">'
       +   (sol ? '<a href="' + href + '" target="_blank" rel="noopener">Solscan ↗</a>' : '<a href="' + href + '">token →</a>')
       +   (tx ? ' <a class="mono" style="font-size:12px" href="' + tx + '" target="_blank" rel="noopener">tx ↗</a>' : '')
+      +   (Number(r.chainId) === 4663 ? ' <a class="mono" style="font-size:12px" href="/agents?token=' + encodeURIComponent(r.token) + '" title="read this token with the OAKEN agent">agent ↗</a>' : '')
       + '</td></tr>';
   }
 

@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launch on the OAKEN Curve · OAKEN</title>
+<meta name="description" content="A fixed-supply launch on OAKEN's own bonding curve: no creator allocation, liquidity from the first buy, graduating into a locked pool.">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/chain.webp"><source src="/app/media/chain-head.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">OAKEN Curve</div>
+    <h1 class="reveal">Launch with a market, not just a token.</h1>
+    <p class="muted reveal" style="max-width:64ch">Fixed supply. The creator gets no allocation — you buy from the
+      curve like everyone else. When the curve sells out, the remaining tokens and the raise go into a DEX position
+      that nobody can withdraw from.</p>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:36px">
+    <div id="unconfigured" class="panel hide">
+      <div class="body">
+        <b>The curve launcher is not configured on this chain.</b>
+        <div class="hint" style="margin-top:8px">Nothing was deployed here, so there is no form to fill. The other
+          launch routes on <a href="/launch">/launch</a> are unaffected.</div>
+      </div>
+    </div>
+
+    <div id="launcher" class="hide">
+      <div class="row2" style="grid-template-columns:1fr 1fr;align-items:start;gap:22px">
+        <div class="panel reveal">
+          <div class="head"><h3>Create</h3><span class="muted" id="factoryhint" style="margin-left:auto;font-size:12.5px"></span></div>
+          <div class="body">
+            <label class="f">Chain</label>
+            <div class="seg" id="chainseg"></div>
+            <div class="hint" id="chainhint">The token is created on this chain. The wallet is asked to switch before signing.</div>
+
+            <label class="f" for="cname">Token name</label>
+            <input class="i" id="cname" placeholder="Ex: Oaken Test" maxlength="64" autocomplete="off">
+            <label class="f" for="csymbol">Symbol</label>
+            <input class="i" id="csymbol" placeholder="Ex: OAKT" maxlength="16" autocomplete="off">
+
+            <label class="f" for="cfee">Creator fee recipient (optional)</label>
+            <input class="i" id="cfee" placeholder="0x… — defaults to you" autocomplete="off">
+            <div class="hint">Trade fees go here. It does not receive any tokens at launch.</div>
+
+            <label class="f" for="ctax">Creator tax (bps, optional)</label>
+            <input class="i" id="ctax" placeholder="0" inputmode="numeric" autocomplete="off">
+            <div class="hint">Extra tax on curve trades, on top of the 1% base fee. Max 1000 (10%). Paid to the
+              creator fee recipient.</div>
+
+            <label class="f" for="cexempt">Snipe-tax exempt wallets (optional)</label>
+            <textarea class="i" id="cexempt" rows="2" placeholder="0x…, 0x… — team wallets you want exempt for the first seconds" style="resize:vertical"></textarea>
+
+            <div id="taxwrap" class="hide" style="margin-top:16px">
+              <div class="stephead"><span class="num">Tx</span><b>Tax token (Flap model)</b></div>
+              <label class="chk" for="istax"><input type="checkbox" id="istax"> make this a buy/sell tax token?</label>
+              <div class="hint">Tax tokens graduate into a Pancake V2 pair; standard tokens into a Pancake V3 position.
+                The tax only starts after graduation, when a pool exists.</div>
+              <div id="taxpanel" class="hide">
+                <div class="row2">
+                  <div><label class="f" for="buyrate">Buy tax</label>
+                    <select class="i" id="buyrate"><option value="100">1%</option><option value="300">3%</option><option value="500" selected>5%</option><option value="1000">10%</option></select></div>
+                  <div><label class="f" for="sellrate">Sell tax</label>
+                    <select class="i" id="sellrate"><option value="100">1%</option><option value="300">3%</option><option value="500" selected>5%</option><option value="1000">10%</option></select></div>
+                </div>
+                <label class="f" for="taxdays">Tax duration (days)</label>
+                <input class="i" id="taxdays" value="30" inputmode="numeric" autocomplete="off">
+                <div class="hint">After this window the token trades untaxed.</div>
+                <label class="f">Tax split (must add up to 100%)</label>
+                <div class="row2" style="grid-template-columns:repeat(4,1fr)">
+                  <div><label class="f" for="bmkt" style="font-size:11.5px">Marketing</label><input class="i" id="bmkt" value="40" inputmode="decimal"></div>
+                  <div><label class="f" for="bdef" style="font-size:11.5px">Deflation</label><input class="i" id="bdef" value="20" inputmode="decimal"></div>
+                  <div><label class="f" for="bdiv" style="font-size:11.5px">Dividend</label><input class="i" id="bdiv" value="20" inputmode="decimal"></div>
+                  <div><label class="f" for="bliq" style="font-size:11.5px">Liquidity</label><input class="i" id="bliq" value="20" inputmode="decimal"></div>
+                </div>
+                <div class="hint" id="buckethint">Percents of the tax. Deflation sends tokens to a dead address;
+                  dividend/liquidity go to the wallets below. A 0.06%-of-volume platform fee is taken from the tax.</div>
+                <label class="f" for="wmkt">Marketing wallet</label>
+                <input class="i" id="wmkt" placeholder="0x… — defaults to you" autocomplete="off">
+                <label class="f" for="wdiv">Dividend wallet</label>
+                <input class="i" id="wdiv" placeholder="0x… — defaults to you" autocomplete="off">
+                <label class="f" for="wliq">Liquidity wallet</label>
+                <input class="i" id="wliq" placeholder="0x… — defaults to you" autocomplete="off">
+              </div>
+            </div>
+
+            <div class="warnbox" style="margin-top:16px">
+              <b>What you are signing:</b> a fixed 1,000,000,000 supply, all of it minted to the curve.
+              You receive <b>zero tokens</b> at launch. The curve sells ~71% (Pons model) or ~79% (Flap model);
+              the rest seeds the pool. Nobody — including OAKEN — can pause, mint or pull the principal.
+            </div>
+
+            <button class="btn btn-p" id="createbtn" style="width:100%;margin-top:16px" disabled>Connect a wallet</button>
+            <div class="hint" id="createhint" style="margin-top:8px">One transaction creates the token and the curve.</div>
+            <div id="createresult" class="hide" style="margin-top:16px"></div>
+          </div>
+        </div>
+
+        <div class="panel reveal">
+          <div class="head"><h3>How this launch works</h3></div>
+          <div class="body" style="display:grid;gap:12px">
+            <div><b>1 · The curve.</b> All supply starts in the curve. Buyers pay the chain's native coin; the price
+              follows a constant product. There is no team allocation, so there is nothing to dump at open.</div>
+            <div><b>2 · The line.</b> When the sellable allocation is gone, the curve is complete. The last buy is
+              capped and the unused coin is refunded.</div>
+            <div><b>3 · Graduation.</b> Anyone can call it. The remaining tokens and the raise go into a DEX position
+              owned by a contract with no withdraw function. The pool is seeded once.</div>
+            <div><b>4 · Then what.</b> The token trades on the DEX. On a tax token, buys and sells pay the configured
+              tax; on a standard token there is no tax.</div>
+            <div class="hint" style="border-top:1px solid var(--line);padding-top:12px">
+              The creator earns trade fees (and the optional creator tax), not a token allocation. Buying at launch
+              is buying from the same curve as everyone else.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="/app/vendor/ethers.umd.min.js" defer></script>
+<script type="module">
+  import {
+    shell, wallet, chains, currentChain, fmtAmount, txNotice, toast, copyBtn, short, explorerHref,
+    oakenCurveSite, oakenCurveFactory, oakenCurveLaunchFromReceipt,
+  } from '/app/oaken.js';
+
+  shell({ active: 'launch' });
+
+  const $ = (id) => document.getElementById(id);
+  const state = { chain: null, busy: false, ethers: null };
+
+  async function ethersReady() {
+    for (let i = 0; i < 100; i++) {
+      if (window.ethers) return window.ethers;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error('ethers did not load — reload the page (Ctrl+F5).');
+  }
+
+  function configuredChains(live) {
+    return (live || []).filter((c) => !!oakenCurveSite(c));
+  }
+
+  function paintChains(live) {
+    const list = configuredChains(live);
+    const seg = $('chainseg');
+    if (!list.length) {
+      seg.innerHTML = '<button type="button" class="on" disabled>Not configured</button>';
+      $('chainhint').textContent = 'No OAKEN Curve factory is configured on any chain yet.';
+      return list;
+    }
+    seg.innerHTML = list.map((c) => `<button type="button" data-id="${c.id}" class="${state.chain && c.id === state.chain.id ? 'on' : ''}">${c.name}</button>`).join('');
+    for (const b of seg.querySelectorAll('button[data-id]')) {
+      b.onclick = () => applyChain(list.find((c) => c.id === Number(b.dataset.id)));
+    }
+    return list;
+  }
+
+  function paintKind() {
+    const site = state.chain && oakenCurveSite(state.chain);
+    const flap = !!site && site.kind === 'flap';
+    $('taxwrap').classList.toggle('hide', !flap);
+    if (!flap) $('istax').checked = false;
+    $('taxpanel').classList.toggle('hide', !flap || !$('istax').checked);
+    $('factoryhint').textContent = site ? (flap ? 'Flap model' : 'Pons model') : '';
+  }
+
+  async function applyChain(c) {
+    if (!c) return;
+    state.chain = c;
+    for (const b of $('chainseg').querySelectorAll('button[data-id]')) {
+      b.classList.toggle('on', Number(b.dataset.id) === c.id);
+    }
+    paintKind();
+    paintButton();
+    const site = oakenCurveSite(c);
+    if (site && state.ethers) {
+      try {
+        const f = oakenCurveFactory(c);
+        const fee = await f.launchFee();
+        $('chainhint').textContent = fee > 0n
+          ? `The token is created on ${c.name}. Launch fee: ${fmtAmount(fee, 18, 6)} ${c.native}.`
+          : `The token is created on ${c.name}. No launch fee — gas only.`;
+      } catch { $('chainhint').textContent = `The token is created on ${c.name}.`; }
+    }
+  }
+
+  function paintButton() {
+    const connected = !!wallet.provider;
+    $('createbtn').disabled = state.busy || !state.chain || !oakenCurveSite(state.chain);
+    $('createbtn').textContent = state.busy ? 'Creating…' : (connected ? 'Create curve launch' : 'Connect a wallet');
+  }
+
+  function parseAddressList(text) {
+    const out = [];
+    for (const raw of String(text || '').split(/[\s,;]+/)) {
+      const a = raw.trim();
+      if (!a) continue;
+      if (!window.ethers.isAddress(a)) throw new Error(`${a} is not an address.`);
+      out.push(a);
+    }
+    return out;
+  }
+
+  function bpsFromPercent(id, label) {
+    const n = Number($(id).value || 0);
+    if (!Number.isFinite(n) || n < 0 || n > 100) throw new Error(`${label} must be between 0 and 100.`);
+    return Math.round(n * 100);
+  }
+
+  function buildParams(account) {
+    const site = oakenCurveSite(state.chain);
+    const name = $('cname').value.trim();
+    const symbol = $('csymbol').value.trim();
+    if (!name) throw new Error('Give the token a name.');
+    if (!symbol) throw new Error('Give the token a symbol.');
+    const feeRecipient = $('cfee').value.trim() || account;
+    if (!window.ethers.isAddress(feeRecipient)) throw new Error('The creator fee recipient is not an address.');
+    const creatorTax = Number($('ctax').value || 0);
+    if (!Number.isInteger(creatorTax) || creatorTax < 0 || creatorTax > 1000) throw new Error('Creator tax is 0–1000 bps.');
+    const exempt = parseAddressList($('cexempt').value);
+    const salt = window.ethers.hexlify(window.ethers.randomBytes(32));
+
+    if (site.kind === 'flap') {
+      const tax = $('istax').checked;
+      if (!tax) {
+        return [[name, symbol, feeRecipient, creatorTax, salt, exempt, false,
+          [0, 0, 0, 0, 0, 0, 0, window.ethers.ZeroAddress, window.ethers.ZeroAddress, window.ethers.ZeroAddress]], 0n];
+      }
+      const buyRate = Number($('buyrate').value);
+      const sellRate = Number($('sellrate').value);
+      const days = Number($('taxdays').value || 0);
+      if (!Number.isFinite(days) || days <= 0) throw new Error('Set the tax duration in days.');
+      const bm = bpsFromPercent('bmkt', 'Marketing');
+      const bd = bpsFromPercent('bdef', 'Deflation');
+      const dv = bpsFromPercent('bdiv', 'Dividend');
+      const bl = bpsFromPercent('bliq', 'Liquidity');
+      if (bm + bd + dv + bl !== 10000) throw new Error('The four tax buckets must add up to 100%.');
+      const wm = $('wmkt').value.trim() || account;
+      const wd = $('wdiv').value.trim() || account;
+      const wl = $('wliq').value.trim() || account;
+      for (const [w, label] of [[wm, 'Marketing'], [wd, 'Dividend'], [wl, 'Liquidity']]) {
+        if (!window.ethers.isAddress(w)) throw new Error(`${label} wallet is not an address.`);
+      }
+      const seconds = Math.round(days * 86400);
+      return [[name, symbol, feeRecipient, creatorTax, salt, exempt, true,
+        [buyRate, sellRate, seconds, bm, bd, dv, bl, wm, wd, wl]], 1n];
+    }
+    return [[name, symbol, feeRecipient, creatorTax, salt, exempt], 0n];
+  }
+
+  $('istax').addEventListener('change', paintKind);
+  $('createbtn').addEventListener('click', async () => {
+    if (state.busy) return;
+    try {
+      state.busy = true; paintButton();
+      const account = await wallet.connect(state.chain);
+      if (!account) { state.busy = false; paintButton(); return; }
+      const [params] = buildParams(account);
+      const factory = oakenCurveFactory(state.chain, await wallet.signer());
+      if (!factory) throw new Error('The curve factory is not configured on this chain.');
+      const fee = await factory.launchFee();
+      const note = txNotice(state.chain, 'Curve launch');
+      const tx = await factory.createLaunch(params, fee ? { value: fee } : {});
+      note.sent(tx.hash);
+      const rc = await tx.wait();
+      const launched = oakenCurveLaunchFromReceipt(factory, rc);
+      note.ok('Curve launch confirmed.');
+      if (!launched) {
+        $('createresult').classList.remove('hide');
+        $('createresult').innerHTML = '<div class="warnline">The transaction landed but the launch event was not in the receipt — check the explorer.</div>';
+      } else {
+        const slug = state.chain.slug;
+        $('createresult').classList.remove('hide');
+        $('createresult').innerHTML = '<div class="panel" style="border-color:rgba(217,163,67,.45)"><div class="body" style="display:grid;gap:10px">'
+          + `<div><b>Token</b> <span class="mono">${short(launched.token, 8)}</span> ${copyBtn(launched.token, 'copy CA')}</div>`
+          + `<div><b>Curve</b> <span class="mono">${short(launched.curve, 8)}</span> ${copyBtn(launched.curve, 'copy curve')}</div>`
+          + `<div class="hint">${launched.tax ? 'Tax token. ' : ''}The whole supply is in the curve. Trading opens as soon as this block is final.</div>`
+          + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
+          + `<a class="btn btn-p" href="/curve/${slug}/${launched.curve}">Open the curve →</a>`
+          + `<a class="btn btn-s" href="/locks/${slug}/${launched.token}">Token page</a>`
+          + `${explorerHref('/address/' + launched.curve, state.chain) ? `<a class="btn btn-s" href="${explorerHref('/address/' + launched.curve, state.chain)}" target="_blank" rel="noopener">Explorer ↗</a>` : ''}`
+          + '</div></div></div>';
+      }
+    } catch (e) {
+      toast(String((e && (e.shortMessage || e.message)) || e).slice(0, 180), 'bad');
+    } finally {
+      state.busy = false; paintButton();
+    }
+  });
+
+  (async () => {
+    state.ethers = await ethersReady();
+    const live = await chains();
+    const list = paintChains(live);
+    const activeNow = await currentChain();
+    const active = list.find((c) => c.id === (activeNow && activeNow.id)) || list[0];
+    if (!active) {
+      $('unconfigured').classList.remove('hide');
+      $('launcher').classList.add('hide');
+      return;
+    }
+    $('launcher').classList.remove('hide');
+    await applyChain(active);
+    paintButton();
+  })().catch((e) => {
+    $('unconfigured').classList.remove('hide');
+    $('unconfigured').querySelector('.body').innerHTML = '<b>The launcher could not start.</b><div class="hint" style="margin-top:8px">'
+      + String((e && e.message) || e).slice(0, 180) + '</div>';
+  });
+</script>
+</body>
+</html>

@@ -579,7 +579,7 @@ async function doExit() {
 // 三段:投票权（xOAK 存/取）、提案列表（投票/排队/执行）、新提案。
 // 链上的形状（合约见 bond/contracts/Poll.sol、Timelock.sol）:
 //   提案 = **一笔具体调用**（target + calldata），不是一句口号;
-//   通过 → enqueue 进 Timelock → 等 timelock.delay()（24h）→ 谁都能 execute。
+//   通过 → enqueue 进 Timelock → 等 timelock.delay()（48h）→ 谁都能 execute。
 //
 // ⚠️ 为什么要有 xOAK 这一层:REWARD 本身**没有检查点**（不是 ERC20Votes），
 //    直接按当下余额投票 = "投完立刻转走"能在同一个块里刷票。

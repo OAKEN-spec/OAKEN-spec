@@ -19,6 +19,7 @@
   <a class="brand" href="/bonds/"><img class="brand-mark" src="/oaken/ic-oaken.svg" alt=""><span>OAKEN</span></a>
   <span class="tag">OAKEN bonds</span>
   <a class="back" href="/">&larr; OAKEN</a>
+  <a class="back" href="/agents?kind=bond">Agent report &rarr;</a>
   <span class="spacer"></span>
   <span class="net" id="net"></span>
   <button class="btn" id="connect">Connect wallet</button>
@@ -33,9 +34,9 @@
   <div class="notice" id="notice" hidden></div>
   <div class="notice" id="riskNotice">
     <b>RISK — read this first.</b> <b>This is the Bonds product: unlike the ownerless Locks, it has an admin</b>
-    (a 2-of-3 Safe behind a 24h Timelock). aOAKEN is a USDG-collateralized bond at NAV 1.00. Redemptions are limited by the
+    (a 2-of-3 Safe behind a 48h Timelock). aOAKEN is a USDG-collateralized bond at NAV 1.00. Redemptions are limited by the
     vault's USDG reserves. Admin is a <b>2-of-3 Safe</b> (<span class="mono">0x5E8C…E92e</span>). NAV and parameter
-    changes are queued through the <b>24h Timelock</b>; the governance panel below shows the live admin and queue status.
+    changes are queued through the <b>48h Timelock</b>; the governance panel below shows the live admin and queue status.
     Rewards are OAKEN emissions, a small treasury USDG bootstrap, and redemption fees — no external
     yield is promised. Redemption is the only exit; there is no aOAKEN secondary market yet.
   </div>
@@ -169,7 +170,7 @@
 
   <h2 class="sect mono" id="tlHead">GOVERNANCE &amp; TIMELOCK</h2>
   <p class="lede small" id="tlLede">Admin is a 2-of-3 Safe. NAV updates and parameter changes are queued through a
-    24h Timelock; anyone can execute once the delay has passed. Execution is permissionless — no one can move the
+    48h Timelock; anyone can execute once the delay has passed. Execution is permissionless — no one can move the
     vault's USDG or a user's staked bond through this panel.</p>
   <section class="stats" id="tlStats">
     <div><span class="mono k">ADMIN (SAFE)</span><b><a id="tlSafe" href="#" target="_blank" rel="noopener">—</a></b></div>
@@ -203,7 +204,7 @@
   <p class="lede small" id="govLede" hidden>
     Hold <b>xOAK</b> to vote on the contracts behind this page. A proposal is
     <b>a specific call</b> (target&nbsp;+&nbsp;calldata) &mdash; if it passes, anyone can execute it
-    through the 24-hour timelock. Voting power is <b>snapshotted at the proposal block</b>:
+    through the 48-hour timelock. Voting power is <b>snapshotted at the proposal block</b>:
     moving your tokens afterwards does not change a vote already cast.
   </p>
 
@@ -274,7 +275,7 @@
     <b>Admin.</b> The vault, NAV oracle and staking pool are administered by a <b>2-of-3 Safe</b>
     <span class="mono">0x5E8C4c241a29ff7E60c648f378A4AA70053Ee92e</span>, not a single key. The Safe can update
     params, but cannot move a staked bond or a vault reserve. The NAV keeper is a separate hot key; NAV and parameter
-    changes are queued through the 24h Timelock, and anyone can execute them once the delay has passed.
+    changes are queued through the 48h Timelock, and anyone can execute them once the delay has passed.
   </p>
   <p class="fine" id="contracts">
     <b>Contracts.</b>

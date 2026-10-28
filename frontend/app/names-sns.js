@@ -28,7 +28,6 @@ const timeAgo = (sec) => {
   if (d < 86400 * 30) return Math.floor(d / 86400) + 'd ago';
   return new Date(Number(sec) * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 };
-const dateUTC = (sec) => new Date(Number(sec) * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
 
 const FIELDS = [
   ['url', 'Website', 'https://…'],
@@ -50,7 +49,6 @@ let stats = null;
 let namesIndex = null;
 let indexLoading = null;
 let browseShown = 60;
-let browseList = [];
 let busy = false;
 const st = { label: '', key: null, reg: null, owner: null, tokenized: false, records: {}, primary: null, quote: null };
 
@@ -247,6 +245,23 @@ function errorPanel(what, e, retry) {
 
 async function search(input, { scroll = true } = {}) {
   if (!S || !sol) { await boot(); if (!S) return; }
+  const rawInput = String(input ?? '').trim();
+  // `.sol` is the legacy suffix. Do not silently register the `.sns` twin:
+  // show what the user typed and offer the current TLD explicitly.
+  if (/\.sol$/i.test(rawInput)) {
+    const label = cleanLabel(rawInput).label || rawInput.replace(/\.sol$/i, '');
+    setPlate(label);
+    setStatus('.sol is legacy — SNS now issues .sns', 'bad');
+    showResult(`<div class="panel reveal"><div class="body">
+      <b style="color:var(--parch)">SNS now issues <span class="mono">.sns</span> names.</b>
+      <p class="muted" style="margin:10px 0 0">You typed <span class="mono">${esc(rawInput)}</span>.
+        <span class="mono">.sol</span> is the legacy suffix; it is being migrated and may resolve elsewhere.
+        This page registers <b>${esc(label)}.sns</b>.</p>
+      <button class="btn btn-p" type="button" id="sns-continue" style="margin-top:14px">Continue with ${esc(label)}.sns</button>
+    </div></div>`);
+    $('sns-continue').onclick = () => { if ($('sns-q')) $('sns-q').value = label; search(label); };
+    return;
+  }
   const clean = cleanLabel(input);
   if (clean.error) {
     setPlate('');
@@ -359,16 +374,20 @@ async function readPrimary(owner) {
   } catch { return null; }
 }
 
+/** Reverse accounts are name-registry accounts: 96-byte header, then the borsh string. */
+function reverseLabel(data) {
+  const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const len = dv.getUint32(96, true);
+  return new TextDecoder().decode(data.subarray(100, 100 + len)).replace(/^\u0000/, '');
+}
+
 async function readReverseLabel(nameAccount) {
   try {
     const conn = await sol.ready();
     const key = S.reverseAccount(nameAccount);
     const info = await conn.getAccountInfo(key);
     if (!info) return null;
-    const dv = new DataView(info.data.buffer, info.data.byteOffset, info.data.byteLength);
-    const len = dv.getUint32(0, true);
-    const text = new TextDecoder().decode(info.data.subarray(4, 4 + len)).replace(/^\u0000/, '');
-    return text || null;
+    return reverseLabel(info.data) || null;
   } catch { return null; }
 }
 
@@ -705,9 +724,7 @@ async function labelsForAccounts(accounts) {
     infos.forEach((info, j) => {
       if (!info) return;
       try {
-        const dv = new DataView(info.data.buffer, info.data.byteOffset, info.data.byteLength);
-        const len = dv.getUint32(0, true);
-        const text = new TextDecoder().decode(info.data.subarray(4, 4 + len)).replace(/^\u0000/, '');
+        const text = reverseLabel(info.data);
         if (text) out.push({ name: text, account: accounts[i + j], owner: walletAddr });
       } catch { /* not a reverse account */ }
     });
@@ -859,7 +876,6 @@ async function randomBrowse() {
     seen.add(i);
     picked.push(namesIndex[i]);
   }
-  browseList = picked;
   if (host) host.innerHTML = '<div class="hint">Reading owners…</div>';
   try {
     const conn = await sol.ready();
@@ -890,8 +906,9 @@ function bind() {
     q.addEventListener('input', () => {
       const clean = cleanLabel(q.value);
       if (clean.label !== q.value.trim().toLowerCase()) {
-        // Do not fight the caret for normal typing; only strip a pasted suffix/dot.
-        if (/\.(sns|sol)$/i.test(q.value.trim())) q.value = clean.label;
+        // Strip a pasted `.sns` suffix, but leave `.sol` visible so the search
+        // can explain that it is the legacy TLD instead of silently selling .sns.
+        if (/\.sns$/i.test(q.value.trim())) q.value = clean.label;
       }
       if (!clean.label) { setPlate(''); setStatus('Search a name'); }
       else { setPlate(clean.label); setStatus('Press Search to check'); }

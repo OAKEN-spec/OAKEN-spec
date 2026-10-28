@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OAKEN Curve · Solana · OAKEN</title>
+<meta name="description" content="Read and trade an OAKEN Curve launch on Solana: progress to graduation, buy and sell on the curve, and the PumpSwap pool whose LP is locked forever.">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<style>
+  .walletrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .walletrow .addr { font: 12px/1.4 ui-monospace, Consolas, monospace; color: var(--parch); }
+  .walletbtns { display: flex; gap: 8px; flex-wrap: wrap; }
+  #curveaddr { font: 12.5px/1.5 ui-monospace, Consolas, monospace; word-break: break-all; }
+</style>
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; it is the whole diagnosis.';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'+err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/chain.webp"><source src="/app/media/chain-head.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">OAKEN Curve · Solana</div>
+    <h1 class="reveal" id="hero-title">Reading the curve…</h1>
+    <p class="muted reveal" id="hero-sub" style="max-width:64ch"></p>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:32px">
+    <div id="err" class="panel hide"><div class="body" id="errbody"></div></div>
+
+    <div id="notdeployed" class="panel hide">
+      <div class="head"><h3>This program is not on mainnet yet</h3><span class="chip warn">Not deployed</span></div>
+      <div class="body">
+        <p class="muted" style="max-width:72ch;margin:0">OAKEN Curve on Solana is built and tested — the SBF artifact, the
+          host tests, the in-process PumpSwap test and the client builders all pass — but the program has not been
+          deployed to mainnet. No curve can exist at this address until it is, so this page does not pretend to read one.</p>
+        <p class="hint" style="margin:14px 0 0">Program ID: <span class="mono">BvTeztC4ENG8x2TW19AkiJ9EnC9JNresmA1pE6MBWpRi</span>.
+          Deployment needs about 1.29 SOL at peak (0.647 SOL final); see <span class="mono">solana/curve-program/README.md</span>.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+          <a class="btn btn-s" href="/launch/solana">Launch on Solana today</a>
+          <a class="btn btn-s" href="/verify">Verify the programs</a>
+        </div>
+      </div>
+    </div>
+
+    <div id="view" class="hide">
+      <div class="stats reveal" style="margin-bottom:22px">
+        <div><div class="v" id="s-sold">—</div><div class="k">Sold on the curve</div></div>
+        <div><div class="v" id="s-raised">—</div><div class="k">Raised</div></div>
+        <div><div class="v" id="s-line">—</div><div class="k">Graduation line</div></div>
+        <div><div class="v" id="s-status">—</div><div class="k">Status</div></div>
+      </div>
+
+      <div class="panel reveal">
+        <div class="head"><h3 id="progress-title">Progress</h3><span class="muted" id="progress-note" style="margin-left:auto;font-size:12.5px"></span></div>
+        <div class="body">
+          <div style="height:10px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden">
+            <div id="bar" style="height:100%;width:0;background:linear-gradient(90deg,#8a6a2f,#d9a343);transition:width .4s"></div>
+          </div>
+          <div class="hint" id="progress-hint" style="margin-top:8px"></div>
+          <div class="hint" id="addresses" style="margin-top:12px;display:flex;gap:14px;flex-wrap:wrap"></div>
+        </div>
+      </div>
+
+      <div class="panel reveal" style="margin-top:22px">
+        <div class="head"><h3>Solana wallet</h3><span class="pill">mainnet-beta</span></div>
+        <div class="body">
+          <div id="walletstate" class="hint">Looking for a Solana wallet…</div>
+          <div class="walletbtns" id="walletbtns" style="margin-top:10px"></div>
+          <div class="hint" id="walletinstall" style="display:none;margin-top:10px">No Solana wallet found in this browser. Install Phantom or Solflare, then reload.</div>
+          <div class="walletrow" id="walletrow" style="display:none;margin-top:10px">
+            <span class="addr" id="walletaddr"></span>
+            <span class="hint" id="walletbal"></span>
+            <button class="btn btn-s" type="button" id="walletdisconnect">Disconnect</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="row2" style="grid-template-columns:1fr 1fr;align-items:start;gap:22px;margin-top:22px">
+        <div class="panel reveal">
+          <div class="head"><h3>Buy on the curve</h3><span class="muted" id="buy-note" style="margin-left:auto;font-size:12.5px"></span></div>
+          <div class="body">
+            <label class="f" for="buyamt">Pay with SOL</label>
+            <input class="i" id="buyamt" placeholder="0.0" inputmode="decimal" autocomplete="off">
+            <div class="hint" id="buyest">Enter an amount to see the estimate.</div>
+            <button class="btn btn-p" id="buybtn" style="width:100%;margin-top:12px">Connect a wallet</button>
+          </div>
+        </div>
+
+        <div class="panel reveal">
+          <div class="head"><h3>Sell on the curve</h3><span class="muted" id="sell-note" style="margin-left:auto;font-size:12.5px"></span></div>
+          <div class="body">
+            <label class="f" for="sellamt">Tokens to sell</label>
+            <div class="row2" style="grid-template-columns:1fr auto;align-items:center">
+              <input class="i" id="sellamt" placeholder="0.0" inputmode="decimal" autocomplete="off">
+              <button type="button" class="btn btn-s" id="sellmax" style="white-space:nowrap" disabled>Max</button>
+            </div>
+            <div class="hint" id="sellest">Connect a wallet to see your balance.</div>
+            <button class="btn btn-s" id="sellbtn" style="width:100%;margin-top:12px">Connect a wallet</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel reveal" style="margin-top:22px">
+        <div class="head"><h3>Graduation</h3><span class="muted" id="gradstate" style="margin-left:auto;font-size:12.5px"></span></div>
+        <div class="body">
+          <div class="hint" id="graduatehint">At graduation the remaining tokens and the raised SOL go into a permissionless PumpSwap pool. The LP sits in a data-less authority's Token-2022 account and no instruction can move it.</div>
+          <button class="btn btn-p" id="graduatebtn" style="width:100%;margin-top:12px" disabled>Not ready yet</button>
+        </div>
+      </div>
+
+      <div class="hint" id="after" style="margin-top:22px"></div>
+      <div class="hint" id="status" role="status" aria-live="polite" style="margin-top:10px"></div>
+    </div>
+  </section>
+</main>
+
+<script src="/app/vendor/oaken-buffer.iife.min.js"></script>
+<script src="/app/vendor/solana-web3.iife.min.js"></script>
+<script type="module">
+  import { shell, toast } from '/app/oaken.js';
+  import * as SOL from '/app/solana.js';
+
+  shell({ active: 'launch' });
+
+  const $ = (id) => document.getElementById(id);
+  const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+  const parts = location.pathname.split('/').filter(Boolean);
+  const curveAddr = parts[2] || '';
+  const state = { info: null, addr: SOL.address(), busy: false, solUsd: null };
+
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+  const short = (a) => (a ? String(a).slice(0, 4) + '…' + String(a).slice(-4) : '—');
+  const fmt = (raw, decimals = 6, max = 4) => {
+    const n = Number(raw) / 10 ** Number(decimals);
+    if (!Number.isFinite(n)) return '—';
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    return n.toLocaleString('en-US', { maximumFractionDigits: max });
+  };
+  const lamportsToSol = (v) => Number(v) / 1e9;
+  const decimalString = (raw, decimals) => {
+    const s = (Number(raw) / 10 ** decimals).toFixed(decimals);
+    return s.replace(/\.?0+$/, '') || '0';
+  };
+  const usd = (v) => (state.solUsd ? ` (~$${(v * state.solUsd).toFixed(2)})` : '');
+  const setStatus = (text) => { $('status').textContent = text || ''; };
+
+  function fail(msg) {
+    $('view').classList.add('hide');
+    $('notdeployed').classList.add('hide');
+    $('err').classList.remove('hide');
+    $('errbody').innerHTML = '<b>This curve page could not load.</b><div class="hint" style="margin-top:8px">' + esc(msg) + '</div>';
+    document.documentElement.dataset.oakenBoot = '1';
+  }
+
+  function showNotDeployed() {
+    $('view').classList.add('hide');
+    $('err').classList.add('hide');
+    $('notdeployed').classList.remove('hide');
+    document.documentElement.dataset.oakenBoot = '1';
+  }
+
+  function quoteBuy(lamports) {
+    const gross = BigInt(lamports);
+    const bps = BigInt(state.info.protocolFeeBps + state.info.creatorFeeBps);
+    const net = gross - (gross * bps) / 10000n;
+    let out = (net * state.info.virtualToken) / (state.info.virtualSol + net);
+    const capped = out > state.info.realToken;
+    if (capped) out = state.info.realToken;
+    return { out, capped, feePct: Number(bps) / 100 };
+  }
+
+  function quoteSell(amount) {
+    const gross = (amount * state.info.virtualSol) / (state.info.virtualToken + amount);
+    const bps = BigInt(state.info.protocolFeeBps + state.info.creatorFeeBps);
+    const net = gross - (gross * bps) / 10000n;
+    return { gross, net, feePct: Number(bps) / 100 };
+  }
+
+  function parseAmount(text, decimals) {
+    const raw = String(text || '').trim();
+    if (!/^\d*(?:\.\d*)?$/.test(raw) || !raw || raw === '.') throw new Error('Enter an amount first.');
+    const [whole, frac = ''] = raw.split('.');
+    return BigInt(whole || '0') * 10n ** BigInt(decimals) + BigInt((frac + '0'.repeat(decimals)).slice(0, decimals) || '0');
+  }
+
+  function paintWallet() {
+    state.addr = SOL.address();
+    const list = SOL.wallets();
+    $('walletinstall').style.display = list.length ? 'none' : '';
+    $('walletbtns').innerHTML = list.map((w) =>
+      `<button class="btn btn-s" type="button" data-w="${esc(w.key)}">${esc(w.name)}</button>`).join('');
+    for (const b of $('walletbtns').querySelectorAll('[data-w]')) {
+      b.onclick = async () => {
+        b.disabled = true;
+        try { await SOL.connect(b.dataset.w); afterConnect(); }
+        catch (e) { toast(SOL.humanize(e), 'bad'); }
+        finally { b.disabled = false; }
+      };
+    }
+    const connected = Boolean(state.addr);
+    $('walletstate').style.display = connected ? 'none' : '';
+    $('walletbtns').style.display = connected ? 'none' : '';
+    $('walletrow').style.display = connected ? '' : 'none';
+    if (connected) {
+      $('walletaddr').textContent = state.addr;
+      loadBalance();
+    }
+    updateButtons();
+  }
+
+  async function loadBalance() {
+    if (!state.addr) return;
+    try {
+      const lam = await SOL.balance();
+      const sol = SOL.lamportsToSol(lam);
+      $('walletbal').textContent = `${sol.toFixed(4)} SOL${usd(sol)}`;
+    } catch { $('walletbal').textContent = 'balance —'; }
+  }
+
+  async function afterConnect() {
+    paintWallet();
+    await refresh();
+  }
+
+  function updateButtons() {
+    const info = state.info;
+    if (!info) return;
+    const connected = Boolean(state.addr);
+    const closed = info.graduated || info.completed;
+    $('buybtn').textContent = !connected ? 'Connect a wallet' : closed ? 'The curve is complete' : 'Buy on the curve';
+    $('buybtn').disabled = closed;
+    $('sellbtn').textContent = !connected ? 'Connect a wallet' : closed ? 'The curve is complete' : 'Sell on the curve';
+    $('sellbtn').disabled = closed;
+    $('sellmax').disabled = !connected || !info.balance;
+    $('graduatebtn').textContent = info.graduated ? 'Graduated' : info.completed ? 'Graduate into PumpSwap' : 'Not ready yet';
+    $('graduatebtn').disabled = info.graduated || !info.completed;
+  }
+
+  function render() {
+    const info = state.info;
+    $('hero-title').textContent = `${info.symbol} · OAKEN Curve`;
+    $('hero-sub').textContent = `${info.name} is ${info.status === 'curve' ? 'on the curve' : info.status === 'ready' ? 'complete and ready to graduate' : 'graduated'}. Buy from the curve, or sell back into it.`;
+    $('s-sold').textContent = info.soldPctFormatted;
+    $('s-raised').textContent = info.graduated ? '—' : `${info.raiseSolFormatted} SOL`;
+    $('s-line').textContent = `${info.thresholdSolFormatted} SOL`;
+    $('s-status').textContent = info.statusLabel;
+    $('bar').style.width = `${Math.max(info.soldPct, Math.min(100, (info.raiseSol / info.thresholdSol) * 100))}%`;
+    $('progress-note').textContent = `${info.soldPctFormatted} of the sellable allocation`;
+    $('progress-hint').textContent = info.graduated
+      ? 'The curve is closed. The remaining tokens and the raise are in a PumpSwap pool whose LP cannot be moved.'
+      : `${info.soldHuman} sold · ${info.reservedHuman} reserved for the pool`;
+    $('addresses').innerHTML = `Token <button class="btn btn-s" type="button" id="copymint">copy</button> <span class="mono">${short(info.mint)}</span> · Curve <span class="mono">${short(info.address)}</span>`
+      + ` · <a href="https://solscan.io/token/${esc(info.mint)}" target="_blank" rel="noopener">Solscan ↗</a>`;
+    const copy = $('copymint');
+    if (copy) copy.onclick = async () => {
+      try { await navigator.clipboard.writeText(info.mint); copy.textContent = 'copied ✓'; }
+      catch { copy.textContent = 'copy failed'; }
+      setTimeout(() => { copy.textContent = 'copy'; }, 1500);
+    };
+    $('buy-note').textContent = info.graduated ? 'Curve closed' : info.completed ? 'Graduation ready' : `${info.soldHuman} ${info.symbol} sold`;
+    $('sell-note').textContent = info.graduated ? 'Curve closed' : info.completed ? 'Graduation ready' : '';
+    $('sellest').textContent = state.addr
+      ? `Your balance: ${info.balanceHuman == null ? '—' : `${info.balanceHuman} ${info.symbol}`}`
+      : 'Connect a wallet to see your balance.';
+    $('graduatehint').textContent = info.graduated
+      ? 'Done. The pool position is owned by the pump authority and no instruction in the curve program can move the LP.'
+      : info.completed
+        ? 'The sellable allocation is gone. Anyone can graduate; the LP lands in the pump authority\'s Token-2022 account.'
+        : 'The curve graduates when the sellable allocation is gone. The LP is locked; no instruction can move it.';
+    $('gradstate').textContent = info.graduated ? 'Graduated' : info.completed ? 'Ready' : 'On the curve';
+    $('after').textContent = info.graduated
+      ? 'Trading now happens on the PumpSwap pool. This page does not read that pool.'
+      : 'Until graduation the only market is this curve. Every buy and sell is against the program.';
+    updateButtons();
+    estimateBuy();
+    estimateSell();
+  }
+
+  function estimateBuy() {
+    if (!state.info || !state.addr) return;
+    try {
+      const lamports = parseAmount($('buyamt').value, 9);
+      if (lamports <= 0n) { $('buyest').textContent = 'Enter an amount to see the estimate.'; return; }
+      const q = quoteBuy(lamports);
+      $('buyest').textContent = `≈ ${fmt(q.out, state.info.decimals, 4)} ${state.info.symbol} (fees ${q.feePct.toFixed(2)}%${q.capped ? ', completes the curve' : ''}); min out is set 1% below.`;
+      state.buyMin = (q.out * 99n) / 100n;
+    } catch (e) { $('buyest').textContent = String(e.message || e).slice(0, 160); }
+  }
+
+  function estimateSell() {
+    if (!state.info || !state.addr) return;
+    try {
+      const amount = parseAmount($('sellamt').value, state.info.decimals);
+      if (amount <= 0n) return;
+      const q = quoteSell(amount);
+      $('sellest').textContent = `≈ ${fmt(q.net, 9, 6)} SOL after fees; min out is set 1% below.`;
+      state.sellMin = (q.net * 99n) / 100n;
+    } catch (e) { $('sellest').textContent = String(e.message || e).slice(0, 160); }
+  }
+
+  async function refresh() {
+    const info = await SOL.curveInfo(curveAddr);
+    if (!info.deployed) { showNotDeployed(); return; }
+    state.info = info;
+    render();
+  }
+
+  async function trade(kind) {
+    if (!state.addr) { paintWallet(); return; }
+    if (state.busy) return;
+    state.busy = true;
+    try {
+      if (!state.solUsd) state.solUsd = await SOL.solPriceUsd().catch(() => null);
+      if (kind === 'buy') {
+        const lamports = parseAmount($('buyamt').value, 9);
+        estimateBuy();
+        setStatus('Building the buy…');
+        const sig = await SOL.curveBuy({
+          curve: curveAddr,
+          lamports,
+          minTokensOut: state.buyMin || 0n,
+          onStep: (step) => setStatus(step === 'signing' ? 'Waiting for your wallet…' : step === 'sent' ? 'Sent — waiting for confirmation…' : ''),
+        });
+        toast('Bought on the curve', 'ok', { href: SOL.SOLSCAN_TX(sig), label: 'View ↗' });
+      } else {
+        const amount = parseAmount($('sellamt').value, state.info.decimals);
+        estimateSell();
+        setStatus('Building the sell…');
+        const sig = await SOL.curveSell({
+          curve: curveAddr,
+          amount,
+          minSolOut: state.sellMin || 0n,
+          onStep: (step) => setStatus(step === 'signing' ? 'Waiting for your wallet…' : step === 'sent' ? 'Sent — waiting for confirmation…' : ''),
+        });
+        toast('Sold on the curve', 'ok', { href: SOL.SOLSCAN_TX(sig), label: 'View ↗' });
+      }
+      setStatus('');
+      await refresh();
+    } catch (e) {
+      toast(SOL.humanize(e), 'bad');
+      setStatus('');
+    } finally { state.busy = false; }
+  }
+
+  async function graduate() {
+    if (!state.addr) { paintWallet(); return; }
+    if (state.busy) return;
+    state.busy = true;
+    try {
+      setStatus('Building the graduation…');
+      const sig = await SOL.curveGraduate({
+        curve: curveAddr,
+        pumpSwap: true,
+        onStep: (step) => setStatus(step === 'signing' ? 'Waiting for your wallet…' : step === 'sent' ? 'Sent — waiting for confirmation…' : ''),
+      });
+      toast('Graduated into PumpSwap', 'ok', { href: SOL.SOLSCAN_TX(sig), label: 'View ↗' });
+      await refresh();
+    } catch (e) { toast(SOL.humanize(e), 'bad'); }
+    finally { state.busy = false; setStatus(''); }
+  }
+
+  $('buyamt').addEventListener('input', estimateBuy);
+  $('sellamt').addEventListener('input', estimateSell);
+  $('sellmax').addEventListener('click', () => {
+    if (!state.info?.balance) return;
+    $('sellamt').value = decimalString(state.info.balance, state.info.decimals);
+    estimateSell();
+  });
+  $('buybtn').addEventListener('click', () => trade('buy'));
+  $('sellbtn').addEventListener('click', () => trade('sell'));
+  $('graduatebtn').addEventListener('click', graduate);
+  $('walletdisconnect').addEventListener('click', async () => { await SOL.disconnect(); paintWallet(); await refresh(); });
+  SOL.onSolWallet('accounts', () => { paintWallet(); refresh().catch(() => {}); });
+
+  (async () => {
+    if (!BASE58.test(curveAddr)) return fail('That is not a Solana curve address.');
+    try {
+      const live = await SOL.solanaCurveLive();
+      if (!live) return showNotDeployed();
+      await SOL.restore();
+      await refresh();
+      paintWallet();
+    } catch (e) {
+      fail(String(e?.message || e).slice(0, 240));
+    }
+  })();
+</script>
+</body>
+</html>

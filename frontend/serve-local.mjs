@@ -26,6 +26,8 @@ const STATIC = new Map([
   ['/names', 'app/names.html'],
   ['/launch/solana', 'app/launch-solana.html'],
   ['/locks/solana', 'app/locks-solana.html'],
+  ['/agents', 'app/agents.html'],
+  ['/agents.md', 'app/agents.md'],
   ['/me', 'app/me.html'],
   ['/activity', 'app/activity.html'],
   ['/dashboard', 'app/dashboard.html'],
@@ -48,6 +50,8 @@ const STATIC = new Map([
 ]);
 
 const DYNAMIC = [
+  [/^\/curve\/[^/]+\/0x[0-9a-fA-F]{40}$/, 'app/curve.html'],
+  [/^\/curve\/solana\/[1-9A-HJ-NP-Za-km-z]{32,44}$/, 'app/curve-solana.html'],
   [/^\/locks\/[^/]+\/record\/[^/]+$/, 'app/record.html'],
   [/^\/locks\/[^/]+\/position(?:\/[^/]+)?$/, 'app/position.html'],
   [/^\/locks\/[^/]+\/0x[0-9a-fA-F]{40}$/, 'app/token.html'],

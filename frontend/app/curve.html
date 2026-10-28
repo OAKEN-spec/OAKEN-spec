@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OAKEN Curve · OAKEN</title>
+<meta name="description" content="Read and trade an OAKEN curve launch: progress to graduation, buy and sell on the curve, and the locked pool that follows.">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位（"Reading…" / "Loading…"）干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/chain.webp"><source src="/app/media/chain-head.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">OAKEN Curve</div>
+    <h1 class="reveal" id="hero-title">Reading the curve…</h1>
+    <p class="muted reveal" id="hero-sub" style="max-width:64ch"></p>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:32px">
+    <div id="err" class="panel hide"><div class="body" id="errbody"></div></div>
+
+    <div id="view" class="hide">
+      <div class="stats reveal" style="margin-bottom:22px">
+        <div><div class="v" id="s-sold">—</div><div class="k">Tokens sold on the curve</div></div>
+        <div><div class="v" id="s-raised">—</div><div class="k">Raised</div></div>
+        <div><div class="v" id="s-line">—</div><div class="k">Graduation line</div></div>
+        <div><div class="v" id="s-status">—</div><div class="k">Status</div></div>
+      </div>
+
+      <div class="panel reveal">
+        <div class="head"><h3 id="progress-title">Progress</h3><span class="muted" id="progress-note" style="margin-left:auto;font-size:12.5px"></span></div>
+        <div class="body">
+          <div style="height:10px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden">
+            <div id="bar" style="height:100%;width:0;background:linear-gradient(90deg,#8a6a2f,#d9a343);transition:width .4s"></div>
+          </div>
+          <div class="hint" id="progress-hint" style="margin-top:8px"></div>
+          <div class="hint" id="addresses" style="margin-top:12px;display:flex;gap:14px;flex-wrap:wrap"></div>
+        </div>
+      </div>
+
+      <div class="row2" style="grid-template-columns:1fr 1fr;align-items:start;gap:22px;margin-top:22px">
+        <div class="panel reveal">
+          <div class="head"><h3>Buy on the curve</h3><span class="muted" id="buy-note" style="margin-left:auto;font-size:12.5px"></span></div>
+          <div class="body">
+            <label class="f" for="buyamt">Pay with the chain's native coin</label>
+            <input class="i" id="buyamt" placeholder="0.0" inputmode="decimal" autocomplete="off">
+            <div class="hint" id="buyest">Enter an amount to see the estimate.</div>
+            <button class="btn btn-p" id="buybtn" style="width:100%;margin-top:12px" disabled>Connect a wallet</button>
+          </div>
+        </div>
+
+        <div class="panel reveal">
+          <div class="head"><h3>Sell on the curve</h3><span class="muted" id="sell-note" style="margin-left:auto;font-size:12.5px"></span></div>
+          <div class="body">
+            <label class="f" for="sellamt">Tokens to sell</label>
+            <div class="row2" style="grid-template-columns:1fr auto;align-items:center">
+              <input class="i" id="sellamt" placeholder="0.0" inputmode="decimal" autocomplete="off">
+              <button type="button" class="btn btn-s" id="sellmax" style="white-space:nowrap" disabled>Max</button>
+            </div>
+            <div class="hint" id="sellest">Connect a wallet to see your balance.</div>
+            <button class="btn btn-s" id="sellbtn" style="width:100%;margin-top:12px" disabled>Connect a wallet</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel reveal" id="graduatepanel" style="margin-top:22px">
+        <div class="head"><h3>Graduation</h3></div>
+        <div class="body">
+          <div class="hint" id="graduatehint">The curve graduates when the sellable allocation is gone. The remaining tokens and the raise become a DEX position with no withdraw function; anyone can trigger it.</div>
+          <button class="btn btn-p" id="graduatebtn" style="width:100%;margin-top:12px" disabled>Not ready yet</button>
+        </div>
+      </div>
+
+      <div class="panel reveal" id="creatorpanel" style="margin-top:22px;display:none">
+        <div class="head"><h3>Creator fees</h3></div>
+        <div class="body">
+          <div class="hint" id="creatortext"></div>
+          <button class="btn btn-s" id="sweepbtn" style="width:100%;margin-top:12px">Sweep creator fees</button>
+        </div>
+      </div>
+
+      <div class="panel reveal" id="taxpanel" style="margin-top:22px;display:none">
+        <div class="head"><h3>Tax token</h3><span class="muted" id="taxstate" style="margin-left:auto;font-size:12.5px"></span></div>
+        <div class="body" id="taxbody"></div>
+      </div>
+
+      <div class="hint" id="after" style="margin-top:22px"></div>
+    </div>
+  </section>
+</main>
+
+<script src="/app/vendor/ethers.umd.min.js" defer></script>
+<script type="module">
+  import {
+    shell, wallet, onWallet, chains, currentChain, fmtAmount, short, copyBtn, explorerHref, toast, txNotice,
+    oakenCurveAt, oakenTokenAt, oakenTaxTokenAt,
+  } from '/app/oaken.js';
+
+  shell({ active: 'launch' });
+
+  const $ = (id) => document.getElementById(id);
+  const parts = location.pathname.split('/').filter(Boolean);
+  const slug = parts[1] || '';
+  const curveAddr = parts[2] || '';
+  const state = { chain: null, addr: null, tokenAddr: null, tokenDecimals: 18, symbol: '', meta: null, account: null };
+
+  const ZERO = () => window.ethers.ZeroAddress;
+  const fmtNative = (v, max = 6) => fmtAmount(v, 18, max);
+
+  function fail(msg) {
+    $('view').classList.add('hide');
+    $('err').classList.remove('hide');
+    $('errbody').innerHTML = '<b>This curve page could not load.</b><div class="hint" style="margin-top:8px">' + String(msg || '') + '</div>';
+  }
+
+  async function ethersReady() {
+    for (let i = 0; i < 100; i++) {
+      if (window.ethers) return window.ethers;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error('ethers did not load — reload the page (Ctrl+F5).');
+  }
+
+  async function readAccount() {
+    try { return (await wallet.accounts())[0] || null; } catch { return null; }
+  }
+
+  function pct(a, b) {
+    if (!b || b === 0n) return 0;
+    return Math.min(100, Number((a * 10000n) / b) / 100);
+  }
+
+  async function refresh(accountHint = undefined) {
+    const c = state.curve;
+    if (!c) return;
+    const [tokenAddr, trackedQuote, trackedTokens, reserved, threshold, launchSupply, graduated, ready, reserves, sellable, feeBps, creatorTaxBps, creatorFeeRecipient, launchedAt] =
+      await Promise.all([
+        c.token(), c.trackedQuote(), c.trackedTokens(), c.reservedTokens(), c.graduationThreshold(),
+        c.launchSupply(), c.graduated(), c.readyToGraduate(), c.getReserves(), c.sellableTokens(),
+        c.feeBps(), c.creatorTaxBps(), c.creatorFeeRecipient(), c.launchedAt(),
+      ]);
+    state.tokenAddr = tokenAddr;
+    const t = oakenTokenAt(state.chain, tokenAddr);
+    const [symbol, name, decimals, supply] = await Promise.all([
+      t.symbol().catch(() => '—'), t.name().catch(() => '—'), t.decimals().catch(() => 18), t.totalSupply().catch(() => launchSupply),
+    ]).catch(() => ['—', '—', 18, launchSupply]);
+    state.symbol = symbol; state.tokenDecimals = Number(decimals);
+    state.meta = { name, decimals: Number(decimals), supply };
+
+    // After graduation trackedTokens is 0 but the reserved slice was not sold;
+    // cap the sold figure at the sellable allocation so the stat doesn't read
+    // "1,000,000,000 sold" when 28% went into the locked pool.
+    const sold = launchSupply - trackedTokens;
+    const sellableTotal = launchSupply - reserved;
+    const soldShown = sold > sellableTotal ? sellableTotal : sold;
+    const soldPct = pct(soldShown, sellableTotal);
+    const raisePct = pct(trackedQuote, threshold);
+    $('hero-title').textContent = `${symbol} · OAKEN Curve`;
+    $('hero-sub').textContent = `${name} is on the curve. ${graduated ? 'It graduated — the pool is locked.' : ready ? 'The sellable allocation is gone; graduation is ready.' : 'Buy from the curve, or sell back into it.'}`;
+    $('s-sold').textContent = `${fmtAmount(soldShown, Number(decimals), 2)}`;
+    $('s-raised').textContent = graduated ? '—' : `${fmtNative(trackedQuote)} ${state.chain.native}`;
+    $('s-raised').title = graduated ? 'The raise was moved into the locked pool at graduation.' : '';
+    $('s-line').textContent = `${fmtNative(threshold)} ${state.chain.native}`;
+    $('s-status').textContent = graduated ? 'Graduated' : ready ? 'Ready' : 'On the curve';
+    $('bar').style.width = `${Math.max(soldPct, raisePct)}%`;
+    $('progress-note').textContent = `${soldPct.toFixed(2)}% of the sellable allocation`;
+    $('progress-hint').innerHTML = graduated
+      ? 'The curve is closed. The remaining tokens and the raise were moved into a position owned by the graduator; there is no withdraw function.'
+      : `${fmtAmount(sellable, Number(decimals), 2)} ${symbol} still sellable · reserved for the pool: ${fmtAmount(reserved, Number(decimals), 2)} ${symbol}`;
+    $('addresses').innerHTML = `Token ${copyBtn(tokenAddr, 'copy CA')} <span class="mono">${short(tokenAddr, 6)}</span> · Curve <span class="mono">${short(curveAddr, 6)}</span>`
+      + (explorerHref('/address/' + curveAddr, state.chain) ? ` · <a href="${explorerHref('/address/' + curveAddr, state.chain)}" target="_blank" rel="noopener">Explorer ↗</a>` : '')
+      + ` · <a href="/locks/${state.chain.slug}/${tokenAddr}">Token page →</a>`;
+
+    state.trackedQuote = trackedQuote; state.trackedTokens = trackedTokens;
+    state.reserved = reserved; state.threshold = threshold; state.launchSupply = launchSupply;
+    state.graduated = graduated; state.ready = ready;
+    state.reserves = reserves; state.sellable = sellable;
+    state.feeBps = feeBps; state.creatorTaxBps = creatorTaxBps;
+    state.creatorFeeRecipient = creatorFeeRecipient;
+
+    /* The accountsChanged path passes the address in: never re-query
+       eth_accounts from inside that event (a wallet that re-emits would loop). */
+    state.account = accountHint === undefined ? await readAccount() : accountHint;
+    const connected = !!state.account;
+    $('buy-note').textContent = graduated ? 'Curve closed' : ready ? 'Graduation ready' : `${fmtAmount(sellable, Number(decimals), 0)} ${symbol} left`;
+    $('buybtn').textContent = !connected ? 'Connect a wallet' : graduated || ready ? 'The curve is complete' : 'Buy on the curve';
+    $('buybtn').disabled = graduated || ready;
+    $('sell-note').textContent = graduated ? 'Curve closed' : ready ? 'Graduation ready' : '';
+    $('sellbtn').textContent = !connected ? 'Connect a wallet' : graduated || ready ? 'The curve is complete' : 'Sell on the curve';
+    $('sellbtn').disabled = graduated || ready;
+    const bal = connected ? await t.balanceOf(state.account).catch(() => 0n) : 0n;
+    state.balance = bal;
+    $('sellest').textContent = connected ? `Your balance: ${fmtAmount(bal, Number(decimals), 4)} ${symbol}` : 'Connect a wallet to see your balance.';
+    $('sellmax').disabled = !connected || bal === 0n;
+    $('graduatebtn').textContent = graduated ? 'Graduated' : ready ? 'Graduate the curve' : 'Not ready yet';
+    $('graduatebtn').disabled = graduated || !ready;
+    $('graduatehint').textContent = graduated
+      ? 'Done. The position is owned by the graduator and there is no function in it that can move the position.'
+      : 'The curve graduates when the sellable allocation is gone. The remaining tokens and the raise become a DEX position with no withdraw function; anyone can trigger it.';
+    $('after').innerHTML = graduated
+      ? 'Trading now happens on the DEX pool. The token page shows locks and balances; the pool position is held by the graduator forever.'
+      : 'Until graduation the only market is this curve. Every buy and sell is against the contract, not a pool.';
+
+    // Creator fee sweep, only for the recipient.
+    if (connected && creatorFeeRecipient && state.account.toLowerCase() === creatorFeeRecipient.toLowerCase()) {
+      const pending = await c.pendingCreatorFees().catch(() => 0n);
+      $('creatorpanel').style.display = '';
+      $('creatortext').textContent = pending > 0n
+        ? `Pending: ${fmtNative(pending)} ${state.chain.native}. Only the creator fee recipient can sweep it; the principal is not withdrawable.`
+        : 'No creator fees pending right now.';
+      $('sweepbtn').disabled = pending === 0n;
+    } else {
+      $('creatorpanel').style.display = 'none';
+    }
+
+    // Tax token details, when the token exposes them.
+    try {
+      const tax = oakenTaxTokenAt(state.chain, tokenAddr);
+      const cfg = await tax.tax();
+      const [start, active] = await Promise.all([tax.taxStart(), tax.taxActive()]);
+      $('taxpanel').style.display = '';
+      $('taxstate').textContent = active ? 'Active' : (start > 0n ? 'Window ended' : 'Not started');
+      const w = (a) => `<span class="mono">${short(a, 4)}</span>`;
+      $('taxbody').innerHTML = `<div style="display:grid;gap:6px">`
+        + `<div><b>Buy tax</b> ${Number(cfg.buyTaxBps) / 100}% · <b>Sell tax</b> ${Number(cfg.sellTaxBps) / 100}% · window ${Number(cfg.taxDuration) / 86400} days</div>`
+        + `<div class="hint">Split: marketing ${Number(cfg.marketingBps) / 100}% · deflation ${Number(cfg.deflationBps) / 100}% · dividend ${Number(cfg.dividendBps) / 100}% · liquidity ${Number(cfg.liquidityBps) / 100}%</div>`
+        + `<div class="hint">Wallets: marketing ${w(cfg.marketingWallet)} · dividend ${w(cfg.dividendWallet)} · liquidity ${w(cfg.liquidityWallet)} · platform ${w(cfg.commissionReceiver)}</div>`
+        + `<div class="hint">${start === 0n ? 'The tax starts when the pool is registered at graduation.' : `Tax window started at ${new Date(Number(start) * 1000).toLocaleString()}.`}</div>`
+        + `</div>`;
+    } catch { $('taxpanel').style.display = 'none'; }
+
+    estimateBuy();
+    estimateSell();
+  }
+
+  async function estimateBuy() {
+    if (!state.reserves || !state.account) { $('buyest').textContent = 'Connect a wallet to see the estimate.'; return; }
+    const raw = $('buyamt').value.trim();
+    if (!raw || Number(raw) <= 0) { $('buyest').textContent = 'Enter an amount to see the estimate.'; return; }
+    try {
+      const amount = window.ethers.parseEther(raw);
+      const [quoteReserve, tokenReserve] = state.reserves;
+      const snipe = await state.curve.currentSnipeTaxBps(state.account).catch(() => 0n);
+      const total = state.feeBps + state.creatorTaxBps + snipe;
+      if (total >= 10000n) { $('buyest').textContent = 'This wallet is in the snipe window; the tax would take the whole buy. Try again in a few seconds.'; return; }
+      const net = amount - (amount * state.feeBps) / 10000n - (amount * state.creatorTaxBps) / 10000n - (amount * snipe) / 10000n;
+      const rawOut = (net * tokenReserve) / (quoteReserve + net);
+      const out = rawOut > state.sellable ? state.sellable : rawOut;
+      const clamped = rawOut > state.sellable;
+      state.buyMin = (out * 99n) / 100n;
+      $('buyest').textContent = `≈ ${fmtAmount(out, state.tokenDecimals, 3)} ${state.symbol} (fees: ${Number(total) / 100}%${snipe > 0n ? ', snipe tax active' : ''})`
+        + (clamped ? '. This buy completes the curve; the unused coin is refunded.' : '; min out is set 1% below.');
+    } catch (e) { $('buyest').textContent = String(e.message || e).slice(0, 140); }
+  }
+
+  async function estimateSell() {
+    if (!state.reserves || !state.account) return;
+    const raw = $('sellamt').value.trim();
+    if (!raw || Number(raw) <= 0) return;
+    try {
+      const amount = window.ethers.parseUnits(raw, state.tokenDecimals);
+      const [quoteReserve, tokenReserve] = state.reserves;
+      const gross = (amount * quoteReserve) / (tokenReserve + amount);
+      const fee = (gross * state.feeBps) / 10000n;
+      const tax = (gross * state.creatorTaxBps) / 10000n;
+      const out = gross - fee - tax;
+      state.sellMin = (out * 99n) / 100n;
+      $('sellest').textContent = `≈ ${fmtNative(out)} ${state.chain.native} after fees; min out is set 1% below.`;
+    } catch (e) { $('sellest').textContent = String(e.message || e).slice(0, 140); }
+  }
+
+  async function trade(kind) {
+    try {
+      const account = await wallet.connect(state.chain);
+      if (!account) return;
+      await wallet.ensureChain(state.chain);
+      const signer = await wallet.signer();
+      const curve = oakenCurveAt(state.chain, curveAddr, signer);
+      if (kind === 'buy') {
+        const amount = window.ethers.parseEther($('buyamt').value.trim() || '0');
+        if (amount <= 0n) throw new Error('Enter an amount first.');
+        await estimateBuy();
+        const note = txNotice(state.chain, 'Curve buy');
+        const tx = await curve.buy(state.buyMin || 0n, account, { value: amount });
+        note.sent(tx.hash);
+        await tx.wait();
+        note.ok('Bought on the curve.');
+      } else {
+        const amount = window.ethers.parseUnits($('sellamt').value.trim() || '0', state.tokenDecimals);
+        if (amount <= 0n) throw new Error('Enter an amount first.');
+        await estimateSell();
+        const token = oakenTokenAt(state.chain, state.tokenAddr, signer);
+        const note = txNotice(state.chain, 'Curve sell');
+        const allowance = await token.allowance(account, curveAddr);
+        if (allowance < amount) {
+          note.update('Approve the curve to move your tokens…');
+          const a = await token.approve(curveAddr, amount);
+          note.update('Approval sent — waiting for the block…');
+          await a.wait();
+        }
+        const tx = await curve.sell(amount, state.sellMin || 0n, account);
+        note.sent(tx.hash);
+        await tx.wait();
+        note.ok('Sold on the curve.');
+      }
+      await refresh();
+    } catch (e) {
+      toast(String((e && (e.shortMessage || e.message)) || e).slice(0, 180), 'bad');
+    }
+  }
+
+  async function boot() {
+    await ethersReady();
+    const live = await chains();
+    state.chain = live.find((c) => c.slug === slug) || await currentChain();
+    if (!state.chain) return fail('Unknown chain.');
+    if (!/^0x[0-9a-fA-F]{40}$/.test(curveAddr)) return fail('That is not a curve address.');
+    state.addr = curveAddr;
+    state.curve = oakenCurveAt(state.chain, curveAddr);
+    try { await state.curve.token(); } catch { return fail('There is no curve at that address on ' + state.chain.name + '.'); }
+    $('view').classList.remove('hide');
+    await refresh();
+    onWallet('accounts', (a) => { refresh(a).catch(() => {}); });
+  }
+
+  $('buyamt').addEventListener('input', () => estimateBuy().catch(() => {}));
+  $('sellamt').addEventListener('input', () => estimateSell().catch(() => {}));
+  $('sellmax').addEventListener('click', () => {
+    if (!state.balance) return;
+    $('sellamt').value = window.ethers.formatUnits(state.balance, state.tokenDecimals);
+    estimateSell().catch(() => {});
+  });
+  $('buybtn').addEventListener('click', () => trade('buy'));
+  $('sellbtn').addEventListener('click', () => trade('sell'));
+  $('graduatebtn').addEventListener('click', async () => {
+    try {
+      const account = await wallet.connect(state.chain);
+      if (!account) return;
+      await wallet.ensureChain(state.chain);
+      const curve = oakenCurveAt(state.chain, curveAddr, await wallet.signer());
+      const note = txNotice(state.chain, 'Graduation');
+      const tx = await curve.graduate();
+      note.sent(tx.hash);
+      await tx.wait();
+      note.ok('Graduated — the pool position is locked.');
+      await refresh();
+    } catch (e) {
+      toast(String((e && (e.shortMessage || e.message)) || e).slice(0, 180), 'bad');
+    }
+  });
+  $('sweepbtn').addEventListener('click', async () => {
+    try {
+      await wallet.connect(state.chain);
+      await wallet.ensureChain(state.chain);
+      const curve = oakenCurveAt(state.chain, curveAddr, await wallet.signer());
+      const note = txNotice(state.chain, 'Creator fees');
+      const tx = await curve.sweepCreatorFees();
+      note.sent(tx.hash);
+      await tx.wait();
+      note.ok('Creator fees swept.');
+      await refresh();
+    } catch (e) {
+      toast(String((e && (e.shortMessage || e.message)) || e).slice(0, 180), 'bad');
+    }
+  });
+
+  boot().catch((e) => fail(String((e && e.message) || e).slice(0, 200)));
+</script>
+</body>
+</html>

@@ -86,7 +86,7 @@
         <div class="card"><h3>Who owns OAKEN?</h3>
           <p>No operator can move a lock or change its schedule. <b>v4 is upgradeable:</b> a 2-of-3 multisig can
             schedule a new vault implementation, and every upgrade waits 48 hours on-chain. v1, v2 and v3 have
-            no owner and no upgrade path. The Bonds contracts have an admin — a 2-of-3 Safe behind a 24h
+            no owner and no upgrade path. The Bonds contracts have an admin — a 2-of-3 Safe behind a 48h
             Timelock — and that boundary is stated on every Bonds page. The website is a reader; it is not the
             vault.</p></div>
         <div class="card"><h3>Can the lock contract be upgraded?</h3>
@@ -155,7 +155,7 @@
       <div class="grid2" data-stagger style="margin-top:26px">
         <div class="card"><h3>Why do Bonds have an admin if Locks have no operator?</h3>
           <p>aOAKEN needs a NAV feed, fee parameters and a reward stream. Those are governance variables, so
-            they sit behind a 2-of-3 Safe and a 24h Timelock. The Safe cannot move vault reserves, mint aOAKEN
+            they sit behind a 2-of-3 Safe and a 48h Timelock. The Safe cannot move vault reserves, mint aOAKEN
             without USDG, or force a redemption. Locks and Bonds are separate products with separate trust
             assumptions; the site does not blur them.</p></div>
         <div class="card"><h3>What yield do Bonds pay?</h3>

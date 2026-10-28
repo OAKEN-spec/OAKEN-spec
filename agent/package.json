@@ -1,0 +1,13 @@
+{
+  "name": "oaken-agent-reports",
+  "private": true,
+  "type": "module",
+  "description": "OAKEN Agent Reports — deterministic on-chain reports + x402",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node test-x402.mjs && node test-narrative.mjs"
+  },
+  "dependencies": {
+    "ethers": "^6.17.0"
+  }
+}

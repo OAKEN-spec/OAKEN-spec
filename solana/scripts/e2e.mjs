@@ -15,10 +15,17 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import * as web3 from '@solana/web3.js';
 import { createMint, getOrCreateAssociatedTokenAccount, mintTo, getAccount } from '@solana/spl-token';
+
+/* 临时 keypair 的落盘目录。**生成即落盘**，`finally` 里扫回并在成功后删除；
+   2026-10-25 的教训：只在 try 末尾 sweep，失败路径直接退出，0.2 SOL 留在
+   四个只存在于内存里的 keypair 上（私钥丢了，找不回）。 */
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const TEMP_DIR = path.join(HERE, '..', '.e2e-temp');
 
 /* 指令构造在 solana-build.js（纯函数）；`solana.js` 只做网络与钱包，不导出 makeSolana。
    源码树里是 `app/solana-build.js`，导出仓库里是 `frontend/app/solana-build.js`。 */
@@ -120,10 +127,61 @@ async function waitForRpc(conn, tries = 60) {
   };
   if (!(await waitForRpc(conn))) { console.error('✗ 本地验证器没起来（RPC ' + RPC + '）'); process.exit(1); }
 
+  let payer = null;
+  const tempKeypairs = [];
+
+  /** 生成即落盘：即使进程下一秒崩掉，私钥还在，下一次运行能扫回。
+     文件里记下 RPC —— 本地跑一次不能把上次主网遗留的私钥当成本地账户删掉。 */
+  const saveTempKey = (kp) => {
+    fs.mkdirSync(TEMP_DIR, { recursive: true });
+    const file = path.join(TEMP_DIR, kp.publicKey.toBase58() + '.json');
+    fs.writeFileSync(file, JSON.stringify({ rpc: RPC, secretKey: Array.from(kp.secretKey) }), { mode: 0o600 });
+    tempKeypairs.push({ kp, file });
+    console.log('  临时钱包 ' + kp.publicKey.toBase58() + ' → ' + path.relative(path.join(HERE, '..'), file));
+  };
+
+  /** 把临时钱包的余额扫回付款人，留 0.001 SOL（高于 rent-exempt 最小值）。 */
+  const sweep = async (kp) => {
+    if (!payer) return;
+    const bal = await conn.getBalance(kp.publicKey);
+    const reserve = 1_000_000;
+    if (bal > reserve) {
+      await sendAndConfirm(conn, new Transaction().add(SystemProgram.transfer({
+        fromPubkey: kp.publicKey, toPubkey: payer.publicKey, lamports: bal - reserve,
+      })), [kp]);
+      console.log('  扫回 ' + ((bal - reserve) / LAMPORTS_PER_SOL).toFixed(6) + ' SOL ← ' + kp.publicKey.toBase58());
+    }
+  };
+
+  /** 上一次运行如果死在中途，先把它留在 .e2e-temp 的钱扫回来。
+      只处理**同一条 RPC** 的文件；别的网络的私钥原样留着，不能删。 */
+  async function recoverLeftovers() {
+    if (!fs.existsSync(TEMP_DIR)) return;
+    for (const f of fs.readdirSync(TEMP_DIR).filter((x) => x.endsWith('.json'))) {
+      const file = path.join(TEMP_DIR, f);
+      try {
+        const entry = JSON.parse(fs.readFileSync(file, 'utf8'));
+        if (Array.isArray(entry)) {
+          console.log('  跳过 ' + file + '：旧格式没有记录 RPC，无法判断是哪条链');
+          continue;
+        }
+        if (entry.rpc !== RPC) {
+          console.log('  跳过 ' + file + '：属于 ' + entry.rpc + '，本次是 ' + RPC);
+          continue;
+        }
+        const kp = Keypair.fromSecretKey(Uint8Array.from(entry.secretKey));
+        console.log('  发现上次遗留的临时钱包 ' + kp.publicKey.toBase58() + '，先扫回');
+        await sweep(kp);
+        try { fs.unlinkSync(file); } catch { /* 留着也无害 */ }
+      } catch (e) {
+        console.error('  ✗ 遗留 keypair 处理失败 ' + file + '：' + (e.message || e));
+      }
+    }
+  }
+
   try {
     /* ── 准备：付款账户、一个 6 位小数的代币 ─────────────────────────── */
     console.log('\n① 准备');
-    let payer;
     if (LOCAL && !process.env.PAYER_KEYPAIR) {
       payer = Keypair.generate();
       await conn.confirmTransaction(await conn.requestAirdrop(payer.publicKey, 5 * LAMPORTS_PER_SOL));
@@ -138,6 +196,7 @@ async function waitForRpc(conn, tries = 60) {
         process.exit(1);
       }
     }
+    await recoverLeftovers();
     check('付款账户有币', (await conn.getBalance(payer.publicKey)) > 0, true);
     const fund = async (to, sol = 0.05) => {
       await sendAndConfirm(conn, new Transaction().add(SystemProgram.transfer({
@@ -153,6 +212,7 @@ async function waitForRpc(conn, tries = 60) {
     check('付款人拿到代币', (await getAccount(conn, payerAta.address)).amount, total);
 
     const beneficiary = Keypair.generate();
+    saveTempKey(beneficiary);
     await fund(beneficiary.publicKey);                 // 它要自己签 claim/transfer/renounce
     const [config] = S.configPda();
     /* 本地校验器一般从 0 开始，但 devnet 上程序可能已经跑过 —— 判据用**起点**，不写死 0。 */
@@ -249,6 +309,7 @@ async function waitForRpc(conn, tries = 60) {
     /* ── 转让 / 放弃 ────────────────────────────────────────────────── */
     console.log('\n⑤ 转让与放弃');
     const heir = Keypair.generate();
+    saveTempKey(heir);
     await fund(heir.publicKey);
     await sendAndConfirm(conn, new Transaction().add(S.transferIx({
       lock: lockPda2, beneficiary: beneficiary.publicKey, newBeneficiary: heir.publicKey,
@@ -302,31 +363,23 @@ async function waitForRpc(conn, tries = 60) {
     console.log('\n⑦ 计数器');
     check('下一个 id', await S.readNextId(conn), startId + 3);
 
-    /* 主网跑的是真 SOL：把 beneficiary / heir 剩下的余额扫回付款人，
-       别把 0.1 SOL 留在临时 keypair 里。ATA 的 rent 留在受益人账户下（程序没有 close）。 */
-    const sweep = async (kp) => {
-      const bal = await conn.getBalance(kp.publicKey);
-      const fee = 1_000_000;   // 留 0.001 SOL —— 低于 rent-exempt 最小值的账户会被运行时拒绝
-      if (bal > fee) {
-        await sendAndConfirm(conn, new Transaction().add(SystemProgram.transfer({
-          fromPubkey: kp.publicKey, toPubkey: payer.publicKey, lamports: bal - fee,
-        })), [kp]);
-      }
-    };
-    await sweep(beneficiary);
-    await sweep(heir);
-
     console.log(`\n${bad === 0 ? `✓ 全部通过（${ok} 条）` : `✗ ${bad} 条没过（通过 ${ok}）`}`);
-    /* 成功路径也要**明确退出**：spawn 出来的 validator 是活句柄，
-       只设 process.exitCode 再等事件循环排空会一直挂着（2026-10-23 CI 抓到的）。 */
-    if (validator) { try { validator.kill('SIGKILL'); } catch { /* 已经退了 */ } }
-    process.exit(bad === 0 ? 0 : 1);
   } finally {
+    /* 成功、断言失败、网络错误都走这里：把临时钱包的余额扫回付款人。
+       扫回成功才删私钥文件；失败就把文件留在 .e2e-temp 并报出来。 */
+    for (const { kp, file } of tempKeypairs.splice(0)) {
+      try {
+        await sweep(kp);
+        try { fs.unlinkSync(file); } catch { /* 留着也无害 */ }
+      } catch (e) {
+        console.error('  ✗ 扫回失败 ' + kp.publicKey.toBase58() + '：' + (e.message || e) + '；私钥保留在 ' + file);
+      }
+    }
     if (validator) {
       try { validator.kill('SIGKILL'); } catch { /* 已经退了 */ }
     }
   }
-})().catch((e) => {
+})().then(() => process.exit(bad === 0 ? 0 : 1)).catch((e) => {
   console.error('✗ ' + (e.message || e));
   if (e && e.logs) console.error('logs: ' + JSON.stringify(e.logs));
   if (e && e.transactionLogs) console.error('transactionLogs: ' + JSON.stringify(e.transactionLogs));

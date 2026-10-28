@@ -4,7 +4,7 @@ export const GOVERNANCE = {
   safe: '0x5E8C4c241a29ff7E60c648f378A4AA70053Ee92e',
   timelock: '0x2f848dBdD8b0384AcB1102d959B63E71Ecf44845',
   timelockDeployBlock: 90810577,
-  timelockDelaySec: 86400,
+  timelockDelaySec: 172800,
   safeUrl: 'https://robinhoodchain.blockscout.com/address/0x5E8C4c241a29ff7E60c648f378A4AA70053Ee92e',
   timelockUrl: 'https://robinhoodchain.blockscout.com/address/0x2f848dBdD8b0384AcB1102d959B63E71Ecf44845',
   explorer: 'https://robinhoodchain.blockscout.com',

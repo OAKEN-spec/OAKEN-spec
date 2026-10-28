@@ -4,7 +4,7 @@
   "description": "OAKEN Solana lock program, launch encoders and E2E",
   "main": "index.js",
   "scripts": {
-    "test": "node --test test/builders.test.mjs"
+    "test": "node --test test/builders.test.mjs test/sns-build.test.mjs test/jup-claimable.test.mjs test/curve-builders.test.mjs"
   },
   "keywords": [],
   "author": "",

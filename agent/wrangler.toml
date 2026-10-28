@@ -1,0 +1,35 @@
+name = "oaken-agents"
+main = "worker.mjs"
+compatibility_date = "2026-09-10"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# The report index lives in a SQLite-backed Durable Object so a report URL
+# survives restarts and deployments. One instance (`index`) is the whole index.
+[durable_objects]
+bindings = [{ name = "REPORTS", class_name = "ReportsDO" }]
+
+# Direct API reports are paid in USDG over x402. The Pages proxy adds
+# `x-oaken-site-key` server-side (secret AGENT_SITE_KEY, same value on the Pages
+# project), so the web page stays free. AGENT_FACILITATOR_KEY is a secret, not
+# a var: set it with `wrangler secret put`.
+[vars]
+AGENT_FREE_BETA = "0"
+AGENT_PAY_TO = "0x27605b8D0f754A2eee5ABAf0b7D8524A54DD2cE2"
+# The narrative is optional and guarded in agent/narrative.mjs: the model may
+# only use numbers that already exist in the report's fact sheet. Set
+# AGENT_NARRATIVE=0 to turn it off without changing the Worker.
+AGENT_NARRATIVE = "1"
+AGENT_NARRATIVE_MODEL = "@cf/mistralai/mistral-small-3.1-24b-instruct"
+
+# Workers AI produces the optional narrative. If the binding is removed, the
+# reports still build; they simply have no narrative field.
+[ai]
+binding = "AI"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ReportsDO"]
+
+[observability]
+enabled = true

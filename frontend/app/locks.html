@@ -337,8 +337,10 @@
     paint();
   }
 
-  function wire() {
-    paint();
+  let controlsWired = false;
+  function wireControls() {
+    if (controlsWired) return;
+    controlsWired = true;
     for (const b of document.querySelectorAll('#scope button')) {
       b.onclick = async () => {
         scope = b.dataset.scope;
@@ -360,6 +362,12 @@
       if (page < pages) { page++; paint(); }
     };
     document.getElementById('chain').addEventListener('change', (e) => { chainFilter = Number(e.target.value); paint(); });
+  }
+
+  let noteWired = false;
+  function wireNote() {
+    if (noteWired) return;
+    noteWired = true;
     document.getElementById('note').textContent =
       `Owned by the lockers' beneficiaries; amounts are what is held right now.
        Rows marked live are read from the chain this second — the rest come from the index snapshot that ships
@@ -596,8 +604,9 @@
       document.getElementById('count').textContent = '0 locks';
       return;
     }
-    wire();
   }
+  wireControls();
+  wireNote();
   load();
 </script>
 </body>

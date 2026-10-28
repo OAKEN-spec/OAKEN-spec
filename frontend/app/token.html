@@ -181,6 +181,7 @@
         <a class="pill" target="_blank" rel="noopener" href="${explorer('/token/' + token, chain)}">explorer ↗</a>
         <a class="pill ok" target="_blank" rel="noopener" title="the lock contracts are exact matches on Sourcify"
            href="https://sourcify.dev/#/lookup/${rows.some((r) => r.version === 'v4') ? ADAPTER_V4 : rows.some((r) => r.version === 'v3') ? ADAPTER_V3 : rows.some((r) => r.version === 'v2') ? ADAPTER_V2 : ADAPTER}">source verified ↗</a>
+        <a class="pill" href="/agents?token=${token}" title="read this token, its locks and its Pons state with the agent">agent report →</a>
       </div>
       ${rows.some((r) => r.version === 'v4') ? '<div class="hint" style="margin-top:12px">Some of these locks are in the upgradeable v4 vault: a 2-of-3 multisig can replace the vault code after a public 48-hour delay, but it cannot move a lock\'s tokens or change its schedule directly. Locks in v1–v3 are immutable.</div>' : ''}
       <div class="panel" style="margin-top:26px">

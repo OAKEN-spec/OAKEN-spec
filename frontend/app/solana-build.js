@@ -56,6 +56,22 @@ export const PUMP_FEE_CONFIG = '8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt';
 export const PUMP_BUYBACK_RECIPIENT = 'GXPFM2caqTtQYC2cJ5yJRi9VDkpsYZXzYdwYpGnLmtDL';
 export const WSOL_MINT = 'So11111111111111111111111111111111111111112';
 
+/* OAKEN Curve（Solana）—— 源码在 `solana/curve-program/`，已构建/已测，**尚未主网部署**。
+ * 部署前页面只读状态会明确写“not deployed”；这些构造器先把协议字节钉死在测试里。 */
+export const OAKEN_CURVE_PROGRAM_ID = 'BvTeztC4ENG8x2TW19AkiJ9EnC9JNresmA1pE6MBWpRi';
+export const PUMP_AMM_PROGRAM_ID = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA';
+export const CURVE_TOKEN_DECIMALS = 6;
+export const CURVE_TOTAL_SUPPLY = 1_000_000_000n * 1_000_000n;
+export const CURVE_SELLABLE = 793_100_000n * 1_000_000n;
+export const CURVE_RESERVED = 206_900_000n * 1_000_000n;
+export const CURVE_INITIAL_VIRTUAL_SOL = 30_000_000_000n;
+export const CURVE_INITIAL_VIRTUAL_TOKEN = 1_073_000_000n * 1_000_000n;
+export const CURVE_GRADUATION_LAMPORTS = 85_000_000_000n;
+export const CURVE_PROTOCOL_FEE_BPS = 95;
+export const CURVE_MAX_CREATOR_FEE_BPS = 300;
+/** The protocol's 95 bps go here; the creator's fee goes to the wallet that launched. */
+export const CURVE_PROTOCOL_FEE_RECIPIENT = '6GQkYV92h1YCZSkH5PYqSWMYjGPPYyN7472tQsgNSsfs';
+
 /**
  * 造出一整套指令构造器。
  * @param {object} web3 `@solana/web3.js` 或浏览器的 `window.solanaWeb3`
@@ -80,6 +96,9 @@ export function makeSolana(web3) {
   const pump = pk(PUMP_PROGRAM_ID);
   const mayhem = pk(PUMP_MAYHEM_PROGRAM_ID);
   const jup = pk(JUP_LOCK_PROGRAM_ID);
+  const curveProgram = pk(OAKEN_CURVE_PROGRAM_ID);
+  const amm = pk(PUMP_AMM_PROGRAM_ID);
+  const wsol = pk(WSOL_MINT);
 
   const buf = (u8s) => Buf.from(u8s);
   const u64le = (n) => {
@@ -695,6 +714,217 @@ export function makeSolana(web3) {
     return lock.amount - lock.claimed;
   };
 
+  /* ── OAKEN Curve（Solana）──────────────────────────────────────────────── */
+
+  const curvePda = (mint) => findPda(['curve', pk(mint).toBuffer()], curveProgram);
+  const curveSolVault = (mint) => findPda(['sol', pk(mint).toBuffer()], curveProgram);
+  const curvePumpAuthority = (mint) => findPda(['pump', pk(mint).toBuffer()], curveProgram);
+  const curveAta = (mint) => ata(curvePumpAuthority(mint)[0], mint);
+  const curveMetadataPda = (mint) => findPda(
+    ['metadata', metaplex.toBuffer(), pk(mint).toBuffer()],
+    metaplex,
+  );
+  const curveGraduateVault = (mint) => findPda(['graduate', pk(mint).toBuffer()], curveProgram);
+  const curveGraduateVaultAta = (mint) => ata(curveGraduateVault(mint)[0], mint);
+
+  const ammGlobalConfig = findPda(['global_config'], amm)[0];
+  const ammEventAuthority = findPda(['__event_authority'], amm)[0];
+  const ammPoolPda = (mint, index = 0) => findPda(
+    ['pool', u16le(index), curvePumpAuthority(mint)[0].toBuffer(), pk(mint).toBuffer(), wsol.toBuffer()],
+    amm,
+  );
+  const ammLpMintPda = (pool) => findPda(['pool_lp_mint', pk(pool).toBuffer()], amm);
+  const curveWsolAta = (mint) => ata(curvePumpAuthority(mint)[0], wsol, token);
+  const curveLpAta = (mint, lpMint) => ata(curvePumpAuthority(mint)[0], lpMint, token2022);
+  const ammPoolBaseAta = (pool, mint) => ata(pool, mint, token);
+  const ammPoolQuoteAta = (pool) => ata(pool, wsol, token);
+
+  const curveString = (value, max, label) => {
+    const raw = Buf.from(String(value ?? ''), 'utf8');
+    if (!raw.length || raw.length > max) throw new Error(`${label} must be 1–${max} UTF-8 bytes.`);
+    return Buf.concat([u16le(raw.length), raw]);
+  };
+
+  /**
+   * `CreateWithMetadata` (tag 5). The program writes Metaplex metadata through
+   * a CPI before it mints and renounces; after the renounce the curve PDA can
+   * no longer sign for Metaplex. 11 curve accounts + metadata PDA + Metaplex.
+   */
+  const createCurveWithMetadataIx = ({
+    creator, mint, protocolFeeRecipient, creatorFeeRecipient,
+    creatorFeeBps = 5, name, symbol, uri,
+  }) => {
+    const [curve] = curvePda(mint);
+    const [metadata] = curveMetadataPda(mint);
+    const fee = Number(creatorFeeBps);
+    if (!Number.isInteger(fee) || fee < 0 || fee > CURVE_MAX_CREATOR_FEE_BPS) {
+      throw new Error(`Creator fee must be 0–${CURVE_MAX_CREATOR_FEE_BPS} bps.`);
+    }
+    return new TransactionInstruction({
+      programId: curveProgram,
+      keys: [
+        { pubkey: pk(creator), isSigner: true, isWritable: true },
+        { pubkey: pk(mint), isSigner: true, isWritable: true },
+        { pubkey: curve, isSigner: false, isWritable: true },
+        { pubkey: curveAta(mint)[0], isSigner: false, isWritable: true },
+        { pubkey: curvePumpAuthority(mint)[0], isSigner: false, isWritable: false },
+        { pubkey: pk(protocolFeeRecipient), isSigner: false, isWritable: false },
+        { pubkey: pk(creatorFeeRecipient), isSigner: false, isWritable: false },
+        { pubkey: token, isSigner: false, isWritable: false },
+        { pubkey: system, isSigner: false, isWritable: false },
+        { pubkey: ataProgram, isSigner: false, isWritable: false },
+        { pubkey: rent, isSigner: false, isWritable: false },
+        { pubkey: metadata, isSigner: false, isWritable: true },
+        { pubkey: metaplex, isSigner: false, isWritable: false },
+      ],
+      data: Buf.concat([
+        buf([5]),
+        u16le(fee),
+        curveString(name, 32, 'name'),
+        curveString(symbol, 10, 'symbol'),
+        curveString(uri, 200, 'uri'),
+      ]),
+    });
+  };
+
+  const curveBuyIx = ({
+    buyer, mint, buyerAta, protocolFeeRecipient, creatorFeeRecipient,
+    amountIn, minTokensOut = 0n,
+  }) => new TransactionInstruction({
+    programId: curveProgram,
+    keys: [
+      { pubkey: pk(buyer), isSigner: true, isWritable: true },
+      { pubkey: curvePda(mint)[0], isSigner: false, isWritable: true },
+      { pubkey: pk(mint), isSigner: false, isWritable: false },
+      { pubkey: curveAta(mint)[0], isSigner: false, isWritable: true },
+      { pubkey: pk(buyerAta), isSigner: false, isWritable: true },
+      { pubkey: curveSolVault(mint)[0], isSigner: false, isWritable: true },
+      { pubkey: curvePumpAuthority(mint)[0], isSigner: false, isWritable: false },
+      { pubkey: pk(protocolFeeRecipient), isSigner: false, isWritable: true },
+      { pubkey: pk(creatorFeeRecipient), isSigner: false, isWritable: true },
+      { pubkey: token, isSigner: false, isWritable: false },
+      { pubkey: system, isSigner: false, isWritable: false },
+    ],
+    data: Buf.concat([buf([1]), u64le(amountIn), u64le(minTokensOut)]),
+  });
+
+  const curveSellIx = ({
+    seller, mint, sellerAta, protocolFeeRecipient, creatorFeeRecipient,
+    amountIn, minSolOut = 0n,
+  }) => new TransactionInstruction({
+    programId: curveProgram,
+    keys: [
+      { pubkey: pk(seller), isSigner: true, isWritable: true },
+      { pubkey: curvePda(mint)[0], isSigner: false, isWritable: true },
+      { pubkey: pk(mint), isSigner: false, isWritable: false },
+      { pubkey: pk(sellerAta), isSigner: false, isWritable: true },
+      { pubkey: curveAta(mint)[0], isSigner: false, isWritable: true },
+      { pubkey: curveSolVault(mint)[0], isSigner: false, isWritable: true },
+      { pubkey: pk(protocolFeeRecipient), isSigner: false, isWritable: true },
+      { pubkey: pk(creatorFeeRecipient), isSigner: false, isWritable: true },
+      { pubkey: token, isSigner: false, isWritable: false },
+      { pubkey: system, isSigner: false, isWritable: false },
+    ],
+    data: Buf.concat([buf([2]), u64le(amountIn), u64le(minSolOut)]),
+  });
+
+  /** Graduate into the vault (no withdraw instruction anywhere in the program). */
+  const curveGraduateIx = ({ payer, mint }) => new TransactionInstruction({
+    programId: curveProgram,
+    keys: [
+      { pubkey: pk(payer), isSigner: true, isWritable: true },
+      { pubkey: curvePda(mint)[0], isSigner: false, isWritable: true },
+      { pubkey: pk(mint), isSigner: false, isWritable: false },
+      { pubkey: curveAta(mint)[0], isSigner: false, isWritable: true },
+      { pubkey: curveSolVault(mint)[0], isSigner: false, isWritable: true },
+      { pubkey: curvePumpAuthority(mint)[0], isSigner: false, isWritable: false },
+      { pubkey: curveGraduateVault(mint)[0], isSigner: false, isWritable: true },
+      { pubkey: curveGraduateVaultAta(mint)[0], isSigner: false, isWritable: true },
+      { pubkey: token, isSigner: false, isWritable: false },
+      { pubkey: system, isSigner: false, isWritable: false },
+      { pubkey: ataProgram, isSigner: false, isWritable: false },
+    ],
+    data: buf([3]),
+  });
+
+  /**
+   * Graduate into a permissionless PumpSwap pool. The LP lands in the
+   * pump-authority's Token-2022 ATA and no instruction can move it.
+   * Needs a compute-unit limit (~1.2M) in the same transaction.
+   */
+  const curveGraduatePumpSwapIx = ({ payer, mint, index = 0 }) => {
+    const [curve] = curvePda(mint);
+    const [pumpAuthority] = curvePumpAuthority(mint);
+    const [pool] = ammPoolPda(mint, index);
+    const [lpMint] = ammLpMintPda(pool);
+    return new TransactionInstruction({
+      programId: curveProgram,
+      keys: [
+        { pubkey: pk(payer), isSigner: true, isWritable: true },
+        { pubkey: curve, isSigner: false, isWritable: true },
+        { pubkey: pk(mint), isSigner: false, isWritable: false },
+        { pubkey: curveAta(mint)[0], isSigner: false, isWritable: true },
+        { pubkey: curveSolVault(mint)[0], isSigner: false, isWritable: true },
+        { pubkey: pumpAuthority, isSigner: false, isWritable: true },
+        { pubkey: curveWsolAta(mint)[0], isSigner: false, isWritable: true },
+        { pubkey: pool, isSigner: false, isWritable: true },
+        { pubkey: ammGlobalConfig, isSigner: false, isWritable: false },
+        { pubkey: lpMint, isSigner: false, isWritable: true },
+        { pubkey: curveLpAta(mint, lpMint)[0], isSigner: false, isWritable: true },
+        { pubkey: ammPoolBaseAta(pool, mint)[0], isSigner: false, isWritable: true },
+        { pubkey: ammPoolQuoteAta(pool)[0], isSigner: false, isWritable: true },
+        { pubkey: ammEventAuthority, isSigner: false, isWritable: false },
+        { pubkey: amm, isSigner: false, isWritable: false },
+        { pubkey: wsol, isSigner: false, isWritable: false },
+        { pubkey: token, isSigner: false, isWritable: false },
+        { pubkey: token2022, isSigner: false, isWritable: false },
+        { pubkey: system, isSigner: false, isWritable: false },
+        { pubkey: ataProgram, isSigner: false, isWritable: false },
+      ],
+      data: Buf.concat([buf([4]), u16le(index)]),
+    });
+  };
+
+  /** The 232-byte curve account (layout in solana/curve-program/src/state.rs). */
+  const decodeCurve = (data) => {
+    if (!data || data.length !== 232) throw new Error(`curve account is ${data ? data.length : 0} bytes`);
+    const key = (at) => new PublicKey(data.subarray(at, at + 32)).toBase58();
+    return {
+      version: data[0],
+      bump: data[1],
+      creator: key(2),
+      mint: key(34),
+      curveAta: key(66),
+      protocolFeeRecipient: key(98),
+      creatorFeeRecipient: key(130),
+      virtualSol: data.readBigUInt64LE(162),
+      virtualToken: data.readBigUInt64LE(170),
+      realSol: data.readBigUInt64LE(178),
+      realToken: data.readBigUInt64LE(186),
+      protocolFeeBps: data.readUInt16LE(194),
+      creatorFeeBps: data.readUInt16LE(196),
+      graduated: data[198] === 1,
+      completed: data[199] === 1,
+      pool: key(200),
+    };
+  };
+
+  const readCurve = async (connection, address) => {
+    const info = await connection.getAccountInfo(pk(address));
+    if (!info) return null;
+    if (!info.owner.equals(curveProgram)) throw new Error('That account is not an OAKEN curve.');
+    return { address: pk(address).toBase58(), ...decodeCurve(info.data) };
+  };
+
+  /**
+   * The Solana program is built and tested but not deployed. The page uses this
+   * to say so instead of rendering a "connect wallet" button that cannot work.
+   */
+  const curveProgramLive = async (connection) => {
+    const info = await connection.getAccountInfo(curveProgram);
+    return Boolean(info && info.executable);
+  };
+
   return {
     web3,
     Buffer: Buf,
@@ -713,6 +943,12 @@ export function makeSolana(web3) {
     pumpBuyExactQuoteV3Ix,
     // Jupiter Lock
     jup, jupEscrowPda, jupEventAuthorityPda, jupCreateLockIx, jupClaimIx, jupCreateLockV2Ix, jupClaimV2Ix,
+    // OAKEN Curve
+    curveProgram, amm, curvePda, curveSolVault, curvePumpAuthority, curveAta,
+    curveMetadataPda, curveGraduateVault, curveGraduateVaultAta,
+    createCurveWithMetadataIx, curveBuyIx, curveSellIx, curveGraduateIx, curveGraduatePumpSwapIx,
+    ammGlobalConfig, ammEventAuthority, ammPoolPda, ammLpMintPda, curveWsolAta, curveLpAta,
+    ammPoolBaseAta, ammPoolQuoteAta, decodeCurve, readCurve, curveProgramLive,
     // reads
     decodeLock, readLock, readNextId, readMint, readMetadata, claimable,
     decodeJupEscrow,

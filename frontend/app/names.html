@@ -332,6 +332,7 @@
   .nsns-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
   #sns-result .panel .head { flex-wrap: wrap; row-gap: 8px; }
   #sns-result .panel .head h3 { flex: 1 1 100%; }
+  #ns-sns .nprice tr { cursor: default; }
   .nrec-edit { display: grid; grid-template-columns: 160px 1fr auto; gap: 10px; align-items: center; }
   @media (max-width: 820px) { .nsns-cols { grid-template-columns: 1fr !important; } }
   @media (max-width: 760px) {
@@ -483,7 +484,7 @@
         <div class="nplate-foot">
           <div class="nstat" id="sns-stat">
             <div><div class="v" id="sns-total">—</div><div class="k">Names in the registry</div></div>
-            <div><div class="v" id="sns-new24">—</div><div class="k">New in the last 24h</div></div>
+            <div><div class="v" id="sns-new24">—</div><div class="k">New in 24h (registrar)</div></div>
             <div><div class="v" id="sns-pricefrom">$20</div><div class="k">5+ characters, one-off</div></div>
           </div>
           <div class="nplate-note">
@@ -496,7 +497,7 @@
       </div>
       <div class="hint nplate-hint" id="sns-hint">One label: lowercase letters, numbers, hyphens, underscores and emoji.
         Checking is free and needs no wallet. Registration is one transaction, signed by your Solana wallet; a name can
-        be taken between your search and your signature. <b>`.sol` is the legacy suffix</b> — SNS now issues
+        be taken between your search and your signature. <b><span class="mono">.sol</span> is the legacy suffix</b> — SNS now issues
         <span class="mono">.sns</span> names, and this page sells those. Names resolve in Phantom, Solflare, Backpack
         and any app that speaks SNS.</div>
 

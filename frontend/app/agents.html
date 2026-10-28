@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Reports · OAKEN</title>
+<meta name="description" content="A free beta agent that reads a Robinhood Chain token, its OAKEN locks, its Pons launch state, an OAKEN Curve launch, or the OAKEN bond — and shows the calls it made.">
+<meta property="og:title" content="Agent Reports · OAKEN">
+<meta property="og:description" content="A reading aid, not an audit. Read a Robinhood Chain token, its OAKEN locks, its Pons launch state, an OAKEN Curve launch, or the OAKEN bond — with every number pinned to a block.">
+<meta property="og:image" content="https://oaken.one/logo512.png">
+<meta property="og:type" content="website">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/app/oaken.css">
+<style>
+  #kind-tabs { flex-wrap: wrap; }
+  @media (max-width: 720px) {
+    #report .body, #recent-panel .body { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    #report table.list { min-width: 640px; }
+    #form-token .controls input.i { max-width: 100%; }
+    /* Recent reports become cards on phones: no sideways scraping. */
+    #recent { min-width: 0; }
+    #recent thead { display: none; }
+    #recent, #recent tbody { display: block; }
+    #recent tr { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+    #recent td { display: block; padding: 0; border: 0; }
+    #recent td:nth-child(1) { grid-column: 1; grid-row: 1; }
+    #recent td:nth-child(2) { grid-column: 1; grid-row: 2; font-size: 13px; }
+    #recent td:nth-child(3) { grid-column: 2; grid-row: 1; text-align: right; font-size: 12.5px; color: var(--muted); }
+    #recent td:nth-child(4) { grid-column: 2; grid-row: 2; text-align: right; }
+    #recent td:nth-child(5) { grid-column: 1 / -1; grid-row: 3; font-size: 12.5px; }
+    #recent tr:last-child { border-bottom: 0; }
+  }
+</style>
+<!-- oaken-boot-gate -->
+<script>(function(){try{var q=new URLSearchParams(location.search);if(q.get('boot')==='0')return;var force=q.get('boot')==='1';if(!force&&sessionStorage.getItem('oaken.boot')==='1')return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('boot-run');sessionStorage.setItem('oaken.boot','1');setTimeout(function(){if(!document.getElementById('boot')){document.documentElement.classList.remove('boot-run');document.documentElement.dataset.bootReason='gate-fallback';}},8000);}catch(e){}})();</script>
+<!-- oaken-boot-watch：页面脚本没跑起来时，别让用户对着静态占位干等 -->
+<script>(function(){try{
+  var err='';
+  window.addEventListener('error',function(e){if(!err)err=String((e&&(e.message||(e.error&&e.error.message)))||'script error');},true);
+  window.addEventListener('unhandledrejection',function(e){if(!err)err=String((e&&e.reason&&(e.reason.message||e.reason))||'promise rejection');});
+  setTimeout(function(){
+    var h=document.documentElement;
+    if(h.dataset.oakenBoot==='1')return;
+    h.dataset.bootStalled='1';
+    var m=document.querySelector('main')||document.body; if(!m)return;
+    var d=document.createElement('div');
+    d.setAttribute('role','alert');
+    d.style.cssText='margin:18px auto;max-width:64ch;padding:14px 16px;border:1px solid rgba(224,120,95,.55);'
+      +'background:rgba(224,120,95,.08);border-radius:6px;color:#f3eadb;font:14px/1.6 system-ui,Segoe UI,sans-serif';
+    var head='<b style="color:#e0785f">This page did not finish starting.</b> Whatever it shows below is a '
+      + 'placeholder, not data &mdash; the script that fills it never ran. ';
+    var tip='Reload with <b>Ctrl+F5</b> (hard refresh). If it stays like this, send us the line below &mdash; '
+      + 'it is the whole diagnosis (and the footer build number helps us too).';
+    var line=err?('<div style="margin-top:8px;font:12px/1.5 ui-monospace,Consolas,monospace;opacity:.85">'
+      +err.slice(0,160).replace(/[<>&]/g,'')+'</div>'):'';
+    d.innerHTML=head+tip+line;
+    m.insertBefore(d,m.firstChild);
+  },7000);
+}catch(e){}})();</script>
+</head>
+<body>
+<div id="shell"></div>
+
+<section class="pagehead">
+  <div class="ph-bg">
+    <video data-video autoplay muted loop playsinline preload="metadata" poster="/app/media/rings.webp"><source src="/app/media/rings-head.mp4" type="video/mp4"></video>
+  </div>
+  <div class="ph-scrim"></div>
+  <div class="wrap ph-in">
+    <div class="eyebrow reveal">Agent Reports</div>
+    <h1 class="reveal">Read the chain. Show the calls.</h1>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="band" style="padding-top:40px">
+    <p class="muted" style="max-width:68ch">A reading aid, not an audit. Pick a report and an agent reads Robinhood Chain at
+      one block — the token, every OAKEN lock in v1–v4, the Pons launch state, an OAKEN Curve v5 launch, or the OAKEN
+      bond vault — then shows every number it used. Checks that cannot be made are left unknown rather than guessed.</p>
+
+    <div class="panel reveal" style="margin-top:28px">
+      <div class="head"><h3>Run a report</h3><span class="pill ok">Web beta · free</span></div>
+      <div class="body">
+        <div class="tabs" id="kind-tabs" role="tablist" aria-label="Report type">
+          <a href="#" data-kind="token" class="on" role="tab" aria-selected="true">Token + locks</a>
+          <a href="#" data-kind="prelaunch" role="tab" aria-selected="false">Pre-launch review</a>
+          <a href="#" data-kind="curve" role="tab" aria-selected="false">Curve launch</a>
+          <a href="#" data-kind="bond" role="tab" aria-selected="false">Bond health</a>
+        </div>
+
+        <div id="form-token" role="tabpanel">
+          <label class="mono" for="token" style="font-size:12px;letter-spacing:.08em;color:var(--muted)">TOKEN ADDRESS</label>
+          <div class="controls" style="margin-top:8px">
+            <input class="i" id="token" value="0x02b0de4c4d4a7416a3465126730df71a026d7bbb" placeholder="0x… token on Robinhood Chain" autocomplete="off" spellcheck="false">
+            <button class="btn btn-p" id="run-token" type="button">Run token report</button>
+          </div>
+          <div class="hint">Robinhood Chain (4663) only. The default address is OAKEN's own token; replace it with any token you want to read.</div>
+        </div>
+
+        <div id="form-prelaunch" role="tabpanel" style="display:none">
+          <label class="mono" for="ptoken" style="font-size:12px;letter-spacing:.08em;color:var(--muted)">TOKEN ADDRESS</label>
+          <div class="controls" style="margin-top:8px">
+            <input class="i" id="ptoken" value="0x02b0de4c4d4a7416a3465126730df71a026d7bbb" placeholder="0x… token on Robinhood Chain" autocomplete="off" spellcheck="false">
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:14px">
+            <label class="hint" style="display:flex;flex-direction:column;gap:6px">Tokens to lock
+              <input class="i" id="pamount" type="number" min="0" step="any" placeholder="5000000">
+            </label>
+            <label class="hint" style="display:flex;flex-direction:column;gap:6px">Lock days
+              <input class="i" id="pdays" type="number" min="0" max="3650" step="1" value="180">
+            </label>
+            <label class="hint" style="display:flex;flex-direction:column;gap:6px">Vesting steps
+              <input class="i" id="psteps" type="number" min="0" max="24" step="1" value="0">
+            </label>
+            <label class="hint" style="display:flex;flex-direction:column;gap:6px">Initial unlock %
+              <input class="i" id="pinitial" type="number" min="0" max="100" step="any" value="0">
+            </label>
+            <label class="hint" style="display:flex;align-items:center;gap:8px;padding-top:22px;cursor:pointer">
+              <input type="checkbox" id="prevocable"> Revocable
+            </label>
+          </div>
+          <div class="hint" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+            <span class="muted">Presets from the lock page:</span>
+            <button type="button" class="btn btn-s" data-preset="10,30,5" style="padding:5px 10px;font-size:12px">10% TGE + 5% / 30d</button>
+            <button type="button" class="btn btn-s" data-preset="20,30,4" style="padding:5px 10px;font-size:12px">20% TGE + 4% / 30d</button>
+            <button type="button" class="btn btn-s" data-preset="0,90,25" style="padding:5px 10px;font-size:12px">25% / quarter (1y)</button>
+          </div>
+          <button class="btn btn-p" id="run-prelaunch" type="button" style="margin-top:16px">Run pre-launch review</button>
+          <div class="hint">The token facts are read from the chain; the lock plan is what you type. OAKEN's heuristics are labelled as heuristics, not contract rules.</div>
+        </div>
+
+        <div id="form-curve" role="tabpanel" style="display:none">
+          <label class="mono" for="curveaddr" style="font-size:12px;letter-spacing:.08em;color:var(--muted)">CURVE ADDRESS</label>
+          <div class="controls" style="margin-top:8px">
+            <input class="i" id="curveaddr" placeholder="0x… OAKEN curve on Robinhood Chain" autocomplete="off" spellcheck="false">
+            <button class="btn btn-p" id="run-curve" type="button">Run curve report</button>
+          </div>
+          <div class="hint">Pass the curve address from <span class="mono">/curve/robinhood/&lt;address&gt;</span>. The report reads <span class="mono">token()</span> from it and refuses an address that is not an OAKEN curve. The v5 factory has no registry getter, so a token address alone cannot be turned into its curve.</div>
+        </div>
+
+        <div id="form-bond" role="tabpanel" style="display:none">
+          <label class="mono" for="bsymbol" style="font-size:12px;letter-spacing:.08em;color:var(--muted)">BOND</label>
+          <div class="controls" style="margin-top:8px">
+            <select class="i" id="bsymbol" aria-label="Bond">
+              <option value="OAKEN">OAKEN Bond (aOAKEN)</option>
+            </select>
+            <button class="btn btn-p" id="run-bond" type="button">Run bond health report</button>
+          </div>
+          <div class="hint">Bonds are not locks: they have a 2-of-3 Safe, a NAV keeper and an oracle. This report keeps that boundary explicit.</div>
+        </div>
+
+        <div class="hint" id="status" role="status" aria-live="polite" style="margin-top:16px">Pick a report above. Nothing is signed and no wallet is needed in this beta.</div>
+      </div>
+    </div>
+
+    <div id="report"></div>
+
+    <div class="panel reveal" style="margin-top:28px" id="recent-panel">
+      <div class="head"><h3>Recent reports</h3><span class="pill" id="recent-count">—</span></div>
+      <div class="body" style="padding:0">
+        <table class="list" id="recent">
+          <thead><tr><th>Report</th><th>Subject</th><th>Read at</th><th>Flags</th><th>Notes</th></tr></thead>
+          <tbody><tr><td colspan="5" style="padding:18px 22px"><span class="muted">Reading the report index…</span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel reveal" style="margin-top:28px">
+      <div class="head"><h3>For agents</h3><span class="pill">HTTP / JSON</span></div>
+      <div class="body">
+        <p class="muted" style="max-width:72ch">The web page is free during the beta. Agents calling the API directly pay per report in USDG over
+          x402 on Robinhood Chain — 0.02 for a token, curve or bond report, 0.05 for a pre-launch review. The wire
+          contract is documented in <a href="/agents.md">agents.md</a>.</p>
+        <pre class="mono" style="margin:14px 0 0;padding:14px 16px;border:1px solid var(--line);border-radius:6px;overflow:auto;font-size:12.5px;line-height:1.6">POST /api/agents/report
+content-type: application/json
+
+{"kind":"token","token":"0x…"}
+{"kind":"prelaunch","token":"0x…","lockAmount":5000000,"lockDays":180,"steps":6,"initialUnlockPct":10,"revocable":false}
+{"kind":"curve","address":"0x…"}
+{"kind":"bond","symbol":"OAKEN"}</pre>
+        <p class="hint">Direct API base: <span class="mono">https://agents.oaken.one</span>. The free web proxy is <span class="mono">https://oaken.one/api/agents</span>.</p>
+        <p class="hint">Reports are stored and can be read back at <span class="mono">/api/agents/report/&lt;id&gt;</span> without paying again.</p>
+      </div>
+    </div>
+
+    <div class="panel reveal" style="margin-top:28px">
+      <div class="head"><h3>What this checks — and what it does not</h3></div>
+      <div class="body">
+        <p class="muted" style="max-width:72ch">The reports read runtime code, common ERC-20 selectors, the EIP-1967
+          implementation slot, OAKEN's lock adapters v1–v4, the vault schedule behind each lock, the Pons factory and curve,
+          an OAKEN Curve v5 launch (supply, sellable allocation, tracked reserves, fees and graduation state), and the
+          OAKEN bond vault, NAV oracle and staking pool. They do not read source code, holder distribution,
+          off-chain social claims, or a third-party audit. A selector in bytecode is not a live function; an empty owner
+          slot is not proof of renouncement; a curve price is not a promise of liquidity. The pre-launch plan is the one
+          input that is not on-chain, and the report says so.</p>
+        <p class="hint">No LLM writes the numbers. An optional AI narrative may rephrase the fact sheet; it is
+          dropped if it contains a number that is not already in the report, or if it gives advice. Direct API reports
+          settle per report in USDG over x402 on Robinhood Chain; this web page is free during the beta and rate-limited.
+          The report is stored so its URL stays stable.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="module" src="/app/agents.js"></script>
+</body>
+</html>

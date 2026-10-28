@@ -112,6 +112,8 @@
       anything; locks created there use the v4 vault, whose code a 2-of-3 multisig can upgrade only after a
       48-hour delay. Looking for token sales instead? <a href="/launchpads">That listing is here</a>.</p>
 
+    <p class="hint" style="max-width:66ch">Planning a lock or a bond? <a href="/agents?kind=prelaunch">Run a pre-launch review with the OAKEN agent →</a></p>
+
     <p class="muted" style="max-width:66ch;margin-top:8px"><b>On Solana?</b>
       <a href="/launch/solana">Launch an SPL token through OAKEN Factory or pump.fun →</a></p>
 
@@ -132,6 +134,10 @@
             <b>our own factory</b>: one transaction creates the token, with no external service in the path. Locking
             is a separate page. The other routes are there when you already want that house's market.</div>
           <div class="hint" id="routehint"></div>
+          <div class="hint" id="curvelink" style="margin-top:12px;display:none">
+            <b style="color:var(--gold)">OAKEN Curve (v5).</b> Fixed supply, zero creator allocation, and a
+            liquidity pool created and locked at graduation. <a href="/launch/curve">Open the curve launcher →</a>
+          </div>
           <!-- 报告里的"路由对比表"：一眼看清谁在跑、创建时能不能锁、谁能改。 -->
           <details class="routetable" open>
             <summary>Compare the routes at a glance</summary>
@@ -469,7 +475,7 @@
 <script type="module">
   import { shell, wallet, chains, currentChain, launcher, launchedFromReceipt, fmtAmount, short, toast,
     explorerHref, nativeBalance, provider, humanizeTxError, txNotice,
-    curveSite, curveFactory, curveLaunchReadiness, curveLaunchInfo, curveTokenFromReceipt, ponsLaunchParams,
+    curveSite, curveFactory, curveLaunchReadiness, curveLaunchInfo, curveTokenFromReceipt, ponsLaunchParams, oakenCurveSite,
     curveLaunchAndBuy,
     CLANKER, clankerFactory, clankerDeployParams, clankerTokenFromReceipt, recordLaunch, copyBtn,
     flap, flapParams, flapTaxParams, flapTokenFromReceipt, mineFlapSalt, FLAP,
@@ -582,6 +588,8 @@
       if (rb) rb.onclick = () => { $('chainseg').innerHTML = '<button type="button" class="on">Loading…</button>'; boot(); };
       return;
     }
+    const curveLink = document.getElementById('curvelink');
+    if (curveLink) curveLink.style.display = live.some((c) => !!oakenCurveSite(c)) ? '' : 'none';
     state.chain = await currentChain();
     chainNow(state.chain).then((t) => { state.nowSec = t; }).catch(() => { /* 读不到就退回设备时钟 */ });
     const seg = $('chainseg');

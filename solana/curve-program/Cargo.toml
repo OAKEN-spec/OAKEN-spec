@@ -1,0 +1,28 @@
+[package]
+name = "oaken-curve"
+version = "0.1.0"
+edition = "2021"
+description = "OAKEN Curve — pump.fun-model bonding curve on Solana"
+
+# Same rule as the lock program: the deployed program depends on solana-program
+# only. SPL Token / ATA / System instruction bytes are written out by hand in
+# src/spl.rs, with their layout in the comments and tests pinning them.
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "oaken_curve"
+
+[dependencies]
+solana-program = "2"
+
+[dev-dependencies]
+# Integration test: runs the program in the real runtime with the actual
+# PumpSwap program cloned from mainnet (tests/fixtures/pump_amm.so). Run with
+# `cargo-test-sbf`, which builds oaken_curve.so and sets BPF_OUT_DIR.
+solana-program-test = "2.3"
+solana-sdk = "2.3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[features]
+default = []
+no-entrypoint = []
+
