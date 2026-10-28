@@ -3,13 +3,13 @@
 The pump.fun-shaped launch on Solana: one fixed 1B supply, minted to a bonding
 curve, with no creator allocation.
 
-## Status (2026-10-25)
+## Status (2026-10-28)
 
 | Piece | State |
 |---|---|
 | SBF build (deployable, SBPF v3) | ✅ `target/deploy/oaken_curve.so` — **106,184 bytes**, sha256 `cc9ab3c8541797f80f4f7f90f305df7124994e6f31265f42f9e1ccc45928eb08` |
 | Host unit tests | ✅ 26/26 (`cargo test`) |
-| Client builders | ✅ 9/9 (`node --test test/curve-builders.test.mjs`) |
+| Client builders | ✅ 12/12 (`cd .. && node --test test/curve-builders.test.mjs`) + 5 site-parity tests (`test/curve-site-builders.test.mjs`) |
 | In-process integration tests | ✅ **2/2**: real runtime + **the real PumpSwap ELF** and **the real Metaplex Token Metadata ELF**; `cargo-test-sbf --arch v2` (the 2.3 test runtime supports SBPF v2; the deployable artifact is v3). |
 | Local validator E2E | ⛔ blocked on this Windows machine — `solana-test-validator` needs symlink privileges (error 1314). Two scripts are ready for Linux/CI: `scripts/curve-e2e.mjs` (vault) and `scripts/curve-pumpswap-e2e.mjs` (real PumpSwap, cloned from mainnet). |
 | PumpSwap CPI | ✅ **implemented and exercised in-process.** `GraduatePumpSwap` creates a permissionless PumpSwap pool and leaves the LP locked in a data-less authority's Token-2022 ATA. |
@@ -59,7 +59,7 @@ authority, so those owners must match.
 | 4 | GraduatePumpSwap { index } | payer, curve, mint, curve ATA, SOL vault, pump authority, curve wSOL ATA, pool, PumpSwap global config, LP mint, LP ATA, pool base ATA, pool quote ATA, event authority, PumpSwap program, wSOL mint, token, token-2022, system, ATA |
 
 The client builders in `client.mjs` are the same wire format and account order;
-`test/curve-builders.test.mjs` pins them.
+`test/curve-builders.test.mjs` pins them; `test/curve-site-builders.test.mjs` compares the browser builders in `frontend/app/solana-build.js` with this client byte for byte.
 
 ## Metadata
 
